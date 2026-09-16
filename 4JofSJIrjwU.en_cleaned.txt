@@ -1,0 +1,481 @@
+This video will give you a full and complete guide to fine-tuning LLMs on your own hardware. 
+What I'm going to show you how to do here is pick the correct LLM, fine-tune it based on your own data, and then use it and compare it to the existing base models so you can see if it's actually working. 
+I'm going to give you a full guide. 
+I'm going to explain everything. 
+I'm going to walk through a full tutorial, so by the end of this video, you understand everything and you can fine-tune your own models. 
+With that said, let's dive in. 
+Okay. 
+So, first thing, let's just talk a little bit about fine-tuning in general, then we'll dive into the tool that we're going to use, and we'll start going through the tutorial. 
+Now, the basic idea behind fine-tuning is that rather than us building our own LLM completely from scratch, which is super complicated and it's going to require a massive amount of hardware, we take an existing LLM, one that's already pretty good, and we just add our own data to it. 
+We just take a bunch of examples, and we essentially train that on top of the base LLM. 
+So, this would allow us to have an example like what we see on screen, where we have an LLM that's already good at language, can already form sentences. 
+So, for example, maybe it replies like this, and then we train it based on some of our own examples, and it will kind of populate here in a second, and we get a custom version that's fit to our specific domain. 
+So, for example, a Tim llama model, right, that talks like me. 
+That's something that's very easy to make, which you're going to see. 
+Now, in order to do this, we're going to use a tool called Unsloth Studio. 
+Now, Unsloth Studio is a new release or a new kind of tool from Unsloth themselves, which I believe is built and maintained by Nvidia engineers. 
+Now, the idea is that Unsloth Studio is a graphical user interface on top of the pre-existing and very popular tool called Unsloth. 
+Unsloth was typically command-line based, meaning you need to write a bunch of commands in the terminal, a little bit complicated to use. 
+They've now built a really nice graphical user interface, which they're calling the studio, which allows you to do everything just from a graphical user interface. 
+So, we get a full web user interface for fine-tuning. 
+This is free, open source, you don't need an account, and you don't even have to be connected to the internet. 
+It runs completely on your machine, and then you can download and fine-tune pretty much any open source model that you want, and it runs extremely fast because it's using some pretty optimized software in the background, which can then utilize your GPU, CPU, RAM, memory, all of the stuff that you have on your machine much faster than if you were to try to train it yourself. 
+Okay. 
+Let's keep going. 
+In this UI, just so you can understand, we can fine-tune the model. 
+We can also build the data sets, which is arguably even more important, and then we can ship and package up and export the model if we want to share it with other people. 
+All right, so let's quickly just talk about kind of the mechanics of fine-tuning, the methods that we can use, and then I want to get into the demo. 
+Now, like I said, the basic idea with fine-tuning is that we keep a base model. 
+We add a bunch of our own examples to it. 
+These are going to be in kind of a data set that we create. 
+We then train what's called a LoRA adapter layer that's kind of on top of, or I don't know, outside of or next to the base model, and that combined gives us our specialized model. 
+So, if we have a look at a quick diagram here, you can see that we actually don't touch the base model at all. 
+So, let's say we pick a Llama 8 billion parameter model. 
+We don't touch the base weights or the base model itself. 
+What we do instead is we train what's called this LoRA adapter layer. 
+You don't need to worry too much about exactly what that means. 
+It's less than 1% of the size of the actual base model itself, and what will happen is we'll kind of add these layers on top of the base model, and it will allow us to kind of steer or fine-tune the output from this model. 
+So, I'm giving you a really, really high-level explanation, but we're not touching the base itself. 
+We're just training these kind of additional layers on top, and these additional layers help to fine-tune or adjust or tweak or push the model's output in the right direction so it gets closer to our examples and the output that we're looking for. 
+Okay? So, just understand that and by doing this it allows us to really optimize the training process and to keep the model size very small without having to train a bunch of different weights. 
+Okay. 
+Let's keep going and quickly talk about QLoRA. 
+Now, when you do this fine-tuning, there's many different methods you can use. 
+You can use LoRA adapters, you can use QLoRA adapters, and the one that we're going to use and which is recommend is QLoRA. 
+Now, when you see QLoRA, this is effectively the exact same thing as what I just explained. 
+The only difference is we're using a compressed version of the base model. 
+So, by default, the models are in a format where we have 16-bit weights. 
+That means we're using 16 bits of information for every single weight, which makes these models quite large. 
+So, for example, our base model might be 16 GB. 
+Rather than keeping the full 16 GB model, which is going to take up a ton of room in our video memory, we can quantize it and compress it down to a 4-bit format. 
+This will then shrink it drastically so you can see it goes from about 16 GB down to 5, 6, 7 GB, and then we can fit all of that in our memory plus the training that we do for these adapter layers so that the overall size that we need or the overall RAM that we need is much smaller than if we were to keep the original model. 
+Now, when we do this, the precision will slightly decrease from the original model. 
+However, we get way more space and we'll end up getting a better output actually because we have more room to be able to train the adapter layers. 
+I'm not going to get into the mechanics too much. 
+I don't want to teach you all of the, you know, advanced computer science and all that's going into this and the mathematics, but the basic idea is that QLoRA, exact same thing as LoRA, just a compressed version, slightly less precision, but overall for almost all of us we need to use this because we don't have 100 GPUs sitting in our computer and an unlimited amount of space to train these models. 
+Okay, so hopefully that makes sense and I want to keep going and talk about fine-tuning versus RAG, which is a common misconception. 
+But first, if you're interested in AI, you're going to want to hear about this. 
+Quick heads-up. 
+Everything you're watching right now was generated with HeyGen, my sponsor for this video. 
+Now, this isn't me on camera, it's my digital twin avatar, and this whole ad was made from a script. 
+Now, here's why that matters. 
+Normally, I write the code, then burn 3 hours filming, flubbing lines, and relighting the entire room just to explain it. 
+And if I get one line wrong, I'm shooting the whole thing again. 
+Now, with HeyGen, I recorded one 15-second clip one time. 
+That built my digital twin. 
+Now, I just paste the script, and this AI video generator makes the videos. 
+Same face, same voice, no camera, no reshoots. 
+And it's not stiff or robotic. 
+It's fast, the lipstick is real, and the gestures actually look like me. 
+If I want to change a line, I just change the text, not the whole take. 
+Now, here's the part that got me, though. 
+It'll translate this exact video into 175-plus languages in my own voice with the lip sync match. 
+So, the same explainer can reach people who normally never watch it. 
+And if this looks filmed to you, that's the point. 
+You've been watching the demo the entire time. 
+No studio, no crew, just one script. 
+Try HeyGen for free with the link in the description, and go make a video without ever getting on camera. 
+Okay, so let's dive into fine-tuning versus rag quick, and I promise we're almost at the demo. 
+Now, a lot of people believe that fine-tuning cannot teach an LLM new information. 
+They think that rag is always the way to go, and that you need rag for something like domain expertise. 
+Now, this is actually not the case, it's a common misconception, and the difference between rag and fine-tuning is that rag will allow you to retrieve real, up-to-date data and feed that into the prompt for a model. 
+So, what you're doing is effectively injecting facts or information or fresh data into the prompt so the model can reason based on that. 
+This is a different approach from fine-tuning. 
+Fine-tuning actually adjust the weights itself, right? By adding these lower adapter layers, so the model itself will reply differently without you needing to do anything to the prompt. 
+Okay, so let's quickly talk about the hardware requirements here, which are important to understand. 
+Now, technically, no matter what hardware you have, as long as you have a computer, you are able to follow along here. 
+However, if you're on Windows, it's going to be best if you have a moderated Nvidia GPU, ideally something with 12 GB of VRAM or more. 
+And if you're on Mac, you have a relatively modern M-series MacBook with as much RAM as you can possibly get. 
+If you have, for example, 24, 32, 64 GB of RAM, and we're talking M3, M4, M5, you know, Pro, Max, whatever, that's going to be pretty good performance for what we're about to do. 
+That said, no matter what you have, feel free to play along. 
+It's just the speeds you're going to get will be probably lower than what you see me getting here. 
+And the important thing is that if you're on Windows, you want to look at how much video memory you have on your GPU. 
+And if you're on Mac, you want to look at how much unified memory you have, because that's going to dictate the size of the models that you can fine-tune. 
+Now, for some reason you have really low-end hardware, you can actually use a free Google Colab notebook that comes from Unsloth. 
+I think they have it in their documentation. 
+I believe there's a Colab notebook that they link to somewhere inside of here, and you can train it in the cloud using a free GPU that comes from Google. 
+I'm not going to go through that process, but for you guys, you can do that, and it's kind of a similar flow to what I'm going to do here. 
+Okay, so with that said, let's install Unsloth Studio, and let's set everything up, and hopefully you have a basis of what fine-tuning actually is. 
+So, to set this up depends on the operating system that you're on. 
+What I'm going to do is just go here to the documentation. 
+We're going to go to get started. 
+And sorry, I should have to search through and find it. 
+We're going to find the installation commands. 
+Now, what we're going to do here is just open up a terminal, so let me put one on the right-hand side of my screen. 
+If you're on Mac or Windows, it'll will a different command. 
+So, on Mac or Linux, it's going to be this command right here. 
+Again, I'll link this in the description, but you can find it right from the main page if you scroll down here. 
+And if you're on Windows, it's going to be this one here. 
+So, what I'm going to do is just paste the command, go ahead and press on enter, and it should start setting everything up for you. 
+This will take a few minutes to install, so be patient. 
+And once it's done, I'll be right back. 
+Okay, so once the install is finished, it should prompt you to start Unsloth Studio. 
+You can start it with the command that it shows you right here, or you can just type yes, and it will automatically start it. 
+So, I'm going to go Y, and it will start. 
+If that doesn't work, just copy the launch command right here and run it in your terminal. 
+So, now it should be running, and what you can do is you can go to localhost port 8888. 
+And if you do that, you should be prompted in your browser to a uh Unsloth Studio UI. 
+Now, in my case, it's still loading up. 
+You can see it's still running here and enabling everything, so it's going to take a second, but we'll wait for it to boot up, and you can see that it's now here. 
+Now, you need to have this terminal window running in the background in order for this to work. 
+So, you can just minimize this, but make sure you don't exit out of the terminal, otherwise it will shut down the studio. 
+So, again, anytime you want to run this, you're going to open up the terminal, and you're just going to run this command right here, or you can just rerun the install command, and then just press yes, and it should boot it up for you. 
+Again, I'm going to minimize this, keep it running in the background, and now we're in the studio. 
+Now, from the studio, the first thing that we want to do if we want to start with fine-tuning is we need to pick a model to download that we want to fine-tune. 
+So, what you can do is go to this model selector up here at the top. 
+You also can go to hub. 
+Now, when you go here, you're going to have the ability to search through different models. 
+And if you look at the model selector, if you go to the chat interface, it will show you any models that you already have downloaded. 
+You can see that I have a bunch of them cuz I've done a lot of local AI stuff, but for most of you, probably don't have any. 
+Now, the important thing to note here is that you cannot use a GGUF model for fine-tuning. 
+You need a model that's in an MLK format or a safe tensors format. 
+So, if you see a bunch of models from like LM Studio, for example, that you have downloaded and they say GGUF, you're not going to be able to fine-tune those. 
+You need a different model format. 
+So, just keep that in mind, okay? So, what we're going to do is just go to hub, and I'm going to explain to you how you can select the model that you want to fine-tune. 
+Okay, so once we're on this hub page, we need to quickly discuss how we can actually find a model that we can fine-tune. 
+Now, I have a quick kind of guide here, so let me explain. 
+So, if you have 6 GB of VRAM or unified memory, you can probably fine-tune a model with 3 to 4 billion parameters. 
+If you have 10 GB, you can do something with 7 or 8 billion parameters, which is a really good sweet spot. 
+If you have 16 to 20 GB, you can do something with 12 to 14 billion. 
+And if you have more, then you can go up to your 27, 35, 70 billion parameter models, but those are quite large and honestly don't require fine-tuning or don't benefit from it as much. 
+In most cases, I found you can get really good performance out of 8 billion parameter models. 
+So, if you're capable of doing that, great. 
+If not, you will have to go to a smaller model. 
+And picking the models, you can consult with Claude, ChatGPT based on the specific hardware you have to find the current best ones, cuz I'm sure it will change after this video is out, that you should fine-tune. 
+Regardless, if you want a relatively safe model to fine-tune that you can do with mid-level hardware, what we're going to do is go to the hub. 
+We're going to change this to say fine-tune ready, super important. 
+And then we're going to search for Llama 3.1. 
+Now, specifically, what we're going to look for is this model right here. 
+I already have it downloaded, that's why it's not showing up. 
+Llama 3.1 8 billion instruct Unsloth BNB 4-bit. 
+And you can see that it's 6 GB in size itself when you download it. 
+This is a quantized version of the Llama 3.1 8 billion instruct model. 
+So, it's already shrunk down to a significantly smaller size, which just saves us the time from downloading it. 
+You can have it shrunk automatically, but it's It's better we download this one directly. 
+So, this is a model that most of you can follow along with. 
+Download it on your machine if you want to just use this. 
+If you want to use something else again, go crazy, search for it, but just make sure that when you search for it, you have it under fine-tune ready. 
+It needs to be fine-tunable, and then it's a size that fits on your machine. 
+So, you're looking at your VRAM or the amount of unified memory depending on your device. 
+Now, I also just have some quick info for you when you pick these models. 
+First, pick the instruct model, not the base model. 
+You can read the reasons why, but instruct is already trained to follow the directions. 
+It will give you a much better result. 
+If you can, grab the BNB 4-bit variant, which is already shrunk down and pre-quantized for the QLoRA, um, what is it, fine-tuning. 
+If they don't have it, don't worry, you can have it shrunk automatically, and then get a safe tensors version, not this GGUF format, which is designed for inference and running models already, not for fine-tuning. 
+Okay. 
+So, now that we have the model downloaded, okay, so we've got it on our device. 
+If we go to chat, we should be able to see it. 
+So, you can see I have this, you know, Unsloth BNB 4-bit version, and I can just load it up. 
+So, I just select the model, and we'll wait a second, and we can directly chat with it inside of this user interface. 
+Obviously, make sure the model works before we spend the time to actually fine-tune it, um, and I'll just wait for it to load, and we'll chat with it. 
+Okay, so it took a second, but it's loaded. 
+So, if I type with it now, and I say something like hello world, you can see that I get a response, okay? And then, you can just start using it directly from the chat interface. 
+Now, that's great, but of course, we want to fine-tune it. 
+So, to fine-tune it, you can go to this train tab here, and I'm going to show you how to do this. 
+But before we can fine-tune it, we need a dataset or some data to fine-tune it with. 
+And what I want to do is discuss what that data should actually look like so you can understand the process of fine-tuning. 
+Now, effectively, what we want in our dataset is we want to have an instruction, we want to have input, and we want to have output. 
+Okay, these are three columns that we want to have contained in whatever data set we're going to use to fine-tune. 
+Now, with these three columns, that will give the model enough information to start learning the patterns in our data and training these Laura adapter layers so that they can be specific to our to our domain, right? Or to whatever it is that we want it to do. 
+So, if you look at the right-hand side of my screen, you can see an example. 
+We have instructions and and then we have an output, okay? And the idea is that we're going to pass a bunch of examples of this to the model when we train it, so it can learn, okay, based on this input, what should the output be? But, it will be flexible and dynamic enough to be able to handle unique situations, which means we don't need tens of thousands of different examples, we just need a few hundred or a few thousand. 
+So, for example, if you have, you know, 300 to 1,000 rows, it will shift the tone and the format. 
+If you have 5,000, 10,000, 15,000 examples, you can teach a real legitimate skill to this model that it's going to be better at performing it. 
+In my case, I think I'm going to use 1,100 rows, and you will see what results we get and how drastic the behavior actually can be. 
+And the reason you see this input as optional here is that you don't need to provide an explicit input kind of example or prompt, it's enough just to provide an instruction and an output, but if you do provide an example input, you will get better results. 
+So, effectively, you just have example conversations, okay? Now, there's lots of other different types of data sets you can make, but this is the easiest to go with, and you can actually have AI generate this for you, which I'll show you in a second. 
+So, just to give you a deeper look here, I'm not going to use this exact data set, but you can see row 12, we have a policy row, right? Handle refund request, here's the input, here's the output. 
+Answer a discount question, do you have student pricing? We do, student pricing is this. 
+Troubleshoot a crash report, boom, input, output, you get the idea. 
+So, effectively, what we're doing is we're trying to teach the model this new information, so it gets baked into the weights. 
+Okay, now the question becomes, how do we generate or get this data? So, I'm going to show you the data set that I'm going to use, and then I'm going to show you how you can make it, and there's multiple different ways. 
+So, this is the data set that I'm going to use. 
+You'll notice that the instruction is always the same. 
+However, I adjust the input and the output values because this is kind of how I want it to work. 
+Now, I myself am learning Indonesian right now, and I only know a few hundred words. 
+So, I'm like a pretty basic speaker. 
+So, what I want to do is I want to train an LLM to be able to chat with me in Indonesian, but only to use words that I'm familiar with and in a format that I'm used to practicing so that I can progress without being, you know, overwhelmed. 
+So, effectively, this is going to seem confusing if you don't speak Indonesian, but we have a bunch of input, which are words that I know, and a bunch of output, which are also words that I know. 
+And the way that I generated this is that I just went to Claude, and I said, "Hey, these are all the words that I know in Indonesian," and I pasted like 300 words have in my kind of vocabulary application. 
+And I said, "Can you generate a data set that looks something like this, right, for me?" And actually, I guess how many rows do we have? We have, sorry, so we have 3,000 in this one that I can pass to Unsloth Studio. 
+And then it generated this 3,000 list JSONL data set for me that has instruction, input, output. 
+So, that's like the simplest version of making the data set. 
+You just say, "Hey, I'm training a model in Unsloth Studio. 
+Go to Claude. 
+Generate a data set for me based on XYZ, right?" can do that. 
+And in this case, it worked like super well. 
+However, Unsloth Studio itself has a way to make your own data sets using something called a recipe. 
+So, I'm going to show you an example recipe and kind of how you can create it because, to be honest, it is a little bit confusing, and do it directly inside of Unsloth using AI generation. 
+Okay, so if you go to this recipes tab, you'll be able to make a new recipe. 
+Now, when you do this, you can start from a learning recipe, or you can start from empty. 
+Now, the learning recipes for me were a little bit confusing to go through, so I made my own that I think is much more clear, and I'm going to show you how it works. 
+And then again, I promise we're going to get to the training, but I got to go through these steps so that you guys have everything you need and you're not going to be completely lost. 
+So, what you can do here if you want to follow along with me is you can make a new recipe. 
+Now, also, keep in mind, you can use an existing data set from Hugging Face if there's one that you want to use. 
+So, for example, if you go here, you can select Hugging Face, and you can scroll through and there's tons of data sets that you can use. 
+Um the issue with this is that most of the time they're not for your exact domain or your exact use case, so it doesn't really make a lot of sense to use those, right? But if there's a public data set you want to use, just go ahead and use one. 
+You can just select it from Hugging Face. 
+But again, I'm showing you how to make your own cuz I think that's more valuable. 
+So, from here, you're going to go new recipe, start empty, and then what I'm going to do is just go into my existing recipe so I can show you what it looks like. 
+So, when you open up a recipe here, you should first of all be able to change the name. 
+So, I'm calling mine Indo or Indonesian recipe. 
+And then you can press this plus button here, and you can start adding notes. 
+Now, for most of us, what we probably want to do is we want to start with some kind of seed data. 
+Now, the seed data could be a document, for example. 
+It could be a PDF with company information that you have, with your refund policies, with a Q&A. 
+It could be a CSV file that has a bunch of words in it. 
+It could be whatever. 
+I don't know what you're going to try to fine-tune, so it's hard for me to guess. 
+But you can see that you can bring in a GitHub repo, a CSV or JSON file. 
+You can bring in a Hugging Face data set itself. 
+You can bring in a document like a PDF, and you can parse it into individual rows. 
+So, what I did is I've brought in a CSV or a JSON file. 
+So, I went to the plus, I went to source data, I went to CSV or JSON file, right? And I dragged it in. 
+Now, it's not letting me do that cuz I already have one, but you can see that what I did here is I selected a file. 
+Now, it's going to make me select it again, but the file that I selected, let me find it, is this vocabulary seed, which I'm going to load and show you what it looks like. 
+And again, I had Claude generate this for me. 
+Now, this is just a list of all of the Indonesian words that I know. 
+Now, I actually got this from a platform that I used to practice Indonesian, but you can see that I have Indonesian, English, category, example, and then example English. 
+So, I just have five very simple CSV columns. 
+And if again, I open this up in VS Code here, let me show you. 
+You can see like it's pretty straightforward. 
+I have what? 276 rows. 
+So, I don't have anything crazy complicated. 
+And again, you can make this super easily with AI. 
+Or if you have some existing data you want to bring in, perfect, bring it in. 
+So, I have this kind of existing data. 
+Now, it's not currently in a format that works, right? Because the format that I need for fine-tuning is I need instruction and output, or instruction, input, output. 
+That's what I need in order for this to work. 
+So, what I did is I've kind of loaded this in. 
+And if I want, I can remove some of these columns, but I want to keep all of them. 
+So, I've loaded in this JSON data. 
+It's now here. 
+Next, what I've done is I've said, "Okay, there's a few different types of kind of tasks that I want to try to generate for my fine-tuning data. 
+I want to be able to translate English to Indonesian. 
+I want to be able to kind of like generally chat. 
+I want to know what the meaning of an Indonesian word is in English. 
+I want to be able to generate a quiz. 
+I want to make a new word. 
+I want to do a correction. 
+I want to do like daily practice." So, what I've done is I've brought in this category note. 
+Now, the way that I did that is I went to generate fields, and I went to category. 
+And notice that there's a bunch of stuff here. 
+Like you can generate a random number. 
+You can generate a yes or no value. 
+And what I've done, okay, is I've said, "These are kind of the different values I want to have." And then these are the weights that I want to associate to each column. 
+So, I want to have 27% of the categories be this. 
+I want to have 23% be chat. 
+I want to have 5% be correction. 
+Okay? So, what I'm saying here is I want to generate a new data set. 
+That's what I'm going to do in this recipe. 
+In this data set, I want to have different categories of kind of example prompts. 
+And then I want 27% of those to be this category, 23% to be this category. 
+You'll see what I mean as we keep going through, but I'm making a distribution that will kind of randomly select categories as I go through this flow. 
+Okay? So, that's what I've done with category. 
+If I wanted subcategory, I can add that. 
+Now, what I've done next is I put in an instruction. 
+Now, this node what I did here was I used a formula. 
+Now, formula is just an expression where you can combine variables together, and you can just bring in a normal string. 
+So, what I did is I pasted a prompt in here where I said, "You are Carto, Tim's personal Indonesian tutor. 
+Speak simple Indonesian using only vocabulary Tim already knows." And this is just that starting instruction prompt, okay? So, this is the instruction every time. 
+So, I've just said, "Hey, I want to have this be called instruction. 
+I want the output type to be a string." And I'm just storing the instruction here. 
+That's it. 
+And I want this to be in my final data set, so I didn't uncheck this box right here, which keeps it out of the final data set. 
+If I wanted this just to be used as like an intermediate value, then I would select this. 
+Okay. 
+Again, I promise I'm going to explain it more, but this is just like a little bit complicated, so I got to go through it step by step. 
+Okay, so we start with some seed data, right? We connect that to some task. 
+We connect that to some instruction. 
+And then what I do is I use an AI generation step. 
+Now, this is where this becomes useful, because what I can do is generate using AI this data set that I then want to fine-tune my LLM model with. 
+So, what I've done is I've added a Let me find it here. 
+Model provider and connection. 
+So, I just brought in this provider here. 
+When I bring in this provider, what I can do is I can configure it, and I can choose what model I want to use for generating this data set for me. 
+Because effectively, what I'm going to do is I'm going to tell the model, "Hey, based on these words, based on this instruction, generate a sample input, instruction, and output, and help me create a data set that I can then fine-tune my model with." That's what this recipe thing is doing. 
+So, I'm using a local model, which means, "Hey, I'm just going to use the local model that I actually have already on my own computer." But, if I want to connect to OpenAI, for example, or Anthropic, I just put in the endpoint, and I put in the API key, and I can now use a close source model, right? Which is going to be faster to generate the data set for me. 
+But, I'm going with local model, which just means use whatever one is currently loaded. 
+Okay. 
+So, let me just delete this one. 
+So, once [snorts] I have that, I can then connect this to a model config. 
+So, if we go here, let me find a few. 
+Uh AI generation. 
+This is a model preset, so you can see this model preset right here. 
+For the model preset, provider is just local model, so we're just using whatever it's connected to. 
+And for the model itself, you can choose what you want to use. 
+So, you can see that here, choose local model, I can pick this Hugging Face model, right? And then load that in there, and this is now the one that I'm going to use, and I can adjust the temperature, which is the randomness. 
+Okay. 
+So, I've brought in the model provider. 
+I then connect the model provider to another node that I have here. 
+Let me show it to you. 
+This node is the AI structured data generator, which is what I would recommend that you use. 
+But, you'll notice if you look here, there's a lot of other ones you can use, like AI score, AI code, whatever, AI text. 
+So, you can create something. 
+That's what we're doing, right? We're trying to create values for the data set. 
+So, for this, let me configure it for you. 
+I called it make row. 
+I'm keeping this data, so I didn't select this. 
+For the model preset, I'm just using the preset I created above. 
+Notice it's automatically connected. 
+It's called model one, right? And then, I've given it a really long prompt that explains to it the examples that I want it to generate. 
+So, I say, right? You are generating one training example for fine-tuning a A Indonesian tutor for Tim, a beginner. 
+Hard rule, every Indonesian word in the example may only come from the known words list. 
+Okay? English text is unrestricted, never use any other Indonesian word with one exception, if the row type is new word, use exactly one word from the new words pool. 
+Okay? So that we can introduce a bit of, you know, new stuff. 
+Now, what I do is I start embedding variables in here that comes from what I had before. 
+So, I have the task type, right? And the task type was generated, if we look here, as this task type field. 
+Okay? Then, let's keep going. 
+I have the uh rows vocabulary card, Indonesian is equal to English. 
+So, I'm using some of that data from the seed data that I had. 
+The card example is example, and then example English. 
+And then you can see that I said, "Write the example for this row type, chat." Boom. 
+I want you to do this. 
+If it's translate, I want you to do this. 
+If it's quiz, I want you to do this. 
+If it's new word, I want you to do this. 
+You get the idea, okay? And then if we keep going here, it says style rule, short and friendly. 
+And then here all the known words that I know. 
+So, the idea is I'm saying, "Okay, I'm effectively going to loop through all of the seed data that I have. 
+I'm going to generate a type for the seed data. 
+I'm going to just have my instruction. 
+And then I'm going to make a new row. 
+And the new row that I'm going to make, right? If we look at it here, is going to now, if we scroll down, have this output format. 
+And I've put a JSON format that says, "Hey, I want to have input, right? So, property input, this is type string. 
+And I want to have, let me move this back, output. 
+This is type string, required input output." So, I'm saying, "Generate an input for me and an output for me based on the prompt that I gave." Hopefully that makes sense. 
+I know it's a little bit confusing when you go through this recipe builder, but I'm using AI to generate the data for me. 
+So, again, we bring in our seed data, task type, instruction, you get the idea. 
+This is a basic example, there's a lot of other stuff you can do, and they have some other examples you can look at, but I'm kind of generating all of these training rows, and that's what this is mean meaning to do. 
+And if you don't want to do it this way, you can just ask an AI model to generate it for you. 
+Again, you don't need that many. 
+If you have a few thousand rows, that's enough to have really good fine-tuning. 
+I think the main thing to understand here is that you want to have input instruction output. 
+If you have those three fields in your training data, that's what you need. 
+Okay? So, from here, what we can do is press check. 
+If we press check, we can just verify to make sure the workflow looks good. 
+And then we're going to do a test run. 
+So, I'm just going to do two records for right now, and go check, and then again, two, and test run. 
+And when I do test run, what this should do, so let's start the test run, is it will bring up a progress bar for us, and it should run through this flow, and generate some examples for us. 
+So, we can just make sure the examples look logical before we move to the next step. 
+Okay, so you can see that it generated this for us, and if I look at the columns, or sorry, if I look at the raw or data, that's what I want to look at. 
+You can see we have Indonesian, English, category, example, example English, and then we have instruction, and then make row. 
+And for make row, we have the input and we have the Let's look here, output. 
+Okay? Says, "Apa bahasa Indonesia untuk brush teeth?" What is it How do you say brush teeth in Indonesian? What is it saying? And then, boom, this is how you say it, okay? Hello, whatever whatever whatever, and then this is the output. 
+And these are all words that I know, okay? So, this is now the example data that was created. 
+We verify it, we make sure it makes sense. 
+Okay, I can save it. 
+And then what I can do is go back to the editor, and now I can go run. 
+And this time, when I want to do a full run, I can press full run, I can give this a data set Indo words, and then decide how many records I want to generate. 
+So, do I want to generate a thousand rows, ten thousand rows, whatever, and then decide do I want to generate a thousand rows, ten thousand rows, whatever. 
+I can enable batching, I can do throughput, retries, whatever. 
+So, let's say we want to just generate a fifty row data set, then I can start the full run. 
+And same thing, I can wait here for this to run, and I can see the progress as it generates it. 
+And you can see before, I generated some previous data sets like this one had three thousand rows. 
+I'm not going to wait for all of that to finish cuz it is going to take a fair amount of time to do on my computer, but this is how you generate the data set. 
+So, let's wait at least just for this one to be done and then I'll move to the next step. 
+Okay, so one thing you'll notice when this is generating that it's going to show you the rate, so the number of records it's doing per second. 
+In my case, it's super slow cuz I'm just using a local model on my own computer, and you can see that it's going to take 332 seconds, which is like 5 minutes or something um to run, right? That's the estimated time. 
+One thing to notice that it's not going to give you live up-to-date progress. 
+It's going to be polling and give you progress over a certain period. 
+So, in this case, it says, "Hey, I'm going to give you progress every five entries." So, if you're unsure if something's happening, open this overview, look in the terminal, and you can see that every time it generates 5, 10, 100, 500 uh entries, whatever, then it will update you. 
+So, don't think it's frozen cuz sometimes it is just super slow. 
+And again, if you want this to be way faster, change the model provider here so that you're not using um a local provider and you're using a third-party provider like OpenAI or something. 
+And it's cost going to cost you a little bit of money to generate that if you use this type of recipe. 
+Again, I found better results just directly doing it through Claude, um but we'll wait for this to finish just so you can see how the recipe works in Unsloth. 
+Okay, so it just finished here. 
+It took a long time. 
+It was like lagging my whole computer, but if I go to the recipe, you can see we've got 50 words and it's generated the uh make row column, which is what we're looking for, which was the input output. 
+You get the idea. 
+So, now that we have this, it's time to actually fine-tune and start training. 
+Now, to do that, we're going to go to this train tab here. 
+We're going to select the model that we want to fine-tune, so I'm going to go with this 3.1 billion instruct Unsloth BNB 4-bit model, but pick whatever one you downloaded, okay? For the method, we're going to go with QLoRA. 
+You can use more if you want, but this is going to take a long time if you go to ones that are higher than the QLoRA, so I recommend staying with the 4-bit. 
+Then, for the data set, either select a Hugging Face data set or go to local. 
+When you go to local, you should see the data sets that you created in the recipes tab, and you can select them. 
+However, if you want instead, you can upload a CSV file. 
+So, you can see I have the data set that I showed you guys before, so we can view it, right? And you can see that it looks like instruction, input, output. 
+If that's the case, we can just select this, and we can go with that if it's already created for us. 
+However, if I select one of the ones that I created, so like recipe Indo data set here. 
+Okay, this is one that I created previously. 
+You're going to notice that if I go to view data set here, then it shows me that it could not auto-detect column rows for these. 
+So, what we can do here is we can use this AI assistant to assign the rows, or we can go here and specify them. 
+So, we can say system, user, assistant, system, right? Whatever. 
+We can set all these different rows, so that it understands what we should actually use for the input, output, instruction. 
+Again, it's a little bit different here because it's a slightly different format, but you get the idea. 
+So, if I go with AI assistant here, it can analyze the data set, and then it will automatically mark the columns for us, and then we can use that for the fine-tuning. 
+When we're selecting this, right? The system is essentially the instruction, user is the input, and then assistant is the output, okay? So, when we're marking these, that's how we want to do it. 
+One thing to keep in mind is make row, we really should split this into two separate rows, which we could do in the um what do you call it? Uh recipe as well. 
+Make an expression, so we have two separate output rows that get generated, one for input, one for output. 
+I didn't do that cuz I'm not actually using this as the data set for fine-tuning, but we would want to do that so that we could then mark the user and assistant properly, and then for the instruction, we would mark this as system, which is effectively the system prompt. 
+And you can see that it's determined, hey, instruction is system. 
+So, I'm not going to let it go through that cuz I'm just going to use the data set that I already know, which is this one here, Indonesian Tutor. 
+Again, when I view the data set, because it's in Indonesia or in instruction input output, it knows how we should categorize these, and we are good to go. 
+So, from there, what we're going to do is go over to parameters. 
+So, once we have the data set selected, for the project name, give it a name, I'm going to go Indo Training 2. 
+For the number of steps, you can change this to be epochs. 
+I recommend that you just start with one epoch, especially if you have simple data, and see the result that you get. 
+However, standard best practice is to go with three, so not 13, but three. 
+Um if you have a lot of data, so the more data you have, the more epochs you want to go with, but typically for simple stuff, if you do more than one, um you're going to have a loss value that goes down very quickly, which you're going to see in a second. 
+Now, there's a bunch of other settings you can adjust, like rank, alpha, dropout, um LoRA adapters, hyper parameters. 
+To be honest, if you're a beginner and you don't know what you're doing, just leave them all exactly the same. 
+The only thing to adjust is the epoch, which will directly determine the amount of time this is going to take to train. 
+Once you have set this, go here to start training, and it will start fine-tuning and training the model for you. 
+Now, depending on the number of rows that you have in your data set, the size of the base model, and the number of steps or epoch settings that you have here, that's going to determine how long this will take to run for you. 
+So, we're going to let this run, it's taking a second here, and you can see that it's loaded the model weights, and it's about to spin everything up. 
+And if we want to see the history, we can go here, and we can see the progress of its training. 
+Now, we also can go to the terminal, just to verify that all of this is working. 
+If you want to see the output, it will take a second to actually start training, and then once it starts training, it's going to show us a bunch of data that I will quickly go through, and then we'll fast forward to when it's finished. 
+All right, so we can see that it's in the process of training here. 
+We can see how much VRAM it's using, temperature, power, all of this, and we can view the training loss, the gradient norm, and the learning rate. 
+Now, quickly, learning rate, this is going to gradually decrease over time. 
+The idea is that the more that we train the model, the less that we want it to learn new information over time, so we're just making small adjustments. 
+The training loss is the main graph that you want to look at, and effectively what we're going to expect to happen is over time the loss value to decrease. 
+The loss is effectively going to tell us what the accuracy is and how well the model is predicting the next tokens based on the examples that we've given it. 
+Now, in this case, I have a very simple data set. 
+It's just language the model's already very good at. 
+It already knows the format. 
+It's template based, so it's really easy for the model to learn this, and you'll see the loss drastically drops down. 
+So, we start really high, and immediately at step 10 we've already dropped below this value, which means that it's already performing extremely well. 
+So, what we're going to do is pay attention to this and hope that the loss continues to go down, and as soon as you see that kind of sharp decline, you know that you've effectively trained the model accurately and that it's going to work relatively well. 
+Now, I'm not going to go through this whole training process here because I don't need to wait for it cuz I already have one trained that I can show you, but the idea is you're going to wait for this to finish. 
+It will show you the ETA, the steps, tokens, all of this kind of stuff. 
+It will show you all of the entries that it's gone through here in the data set, whatever, and then you can just adjust the settings if you want uh in terms of viewing it, and you can stop it. 
+Don't worry too much about the gradient norm. 
+If you want to check that out, you can ask an AI model to explain it to you, but generally the loss is what we're looking at, and you can see that again cuz my data set is really simple. 
+It drops off super quickly, and as long as you see the loss dropping below one, then that typically means that it's performing fairly well, at least as it's evaluating itself in the training. 
+Okay, so what I'm going to do is stop this for now. 
+I'm just going to cancel it cuz I don't need that anymore, and I'm now going to go and show you the fine-tuned model that I have. 
+Now, again, I already trained this before the video so we didn't have to wait for it, and to find this I can go to on device, and I can search for my fine-tuned model, and you can see that I have a fine-tuned model here that I'm going to load up, and I'm going to show you how we can compare it to the base model to ensure it's working properly. 
+Okay, so you can see that it's loaded up now, and I can start chatting with it directly. 
+But, what I can also do is if I press this plus button, I can go more, and I can go compare chat. 
+Now, when I go compare chat, what it's going to do is compare the base model to the fine-tuned version, so we can see the response that we get from both, and if we want to adjust any of the settings here, like the temperature, top P, whatever, we can do that directly from here, and also input a system prompt. 
+So, for example, we may say something like hello, apa kabar, which is hello, how are you in Indonesian. 
+And let's see the response that we get. 
+Okay, and you can see on our side, we get this is the fine-tuned side, I get words that I actually know. 
+Every word here I know. 
+I can translate the sentence for you. 
+This one, not so much. 
+You can see it immediately gives me a bunch of Indonesian words that are probably still simple, but beyond my comprehension and understanding, which makes it significantly more difficult for me to continue this conversation. 
+Now, let's do another example. 
+Can you tell me what the word alone means? Okay, and let's continue, and it says in Indonesian, kata alone dalam whatever, right? Like, I don't know what this means cuz I cannot fully read all this Indonesian. 
+And here, it says alone equals sama canto dia pergi sama, he goes alone, okay? And then it gives me the explanation. 
+So, because of the fine-tuning, now I have essentially an Indonesian kind of teacher that I can chat with, where when I ask it something, it understands that I'm a beginner, it needs to use basic words, and I can have a significantly better conversation. 
+Let's do something else. 
+How would you say I want to go work out today in Indonesian? Okay, and let's see what we get. 
+And again, it's speaking to me in Indonesian. 
+It's not even speaking to me in English. 
+And here, it gives me the direct translation, which is exactly what I'm looking for, and this is a very simple way to say this, compared to what it gave me right here or right here, which is much more complicated and I don't know. 
+So, that's the fine-tuning. 
+So, now if you were happy with the fine-tuning, we could export the model, so I could go here, select my model, and export it to a GGUF model, which I can use in something like Ollama. 
+I can do a full 16-bit inference model. 
+I can do a Lora version. 
+You get the idea, and I can use this in pretty much any tool that I want, share it with someone, upload it to Hugging Face, like you can see here. 
+And you guys get the idea, we can export it and use it from there. 
+Okay. 
+That was a lot of content. 
+That was a full course on using Unsloth Studio. 
+I know it took a long time, and there was a lot to explain, but I hope you guys found value in this video. 
+If you did, make sure to leave a like, subscribe to the channel, and I will see you in the next one. 
+>> [music]

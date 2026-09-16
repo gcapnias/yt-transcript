@@ -1,0 +1,393 @@
+OpenAI Codex is an autonomous AI coding agent designed to read code bases, execute commands, run tests, and complete software engineering workflows across multiple tools and environments. 
+In this course, you will learn the fundamentals of how to use codecs for software development and more. 
+If you've spent any time around software engineering this year, you've probably heard the name OpenAI Codex more times than you can count. 
+Some developers swear it's the best coding tool they've ever used. 
+Others say it finally delivers on the promise of AI agent. 
+And then there are the people who open it for about 5 minutes, close the tab, and wonder what all of the excitement was about. 
+The difference really isn't Codex itself. 
+It's understanding how Codex is meant to be used and that is exactly what this course is about. 
+You will learn about what Codex is, who it is meant for, how to use it, and some of the amazing things you can do with it. 
+At the end of the course, I have a surprise for you. 
+So, be sure to stick around. 
+And in case you're wondering, yes, this entire edit, the complete intro section was made by Codex itself. 
+So, it is part of some of the things you can do with it. 
+So, keep that in mind. 
+Okay. 
+So, if you don't already have Codex installed, what I'd urge you to do is you first of all head on to this website, which is the official OpenAI website. 
+By the way, I have a link in the description below so you can access it. 
+Once you are on here like this, you choose your specific OS installation and you just simply download and install. 
+I've already done that, so I'm not going to go through the same process again. 
+Okay. 
+So once you've had Codex installed and I've logged in and I've gone through the entire onboarding phase, you're supposed to land on an interface like this or the light mode of this. 
+Now if this is your first impression, you probably will be thinking this looks weirdly minimalistic. 
+You're right. 
+By the way, it's only a left pane with the work area on this side. 
+But now that we've gone through the installation process, let's talk about pricing, right? So, Codex allows you to use GPT 5.5 even on a free account, right? So, you are literally paying nothing and you're getting access to GPT 5.5. 
+However, there's limited access to it. 
+So, I think the most value you get for your money is by probably subscribing to the pro, which is either the $100 a month or what I'm currently using, which is the $200 plan. 
+Let me show you. 
+So you come on here, usage and billing, right? So as you can see the 200 over here. 
+Now the reason I only chose the 200 is because I often use it heavily and more than half the time even with the $200 I barely hit my limits. 
+You can see I even have two resets here. 
+The reset is basically if you fail to hit the limit then it's going to roll over. 
+They're going to offer you a reset. 
+[snorts] So, if you're not going to be using it heavily, you probably should subscribe to the $100 tier or lesser than that. 
+If I had had such information before, I probably wouldn't have gone so high. 
+But now I'm addicted to it. 
+So, I'm definitely going to renew with a 200. 
+All right. 
+So, now that that part is also cleared on the left side pane, there's a couple of things you need to take note of. 
+So, this is practically like Chpt itself. 
+Let me close this down over here. 
+So all you are seeing on the left side pane is the new chart which basically allows you to converse with it like you would in Chpt, right? There's also search here which is self-explanatory. 
+And then there's shed. 
+This part will prove vital and very important more than half the time on the basis that you can automate tasks here. 
+So as you can see I have three automations that are currently paused. 
+one that was running every hour. 
+One that was running every day. 
+I don't want to run it. 
+One that was running every day. 
+This one was running every day, right? But currently I've paused them all. 
+So basically, you can simply automate anything inside of Codex. 
+And it's great with machine use. 
+It can look up anything on your device. 
+It can send messages even through your WhatsApp. 
+Right? So there's really no bounding of this AI agent. 
+Now to create an automation you just simply click here create via chat and you can see it gives you some sort of a starting point. 
+So it gives you some sort of a starting point. 
+So it says let's set up a shadow task together whatever whatever or you can just simply go on and start type hey I need you to set an automation that runs in the next 1 minute. 
+That just prompts me that hey my automation run. 
+So basically I'm going to send this over and it's going to boot up an automation for me. 
+Now while that is going on let me explain the other part too. 
+So you can see there's a project side here and there's the chart side here. 
+The chat is basically you conversing with it without actually saving it in any actual folder like the project side. 
+Inside a project everything you are creating is going to be stored in here. 
+So, it's sort of like a collection to organize all of your thoughts. 
+Now, we just got a response from the automation we set up. 
+It says done. 
+I set one time automation for about 1 minute from now. 
+That will prompt. 
+[snorts] Right. 
+Okay. 
+So, we're going to wait for the automation to run. 
+But while we wait, let me explain further some of the things you can see. 
+So, in here, I'm going to create a new chat by clicking the new icon over here. 
+And as you can see, we get a fresh interface to start work from. 
+Now, if you don't already have a project in here, what you do to create one is by hovering on the project side and then clicking this button over here, which will trigger up either to create a new one or to use an existing folder. 
+So, if you want to create a new one, you simply click next, name it, and then save. 
+But since I'm already inside an empty folder, I'm not going to do that. 
+Okay. 
+So remember we set an automation about a minute ago. 
+So as you can see the automation that we set up run now and as you can see it was shed and run. 
+Hey my automation run which you can see here. 
+Hey my automation run. 
+I deleted the completed one time automation so it won't fire again. 
+So the possibility of this is completely endless. 
+You can run any sort of automation supposeding once like asking it to send an email to your boss every morning or contact somebody or reach out for leads or customize your YouTube channel and and gathering your content creation ideas trying to assimilate yourself with what the breaking news are all of that there's absolutely no restrictions on this part. 
+>> [snorts] >> Right now to the most important part, let me show my face on here for this part. 
+So for the most important part, this plug-in section is going to be very instrumental in your use of Codex. 
+So majorly the ones I use are primarily superbase and notion, right? Notion is basically like obsidian to me. 
+So it's like me taking notes inside of notions. 
+So I do not like to store context inside the AI agent itself or the chat window because at some point it's going to get cumbersome. 
+It's going to get very large if you're working on large code bases, right? So if it gets really big, you are at a loss because these AI agents could forget if it exceeds their context window. 
+So I like to store all of the relevant information inside notion but inside notion all of the context will be in there. 
+So in the instance where the AI needs a certain type of information, it just goes into the notion, pulls it out, use that sort of data and the work is done. 
+Right? So this plugins is what I was talking about primarily. 
+There there are a whole lot in here even Figma, Versel, GitHub, there's so many more, right? So basically what you're going to do is say you want to tie Gmail to your Codex, right? You just simply click on install over here and it's going to pull up the connector for you. 
+So inside the connector, you just simply click connect to Gmail and it's going to open up in your browser and try to connect with your actual Gmail account. 
+But I do not want to connect it with my Gmail at the moment. 
+So I'm not going to do that part yet. 
+So I'm going to close out of this. 
+But once you are set up with it, you're going to see that it is fully connected to it and you can interact with it completely from the chat conversations. 
+So I've already connected with superbase. 
+So you can see try chat like this and you can see it tags superbase in here which is the plugin. 
+So use superbase to set up and protected routes for my app. 
+Right? So you can customize this however you wish. 
+There's literally, like I keep saying, it's endless. 
+The possibilities are endless. 
+So, before we progress any further into the course, there are a couple of things I need to address before we can move on. 
+As you can see from the UI here, there are a couple of changes here. 
+Now, the footage you had seen is from a much older version of Codex. 
+However, the principles stay the same. 
+I mean you still have the plugins, you still have the shled, the new chat, you still have the projects over here and as well you are able to chat and converse with it. 
+So primarily those things remain constant and are practically transferable and I'm I'm guessing it's going to remain that way throughout all of the updates of Codex. 
+Right? So the new changes are first of all now it is no longer a standalone application anymore. 
+Now it is primarily the chbpt desktop app. 
+You can see from the logo change over here this logo you can change it back to the Codex logo that you had seen before and as well you can switch in between normal charg. 
+So when you change it to charg over here you are able to specify between two states either to use it as a chat app which is primarily the same as the web version or you can use it as work which primarily gives you more of a practical use case. 
+So in the instance where say you have like five different files that you'd want to compress into one the work is best for that. 
+It's able to you it's able to take it a step further as compared to the chat. 
+Now the Codex version though is primarily for software or I mean software related tasks. 
+Right? So that is the two distinctions that is primarily inside Codex. 
+Now now as you can see over here there's also pull request. 
+This ultimately brings the feature in GitHub into the Codex app itself. 
+So you are not going to have to switch between Codex and GitHub and then make pull requests and then try to close them off or whatever. 
+When you click in the pull request here, it opens up all of the pull requests you have on your active Git account which is linked to your app here. 
+Right? So as you can see this is my actual GitHub repo. 
+You'll understand this from later in the course when I actually build out the surprise I told you about at the start of the tutorial. 
+So you can see I already have one PR over here which is from a year ago. 
+Once you click into it, you'll be able to see the comments. 
+Whatever you would want to do, you can do straight from the Chibbt desktop app. 
+You can also merge changes. 
+Whatever you'd want to do, right? So that is one of the changes that has reflected inside Codex. 
+Now as well we have sites in here now. 
+primarily if you've used Versel or Netlifi before this is like a a a scratch off of all of those things right so now CEX allows you to deploy your websites or web apps inside of Codex by giving you a charg link so I created this yesterday so let me show you what it looks like I primarily asked it to let me open it up for you to see over here I primarily asked it to create me a creator road map as a YouTuber to get to my first $1 million as a YouTuber. 
+Right? So that is what you are seeing over here. 
+So basically what you do is you just call in the sites like an actual plugin. 
+So you do add sites like this and it's primarily going to call in the sites feature. 
+You just click enter like this and then you can add your prompt and then it's going to handle it just as you are seeing my prompt over here. 
+Right? So I asked it to create a website that tells me how to get to my first million dollar as a YouTuber and I asked it to prioritize great design right. 
+So this was the outcome it gave me and it as you can see from the domain link over here it has the chip attached to it. 
+So this is deployed onto's own infrastructure. 
+So this is an actual published website right now when you click into it over here. 
+Let me show you. 
+Now when you click into it over here you're able to see the metrics like analytics or whatever. 
+So this could be an actual deployed platform for you. 
+You can track the traffic that it's received. 
+I mean primarily like an actual dashboard for your website. 
+Right. 
+So that is primarily what the site is for. 
+Now let's move on to the actual important things inside of Codex. 
+Let me close this over here like this. 
+So the most important part of Codex, the part where you'll be working in more than half the time is this work area over here. 
+Now when you look at the work area, there's a couple of things to take note of. 
+First of [snorts] all is this voice recorder which allows you to dictate and send in prompts using your voice. 
+There are other alternatives that I like to use. 
+I do not like to resort to this a lot. 
+I use Whisper Flow, so more than half the time I'm not using this feature. 
+Another thing to take note of is this model selector over here. 
+This allows you to switch between models. 
+So whether so Terra Luna or previous models like the 5.5 or 5.4, right? Do note though that 5.6 sold here is their flagship model. 
+What that means is it's the most competent chip model out there. 
+It rivals uh Fable 5 from Claude Code, right? So soul is the most competent one here with Terra being the intermediate and Luna being a slightly less cheaper and a well economical way of running GPT 5.6. 
+Right? So that is primarily all that you need to know regarding the models themselves. 
+However, you could also specify the efforts in here. 
+So you could have either between light up until ultra with ultra meaning it's going to consume a lot of your tokens and it's ultimately going to produce better results. 
+However, more than half the time you may not even have to use it. 
+For my sake for instance I like to resort to either extra high or simply keep it at medium. 
+This design you see over here was done with a medium and as you can see it's pretty decent in itself. 
+Right? Good. 
+So that is also regarding the efforts. 
+You could also specify the speed over here by either transitioning between standard or fast with fast being as it implies it's going to produce the results much faster and also it's going to use up your tokens quite fast too. 
+Now another thing I wanted to cover though is now I am currently on the $20 plan. 
+The previous footage you had seen was the $200 plan. 
+So in my experience with the tokens optimization it's quite decent. 
+You are not going to have to complain a lot about the $20 plan. 
+With the 200, I was barely hitting my limits. 
+I was just throwing money, burning cash primarily. 
+That is how come I've switched to the $20 plan. 
+And it's quite decent. 
+I I have to be honest, you can do so much with it. 
+One disadvantage about that is once you run out of uh your limits, your weekly or hourly limits and you have to top up, it's quite expensive because what you can do in the 5hour gap window. 
+The credits if you top up say 20 or 50 could run out much faster than your actual limit, right? Which is primarily this 5hour limit or even your weekly limit, right? So that is primarily all that you need to know regarding the model selection and everything relative to that. 
+Right? So you could this is a good visual of all that I just showed you. 
+Right? Another thing though to note is the permissions section over here. 
+So there are three main ways you can transition into. 
+There's the ask for approval which primarily ask you whenever it needs to run something on the terminal or use the internet or access external files generally. 
+So it's always going to ask for approval before doing anything outside of the Codex charg app itself. 
+Right. 
+Now, the app approve for me is also another thing to note because this allows you to be able to run some commands, but if it detects that the command is potentially unsafe, then it's definitely going to ask you to approve of those actions. 
+But I like to keep it at full access because more than half the time the things I am doing are not really on safe. 
+And another thing is I do not have anything to lose on this specific machine. 
+So, if anything goes haywire, there's nothing I'm losing. 
+But you need to be careful if you are ever going to sell it to full access as I have. 
+I'm just going to leave it there for now. 
+Now, this plus sign over here allows you to add context into your prompt, right? So, you're able to tag files and folders in here. 
+You able to trigger on goal and plan mode. 
+We'll get to these two later in the course. 
+They are very good and they deserve their own sections. 
+So, I'm going to delegate that to the later part of this tutorial. 
+And as well, you can access the plugins that you've added. 
+So, once you add a plugin here to access them, you can use this plus over here. 
+I'll show you other ways to access them as well. 
+So, you [snorts] can choose between all of your plugins here, your apps, even the sites. 
+I mean, I added this in as a skill. 
+Or you could even open up your site in here. 
+This is the actual domain link that we just saw, which is over here like this. 
+As you can see, it's the same domain link here, right? So the there's practically everything you have in Codex, you can access it here like that, right? You can even access some of your conversations. 
+You can access your chats and files all over here. 
+Now, another thing I want to show you is slash commands, right? So basically all you got to do is bring a forward slash like this and it allows you to tag in a lot of things right. 
+First of all another thing you would want to know is the fast which I showed you over here. 
+You could trigger it by using a slash command or even the MCPS or models or pets. 
+Let me turn this on for you all to see. 
+So this primarily gives you a Codex a Codex pet. 
+It triggers on a Codex pet over here for you to see. 
+As you can see, here is mine. 
+And once you're working in some sort of codebase or you're doing some work, it's going to show you like a visual of what is happening inside of your codebase, right? So, it's going to show you when you're running command, say you're running through O or you are on boarding or whatever, it's going to show you here. 
+So, you get like a visualization of all that you're doing inside of the Chbt app. 
+But I don't like to use it. 
+So, and I've also found that it tends to make my machine lag a bit. 
+So, I just generally like to turn it off. 
+When it comes to Codex, generally there are three ways to run commands, right? You could either use the slash command, you could use the at sign, sorry, the add sign, which generally allows you to mention things inside of your conversations, or you could use the dollar sign to call in skills. 
+So, the dollar is primarily for skills, right? So as you can see I have a lot of skills in here. 
+When you see this personal tag with them it means they are skills that you have you may have created or CEX may have created for you in the course of running a command. 
+Right? So all of these personal ones are ones that I created or Codex created for me. 
+There are also ones that are system which comes pre-built with Codex itself. 
+As you can see here are some of them like the image generation which is nothing new because Chibbt has great image generation. 
+You're able to open open eye docs. 
+You see the system ones are the ones that come pre-built inside of chex app right as well. 
+You can see there's one with the app tag which primarily calls in the plugins or things you may have installed. 
+Right? So I want to dive in specifically to the skills side. 
+So I'm going to do forward slash over here and show you some of the skills that I've created. 
+Right now the most important ones to note though when you do slash commands is slash plan and slashgo. 
+These two are very instrumental in your use of Codex. 
+Primarily about 80% of Codex everything you're going to be doing in Codex revolves around these two which I'm going to describe later. 
+Now while it is going on and getting things done, let me specify a couple of things. 
+As you can see, this prompt is sort of vague to write. 
+But then it's going to be able to understand based off of the skill that we have added, which is this milliondoll editorial skill. 
+Now, what this does when it is creating the skill is that it takes everything all of the approach that it took to create the design and then it adds it in as a MD file. 
+So that becomes our skill, right? So every time we're needing it and then we just tag it in, it's going to take this prompt and then add this MD file which is going to be like another set of instructions that gives it an understanding of how you are expecting it to reproduce the result. 
+I hope that was clear enough for you to understand how to be able to create reusable skills. 
+But we're going to wait for this so much so that you understand that the difference is just as we expected it to be. 
+The implementation is the same as the previous design, right? So a perfect use case of this would be say you are constantly creating you are working in a team right and then let me use myself as an example right I need to communicate with the rest of the team based on the metrics of my YouTube channel based on the number of people that reached out to collaborate with us the paid sponsorships all of the niche niche details all of the nitty-g gritties right to be able to send a decent design say when I like this design I could just have this added in as a skill since it's already a skill in here. 
+When I want to communicate with the team, I'll just ask it to go and then pull all of the details on my YouTube channel and then create it using this milliondoll editorial design and then have it sent over to the rest of the team. 
+Right? So to take it even a step further, I could automate it so much so that I just come into the shadowed over here create a workflow around it that every month at the end of every month say on the 27th of every month it should send this over to the rest of the team so that they can review it too. 
+So they are always um kept in the loop right so primarily that is one use case I am not able to think out wide on the various use case hopefully you know how you're going to use it for yourself but primarily that is the end of the story there okay so after 11 minutes and some seconds it's able to generate the visualization for us so as you can see this is nothing different from this one which is the actual skill. 
+Right? So the design is primarily the same thing and you as you can see it gives you a strong message to mean a perfect road map. 
+It even add stages to scale the signal. 
+I mean practically an actual road map to get it done and it use the actual design that I had specified with the slash scale command. 
+Right? So that's entirely what I was expecting. 
+Now if you try to open into this, I'm suspecting that you'll be able to even add it in as a skill as a site. 
+Right? So as you can see, this over here will completely turn this thing that you've made into an actual accessible website just like this with a similar domain like this. 
+But I don't want to waste my prompt on that because you primarily get the point I am trying to put across. 
+Right? So a perfect use case would be when you are having repetitive work to do, you just have to add that repetitive task. 
+You create a model that is completely going to be reusable and then you just add it in as a skill. 
+So every time you need to do that skill again, you need to make that change again. 
+Every time you need to make that work again, you simply call that skill with a new information and then send it through as a prompt and it's going to edit have it ready for you. 
+So you can send it over to whomever you'd want to send it to. 
+Back to the two that I am very prudent about. 
+These two are completely the entirety of Codex itself. 
+These two will get you through Codex more than 80% of the time. 
+And this is how you're going to trigger them all by doing slash P L A N. 
+This is for turning on plan mode. 
+And plan mode ultimately runs through your thoughts process. 
+So you just say you want to build maybe a housekeeping app or a calorie counter or something, right? You just explain it in like you would in your normal prompt. 
+Once you send it through, Codex will try to see the vision that you have behind it. 
+It will try to understand everything that you've put across. 
+If there are redundancy or there's something that seems unclear, it's going to come up with series of questions right in a cycle. 
+So say in the first cycle would ask about two questions to properly ascertain what you're trying to tell it to do. 
+And then once it understands it will take all of those context together again try to understand if there are any questions or redundancy again it will bring it to you again for you to specify what you would want to get it to do. 
+Right? So it will continually come back to you. 
+It's not going to be so kimbersome that it becomes annoying though. 
+So it's just running running through your mind to understand what you think. 
+Once it has ascertained what you're trying to get, then it's going to come up with an implementation plan with everything that I was able to put together and then submit it to you for you to review it again. 
+This time if you love it, you can just go on and see proceed with the implementation plan or simply just edit what you want to edit. 
+You'll understand that in a minute because I'm not just going to talk to you about it and not show we'll actually work through that. 
+I also want to talk to you about SL goal, right? So there's a bit of a distinction between the two, right? SL goal, however, is when you actually have a target in mind. 
+So you have like an end goal in mind which I said to trigger you just do simple /go like this and click enter and as you can see it has been triggered here right so go mode comes after you've already decided what you are trying to build so instead of asking coders to think about a project you are the one telling it what the end goal or the result should be I mean it's in the name goal plan mode goal mode it's basically self-explanatory Right? So you're basically saying that you have given it the destination. 
+So it should keep working towards that destination until it is achieved. 
+A typical example would be if you are building an inventory system or say a LinkedIn profile scanner or something, right? A typical end goal would be that the app should be able to analyze LinkedIn profiles. 
+The app should be able to accept LinkedIn links to be able to analyze them, right? The app should be able to recommend changes. 
+Those sound like actual goals, like end goals, right? So, Codex is going to iteratively build on that. 
+So, it's going to recursively improve until that said goal, all of the metrics you gave it are completely achieved and then it will present you the completed work. 
+A slight distinction amongst the two is you cannot have plan mode and go mode all on at the same time. 
+Let me show you. 
+So, we already have plan mode on here. 
+As you can see, if I do /go like this and enter, you see plan mode gets removed and replaced by go mode, right? So, you cannot have the two on at the same time. 
+You can only toggle on one at a time. 
+So, in my case, what I usually like to do is I start with plan mode, right? So, I may have all of the information that I think I have, but then when I send it over as plan mode, Codex is going to analyze everything that I had. 
+given it run through some of the questions that it may have for me. 
+Once it ascertains what I am trying to do, it's going to come up with an implementation plan and I simply copy that implementation plan and then have it sent over with the /go command over here. 
+So, it's going to run it through run it through until that goal is achieved. 
+And finally, when I have an MVP, then I end the topic. 
+All right. 
+So now I want us to get into the actual surprise that I keep mentioning even at the start of this tutorial. 
+So the surprise ultimately is to build out a game specifically a flappy bed type game. 
+But we're not copying the entire implementation because the original Flappy Bird game is basically a bed that is to be kept afloat by tapping as it goes through tunnels, right? So rather than having to type, we're trying to be ingenious. 
+So we are using our voice instead of tapping through those tunnels. 
+Right? So to keep the bed afloat, you just have to use your voice as it is being opposed by gravity. 
+So this is the exact prompt I sent in that I want a a build of the Flappy Bird game and then I sent it in with the slash plan active. 
+Right? So once I sent that through it ran a couple of tools and then it came back with the first round of questions. 
+So it came back the first round of questions was three-fold and it asked these questions right. 
+So when I had answered it took that context back in and then came back with another series of questions which were also three right so I answered those questions too. 
+Basically it gives you whether you want to go with a recommended or two different options or if you don't like any of them you can specify which approach you would want to use. 
+I'm sorry that I don't get to show you that part. 
+But basically that is it. 
+And then it came back with another question which I had answered too. 
+So that is the question over here like this. 
+And then once it's assimilated all of the questions and got a proper context of what I want, it took all of that in and came back with an implementation plan. 
+So this implementation plan I could have sent it through on its own because this type of game is not really cumbersome. 
+It's not that big. 
+It could have oneshotted it on its own, right? But I want to purely demonstrate how the goal works. 
+So I stopped the implementation plan from going through and then I copied the prompt over here like this. 
+And that same prompt I pasted in here with the /go command. 
+Let me show you what I did. 
+So I did I pasted it in like this and brought the /go over here like this and then activated it and simply sent it through. 
+So that is what you are seeing over here like this. 
+I'm going to remove this before I make the mistake of sending it through again. 
+So that is what has been running for the past 23 minutes. 
+That is ideally the very specific goal I gave it and it's constantly running right now. 
+You can see it's edited a couple of files, created even an image for us, something like a cover art ads we're going to use for the game, and now it's still running. 
+So once it has fully oneshotted this code, we're going to test it out on our own. 
+And then I'm going to open source this work. 
+I mean, I'm going to keep it on my repo for free and have a link in the description below so you guys can access it. 
+Ultimately, you can choose to monetize this by either selling it out or even publishing it onto Google Play Store or App Store. 
+Right? For Google Play Store, the pricing is $25 and then for the App Store, it's $99 per year. 
+Right now, the only reason why I'm keeping this particularly minimalistic is that if I do the entire build and then push it out there for you guys to put it on App Store or Play Store, they are definitely going to reject you guys because it's like some sort of circumvention. 
+You are all putting out the same bit of code out there and Apple is just going to term it as a cliche, so to speak, right? So I want you guys to have this for yourself and however you choose to use it whether to monetize or to even keep it yourself to engage with it and then to keep you active when you are low [snorts] that is entirely up to you. 
+So once it is done I'm going to demonstrate it and then I'll show you how to access the repo from the description below. 
+Given us our first generation. 
+I am sort of having some little bit of issues with it, but I just want to test it for you guys to see first before I make any revisions to it. 
+So, let's get into it. 
+So, it it gives you a countdown when you have to keep shouting already. 
+Not so good. 
+Okay. 
+Hey, hey, hey, hey, hey, hey, hey, hey. 
+Sorry about the noise. 
+I may have to skip that for now. 
+So, we just got updates on our game, right? So, this was the follow-up prompt I had sent in. 
+So, I want us to test it together. 
+So, literally deployed it onto the GPT hosting that I talked about before. 
+So, let me just open it in my browser. 
+Yeah. 
+And right now it's only visible to me, but once this video is published, well, right after testing actually, I'm going to actually open it up so that everybody could access it and play it too. 
+And once I deploy it onto my repo, I'll make sure to add a readyto use conversion from this website to an actual mobile app. 
+so much so that you can just copy it, paste it inside of your Codex and then it it will convert it into an actual mobile app which is through expo. 
+So you'll be able to have it on iOS as well as Android. 
+So once you buy your account on the app store, which is the app store developer account, and then the play store account, you can simply just deploy it on there and then you'll make money off of it. 
+Right? So, I'm going to test it out for you all to see. 
+So, I'm going to enable my microphone over here and then start the flight. 
+Ah. 
+Oh, sorry about that. 
+Uh uh. 
+Oh. 
+Okay. 
+So, it's like for it to be able to hover, you see this thing over here? It's picking up my voice, right? So I think for it to be able to hover, it needs to stay constantly inside the third bar, right? So let me try again. 
+Ah, that was bad. 
+That [snorts] was bad. 
+Well, what's software engineering without a sense of humor? Let's go again. 
+Ah! A! >> [laughter] >> That was dumb, bro. 
+[snorts] Oh, at least we just got the the highest score in the game so far. 
+So, literally that's what you have there. 
+Let me just deploy it on to my GitHub repo. 
+Note though that I've already connected it on here. 
+So literally all I have to do is I just ask it to. 
+[music] All right. 
+So Codex just pushed everything onto the GitHub repo that we had specified. 
+So I want to show you how you guys can access it. 
+So literally I'll have this repo linked in the description as well. 
+So you just come on here like this and first of all it has a read me that is user friendly. 
+So you could just read through and then it will show you how to get started and install it basically. 
+And as well it comes with an expo conversion prompt. 
+What this will show you is it's a ready to copy and paste prompt that allows you to paste this inside of Codex or code or whatever AI agent that you're using. 
+And literally it's going to convert this entire thing that we had done into an actual mobile app that is both iOS friendly and Android friendly. 
+So once you have the application you can deploy it onto app store or Google play and then monetize it from there. 
+Right? So literally all you have to do is paste this in there. 
+And as well I want to cover something real quick. 
+All of this thing that we've done in this tutorial was just to get you started and to understand the fundamentals of Codex. 
+I did not show you an actual workflow to be able to build slopless applications. 
+You got to have a workflow. 
+All right. 
+So, in the next video, which is also going to be with free code cam, I'm going to come on here again, right? And literally we'll be centered on workflows because these tools themselves are really competent. 
+They have incredibly powerful. 
+But then if there's no proper workflow around them, you're definitely going to be generating a lot of slop or literally you'll be ending in cycles because you'll just be hoping for the best on every prompt, right? But if indeed you're going to build something that you're going to put in front of real users, then most certainly you need to have a workflow. 
+So in the next video I'm going to take you from one step which is literally from A to Z on how to build actual production ready systems using workflows. 
+So if you like the idea of that, most certainly do leave a comment in the comments box letting the entire Free Code Camp team understand that you would want to see that. 
+And as well, do not forget to like, do not forget to subscribe to Free Code Camp because quite literally they have a lot of incredibly useful projects on here and as well you can find me on Skyro getting text. 
+So do step by sometime. 
+I just figured some of you guys would also want to play the game. 
+So, right now, because the visibility is just set to only me, I'm going to change it to public so that everybody else can also be able to play and have it linked in the description below. 
+So, if you want to play it, just go on and play it. 
+I hope you have fun. 
+See you in the next one. 
+Yeah.
