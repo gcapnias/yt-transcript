@@ -37,5 +37,13 @@ Regenerating the catalog by rescanning every transcript on disk, in full. A rebu
 _Avoid_: Refresh, sync, reindex, update
 
 **Fetch**:
-One run of the tool against one video: download a subtitle track, clean it into prose, write the transcript.
+The tool acting on one video: download a subtitle track, clean it into prose, write the transcript. Always singular — a playlist is many fetches, never one large one.
 _Avoid_: Download, scrape, sync, import
+
+**Batch**:
+The set of fetches a single playlist or channel URL expands into. A batch survives the failure of any of its fetches.
+_Avoid_: Run, job, queue, bulk fetch
+
+**Expand**:
+Turning a playlist or channel URL into the list of videos it names, so each can be fetched. Only playlist and channel URLs expand; a video URL is already a single video.
+_Avoid_: Resolve, enumerate, crawl, unroll
