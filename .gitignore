@@ -142,3 +142,11 @@ dist
 .svelte-kit
 
 # End of https://www.toptal.com/developers/gitignore/api/node
+
+### Workspace folders (see CLAUDE.md) ###
+# Temporary space for ad-hoc operations; nothing here survives across sessions.
+.scratch/*
+!.scratch/.gitkeep
+# Output space for the firecrawl agent.
+.firecrawl/*
+!.firecrawl/.gitkeep
