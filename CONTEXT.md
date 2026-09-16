@@ -32,6 +32,10 @@ _Avoid_: Captions, CC, transcript (the track is the input, the transcript is the
 A Markdown index of every transcript, derived wholly from transcript frontmatter so it cannot drift from what is on disk.
 _Avoid_: Index, manifest, database, TOC
 
+**Rebuild**:
+Regenerating the catalog by rescanning every transcript on disk, in full. A rebuild never appends to what was there before, so the catalog afterwards reflects exactly what is on disk and nothing else.
+_Avoid_: Refresh, sync, reindex, update
+
 **Fetch**:
 One run of the tool against one video: download a subtitle track, clean it into prose, write the transcript.
 _Avoid_: Download, scrape, sync, import
