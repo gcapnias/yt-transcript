@@ -150,3 +150,6 @@ dist
 # Output space for the firecrawl agent.
 .firecrawl/*
 !.firecrawl/.gitkeep
+
+### beads tracker: transient SQLite lock artifacts not covered by .beads/.gitignore ###
+.beads/*.db-lock-*
