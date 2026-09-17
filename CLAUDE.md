@@ -4,11 +4,11 @@
 
 ### Issue tracker
 
-Issues live in the local beads_rust tracker (`.beads/`), managed with the `br` CLI. See `docs/agents/issue-tracker.md`.
+Issues live as GitHub issues in `gcapnias/yt-transcript`, managed with the `gh` CLI. See `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 
-The five canonical triage roles, used verbatim as beads labels. See `docs/agents/triage-labels.md`.
+The five canonical triage roles, used verbatim as GitHub labels. See `docs/agents/triage-labels.md`.
 
 ### Domain docs
 
