@@ -153,3 +153,6 @@ dist
 
 ### beads tracker: transient SQLite lock artifacts not covered by .beads/.gitignore ###
 .beads/*.db-lock-*
+
+# Generated transcripts and their catalog
+transcripts/
