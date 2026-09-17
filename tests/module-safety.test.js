@@ -11,19 +11,8 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
  * so merely importing it wrote a file. Every module must stay import-safe:
  * only bin/yt-transcript.js may run anything.
  */
-test('importing any module writes no file and spawns nothing', async () => {
-  const modules = [
-    ...fs
-      .readdirSync(path.join(root, 'src'))
-      .filter((name) => name.endsWith('.js'))
-      .map((name) => `src/${name}`),
-    // The entry point is a module too: its guard is what stops an import of it
-    // running the whole command. That guard is `import.meta.main`, so it can
-    // only be exercised on a runtime that has it (Node 24.2+).
-    ...(import.meta.main === undefined ? [] : ['bin/yt-transcript.js']),
-  ];
-  assert.ok(modules.length > 1, 'no modules found to check');
-
+/** Asserts that importing `modules` left the repository exactly as it was. */
+async function importLeavingNoTrace(modules) {
   const before = fs.readdirSync(root).sort();
   const cwdBefore = fs.readdirSync(process.cwd()).sort();
 
@@ -33,6 +22,30 @@ test('importing any module writes no file and spawns nothing', async () => {
 
   assert.deepEqual(fs.readdirSync(root).sort(), before);
   assert.deepEqual(fs.readdirSync(process.cwd()).sort(), cwdBefore);
+}
+
+test('importing every src module writes no file and spawns nothing', async () => {
+  const modules = fs
+    .readdirSync(path.join(root, 'src'))
+    .filter((name) => name.endsWith('.js'))
+    .map((name) => `src/${name}`);
+  assert.ok(modules.length > 0, 'no modules found to check');
+
+  await importLeavingNoTrace(modules);
+});
+
+// The entry point is a module too, and its guard is `import.meta.main`, which
+// arrived in Node 24.2 — above this package's Node 22 floor. On Node 22 the
+// guard is absent by design (failing closed would break the tool on a
+// supported runtime), so this skips loudly rather than passing over a case it
+// never checked.
+test('importing the entry point does not run the command', async (t) => {
+  if (import.meta.main === undefined) {
+    t.skip('entry guard needs import.meta.main (Node 24.2+); unguarded on this runtime');
+    return;
+  }
+
+  await importLeavingNoTrace(['bin/yt-transcript.js']);
   assert.equal(process.exitCode ?? 0, 0, 'importing the entry point ran the command');
 });
 
