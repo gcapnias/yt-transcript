@@ -20,6 +20,10 @@ _Avoid_: Header, metadata block
 One timed unit of text in the subtitle file yt-dlp downloads. Cues are an intermediate the pipeline consumes and discards; they never appear in a transcript.
 _Avoid_: Caption, line, segment, subtitle
 
+**Artifact**:
+Anything a subtitle track carries that is not spoken content: a provenance credit, speaker-change notation, or a sound event. Artifacts are removed while cleaning, so they never reach a transcript. Notation is track-kind-specific, and a transcriber's annotation on speech — an uncertain name, on-screen text — is not an artifact and survives verbatim.
+_Avoid_: Noise, junk, markup, tag
+
 **Paragraph**:
 A run of consecutive cues merged into prose, broken at the first sentence end after a minimum word count. Paragraphs are the transcript's only structure.
 _Avoid_: Block, chunk, section
