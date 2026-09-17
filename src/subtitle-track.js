@@ -31,7 +31,7 @@ const AUTO_SIGNAL = /<c[\s.>]|align:start position:0%/;
  * `Kind: captions` appears in both.
  *
  * One signal, three consumers: the `subtitles` frontmatter key, the dedup
- * skip, and (from ytdlp-xmu.3) which artifact notation to look for.
+ * skip, and which artifact notation to look for.
  *
  * @param {string} rawText the subtitle track exactly as downloaded
  * @returns {'auto'|'manual'}
