@@ -197,7 +197,19 @@ test('the summary counts all three outcomes and names every failure', () => {
   assert.match(summary, /1 skipped/);
   assert.match(summary, /1 failed/);
   assert.equal(failureLines.length, 2);
-  assert.match(failureLines.join('\n'), /F3lL98Pj90o/);
+  // Self-sufficient at a distance: on a long batch the full report of this
+  // failure is hundreds of progress lines further up.
+  assert.equal(failureLines[1], `  ${B} (${NO_SUBTITLES})`);
+});
+
+test('a failure with no classification still makes the roll-call', () => {
+  const { failureLines } = describeBatch({
+    fetched: [],
+    skipped: [],
+    failures: [{ url: A, failure: null, message: 'EPERM: operation not permitted' }],
+  });
+
+  assert.equal(failureLines[1], `  ${A}`);
 });
 
 test('a batch that failed at nothing says so without a failure section', () => {

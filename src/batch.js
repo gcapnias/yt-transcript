@@ -97,6 +97,14 @@ export function describeBatch({ fetched, skipped, failures }) {
 
   return {
     summary,
-    failureLines: ['Failed:', ...failures.map((entry) => `  ${entry.url}`)],
+    // A roll-call, not a repeat: each failure was already reported in full as
+    // it happened. It still carries the classification, because on a long
+    // batch that full report scrolls hundreds of progress lines above the
+    // summary, and "which of these is worth re-running" is the question the
+    // summary exists to answer.
+    failureLines: [
+      'Failed:',
+      ...failures.map((entry) => `  ${entry.url}${entry.failure ? ` (${entry.failure})` : ''}`),
+    ],
   };
 }
