@@ -274,7 +274,14 @@ test('manual output keeps every sentence the auto dedup heuristic would have eat
   const wait = body(render(readFixture('manual', 'arj7oStGLkU')).contents);
 
   // Dialogue echo: k=2, the second speaker's opening word deleted.
-  assert.ok(warmth.includes('- Warmth. - Warmth, light.'), 'the two-speaker exchange lost a word');
+  //
+  // The literal lost its two `- ` prefixes when artifact stripping landed:
+  // both cues are line-start speaker markers, and deleting them is this
+  // pipeline's settled behaviour. What the assertion measures is unchanged —
+  // both utterances survive, nothing is deleted — and it reads like an
+  // accidental duplication precisely because the marker is gone. It is not
+  // one, and dedup still never runs on a manual track.
+  assert.ok(warmth.includes('Warmth. Warmth, light.'), 'the two-speaker exchange lost a word');
   // Number split across cues: k=1, a whole magnitude deleted.
   assert.ok(warmth.includes('100 trillion, trillion atoms'), 'the split number lost a magnitude');
   // Rhetorical repeat: k=2, the entire cue erased.
@@ -287,18 +294,128 @@ test('manual output keeps every sentence the auto dedup heuristic would have eat
   assert.ok(wait.includes('right now. Now, sometimes'), 'the discourse marker was cut');
 });
 
-// ------------------------- scope boundary: artifacts belong to the next slice
+// ----------------------------------------------------------- artifacts
+//
+// The inverse of the scope-boundary test ytdlp-xmu.2 left here: every token it
+// asserted was still present is now asserted gone, and every token that is
+// content is asserted to survive.
 
-test('artifact tokens are still present, because stripping them is the next ticket', () => {
-  const manual = body(render(readFixture('manual', 'DxL2HoqLbyA')).contents);
+test('every artifact token the fixtures carry is gone from the rendered prose', () => {
+  const warmth = body(render(readFixture('manual', 'DxL2HoqLbyA')).contents);
   const laughing = body(render(readFixture('manual', 'iG9CE55wbtY')).contents);
   const credited = body(render(readFixture('manual', 'rNxC16mlO60')).contents);
   const amara = body(render(readFixture('manual', '8nHBGFKLHZQ')).contents);
   const auto = body(render(readFixture('auto', 'o3CX_Y59_74')).contents);
 
-  assert.ok(manual.includes('- Warmth.'), 'the manual speaker marker was stripped');
-  assert.ok(/\(Laughter\)|\(Applause\)/.test(laughing), 'a manual sound event was stripped');
-  assert.ok(/Transcriber:|Reviewer:/.test(credited), 'a provenance credit was stripped');
-  assert.ok(amara.includes('Subtitles by the Amara.org community'), 'a final-cue credit was stripped');
-  assert.ok(auto.includes('>>'), 'the auto speaker marker was stripped');
+  assert.ok(!/(^|\s)- /.test(warmth), 'a manual speaker marker survived');
+  assert.ok(!/\(Laughter\)|\(Applause\)|\(Sigh\)|\(Audience\)/.test(laughing), 'a manual sound event survived');
+  assert.ok(!/Transcriber:|Reviewer:/.test(credited), 'a provenance credit survived');
+  assert.ok(!amara.includes('Subtitles by the Amara.org community'), 'a final-cue credit survived');
+  assert.ok(!auto.includes('>>'), 'an auto speaker marker survived');
+  assert.ok(!/\[snorts\]|\[music\]|\[laughter\]|\[clears throat\]/.test(auto), 'an auto sound event survived');
+});
+
+test('a credit in the first cue of a manual track goes, and the same text mid-track stays', () => {
+  // Four cues, not three: with three the repeat would land in last position
+  // and the position guard would drop it for the wrong reason.
+  const { contents } = render(
+    track(['Transcriber: Jane Doe', 'Hello there.', 'Transcriber: Jane Doe', 'Goodbye now.']),
+  );
+
+  assert.equal(body(contents).trimEnd(), 'Hello there. Transcriber: Jane Doe Goodbye now.');
+});
+
+test('a credit in the final cue of a manual track goes, and the speech before it stays', () => {
+  // `8nHBGFKLHZQ` carries its credit as the last cue, which is why the
+  // position guard covers both ends rather than the first cue alone.
+  const amara = body(render(readFixture('manual', '8nHBGFKLHZQ')).contents);
+
+  assert.ok(!amara.includes('Amara'), 'the final-cue credit survived');
+  assert.ok(amara.trimEnd().endsWith('interesting neutron stars, click here.'), amara.slice(-120));
+});
+
+test('a credit is never dropped on an auto track, where the notation does not occur', () => {
+  const { contents } = render(track(['Transcriber training is a real job.', 'And so it goes.'], { auto: true }));
+
+  assert.match(body(contents), /^Transcriber training is a real job\./);
+});
+
+test('the speaker markers go and the speech beside them stays, in both notations', () => {
+  const manual = render(track(['- Heat.', '- Warmth, light.']));
+  const auto = render(track(['&gt;&gt; So this is the plan.', '&gt;&gt; It is a good one.'], { auto: true }));
+
+  assert.equal(body(manual.contents).trimEnd(), 'Heat. Warmth, light.');
+  // Entity decoding is a precondition, not cosmetic: `>>` is `&gt;&gt;` on
+  // disk, so the rule only ever sees the decoded form.
+  assert.equal(body(auto.contents).trimEnd(), 'So this is the plan. It is a good one.');
+});
+
+test("a speaker's own notation is not stripped from the other kind of track", () => {
+  const manual = render(track(['>> is how you quote in Markdown.']));
+  const auto = render(track(['- is a bullet, not a speaker.'], { auto: true }));
+
+  assert.match(body(manual.contents), /^>> is how you quote/);
+  assert.match(body(auto.contents), /^- is a bullet/);
+});
+
+test('short sound events are stripped on both kinds, each in its own notation', () => {
+  const manual = render(track(['(Laughter) That was the whole point.', 'He agreed (Applause) at once.']));
+  const auto = render(track(['[snorts] That was dumb, bro.', 'It went [clears throat] rather well.'], { auto: true }));
+
+  // Token-level, because speech shares the line with the token.
+  assert.equal(body(manual.contents).trimEnd(), 'That was the whole point. He agreed at once.');
+  assert.equal(body(auto.contents).trimEnd(), 'That was dumb, bro. It went rather well.');
+});
+
+test('a parenthetical over four words, or carrying sentence punctuation, survives', () => {
+  // The shape guard is what makes the rule fail safe: an unrecognised long
+  // parenthetical stays visible rather than taking speech with it.
+  const long = render(track(['He paused (and then he thought about it) before answering.']));
+  const punctuated = render(track(['He paused (wait. really) before answering.']));
+
+  assert.match(body(long.contents), /He paused \(and then he thought about it\) before answering\./);
+  assert.match(body(punctuated.contents), /He paused \(wait\. really\) before answering\./);
+});
+
+test('a bracketed annotation survives verbatim on a manual track and is stripped on an auto one', () => {
+  // The same guard-clean token both ways: the asymmetry is the rule, not the
+  // token's shape. Unwrapping it would turn `Matt [Caplin?],` into
+  // `Matt Caplin?,`, a question mark that now reads as the speaker's.
+  const manual = render(track(['The answer by Matt [Caplin] holds.']));
+  const auto = render(track(['The answer by Matt [Caplin] holds.'], { auto: true }));
+
+  assert.match(body(manual.contents), /The answer by Matt \[Caplin\] holds\./);
+  assert.match(body(auto.contents), /The answer by Matt holds\./);
+});
+
+test('the real transcriber annotations survive verbatim, brackets and all', () => {
+  const amara = body(render(readFixture('manual', '8nHBGFKLHZQ')).contents);
+  const wait = body(render(readFixture('manual', 'arj7oStGLkU')).contents);
+
+  assert.ok(amara.includes('Matt [Caplin?],'), 'the annotation lost its brackets');
+  assert.ok(wait.includes('[This is a perfect time to get some work done.] [Nope!]'), 'the annotation was altered');
+});
+
+test('a bracket opening in one cue and closing in the next is left untouched', () => {
+  // Matched within a single cue only, so a token spanning a cue boundary is
+  // not a token at all.
+  const { contents } = render(track(['So then [he', 'paused] and continued.'], { auto: true }));
+
+  assert.match(body(contents), /So then \[he paused\] and continued\./);
+});
+
+test('a sound-event-only cue contributes no words and no whitespace', () => {
+  const { contents } = render(track(['Hello there.', '(Laughter)', 'Goodbye now.']));
+
+  assert.equal(body(contents).trimEnd(), 'Hello there. Goodbye now.');
+});
+
+test('artifacts are stripped before dedup, so repeated boilerplate never feeds the overlap rule', () => {
+  // `[music]` closing one cue and opening the next is exactly the repetition
+  // the overlap detection mis-fires on, and it has no minimum match length.
+  const { contents } = render(
+    track(['the plan is simple [music]', '[music] the plan is simple and it works.'], { auto: true }),
+  );
+
+  assert.equal(body(contents).trimEnd(), 'the plan is simple and it works.');
 });

@@ -1,12 +1,12 @@
 /**
  * The cleaning pipeline: a subtitle track in, prose paragraphs out.
  *
- *   load -> classify -> strip tags -> decode entities -> dedup (auto only) -> paragraph
+ *   load -> classify -> strip tags -> decode entities -> strip artifacts
+ *        -> dedup (auto only) -> paragraph
  *
  * Three of those edges are forced rather than stylistic, and the comments
- * below say which. Artifact stripping is deliberately absent: it belongs to
- * ytdlp-xmu.3 and slots in where this file says so, between entity decoding
- * and dedup.
+ * below say which. The artifact rules themselves live in `./artifacts.js`;
+ * what this file settles is where they run.
  *
  * Timing is not used at all. Inter-cue gaps are exactly 0ms on every auto
  * track measured, so no pause threshold can ever fire; `tests/subtitle-track.test.js`
@@ -14,6 +14,7 @@
  * punctuation, and the cleaner never inserts a period.
  */
 
+import { stripArtifacts } from './artifacts.js';
 import { classifyTrack, parseCues } from './subtitle-track.js';
 
 /** Settled across every speaker tested, and hard-coded by decision, not a flag. */
@@ -148,11 +149,12 @@ export function cleanTrack(rawText) {
     )
     .filter((lines) => lines.length > 0);
 
-  // ytdlp-xmu.3 strips artifacts here, on `cues`, before dedup: the cues are
-  // still separate and still indexed, which its first/last-cue credit rule and
-  // its within-a-single-cue sound-event rule both need. The edge is forced —
-  // the overlap detection below has no minimum match length, so repeated
+  // Artifacts come out here, on `cues`, while they are still separate and
+  // still indexed: the first/last-cue credit rule reads the index, and the
+  // sound-event rule matches within a single cue. The edge is forced — the
+  // overlap detection below has no minimum match length, so repeated
   // boilerplate is precisely the repetition it mis-fires on.
+  const spoken = stripArtifacts(cues, trackKind);
 
-  return { trackKind, paragraphs: toParagraphs(mergeCues(cues, { dedup: trackKind === 'auto' })) };
+  return { trackKind, paragraphs: toParagraphs(mergeCues(spoken, { dedup: trackKind === 'auto' })) };
 }
