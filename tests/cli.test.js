@@ -77,8 +77,7 @@ test('a playlist or channel says so plainly, since batches are not built yet', a
 });
 
 // The failure path returns before any post-success work runs at all, which is
-// why no `rebuildCatalog` stub is needed below. The catalog's own triggers are
-// asserted in tests/catalog.test.js.
+// why no `rebuildCatalog` stub is needed below.
 test('no usable subtitles exits 1, having written nothing', async () => {
   const { err, io } = capture();
 
@@ -134,4 +133,87 @@ test('each rung of the retry ladder is reported, naming the video', async () => 
 
   assert.equal(code, 1);
   assert.match(err.join('\n'), /Rate-limited fetching https:\/\/www\.youtube\.com\/watch\?v=o3CX_Y59_74 \(attempt 1 of 4\); retrying in 5s\./);
+});
+
+// The catalog's two triggers are CLI wiring, so they belong here rather than
+// beside the rendering rules. The rebuild itself is stubbed throughout: what
+// is under test is that it fires, once, on exactly the right paths.
+
+test('`yt-transcript catalog` rebuilds without fetching anything', async () => {
+  const { out, io } = capture();
+  let rebuilds = 0;
+
+  const code = await main(['catalog'], io, {
+    preflight: async () => assert.fail('catalog preflighted yt-dlp'),
+    fetchTranscript: async () => assert.fail('catalog fetched something'),
+    rebuildCatalog: async () => {
+      rebuilds += 1;
+      return { file: 'transcripts/README.md', count: 3, warnings: [] };
+    },
+  });
+
+  assert.equal(code, 0);
+  assert.equal(rebuilds, 1);
+  assert.match(out.join('\n'), /transcripts\/README\.md/);
+  assert.match(out.join('\n'), /3 transcripts/);
+});
+
+test('catalog takes no target and no flags', async () => {
+  const { err, io } = capture();
+
+  assert.equal(await main(['catalog', 'o3CX_Y59_74'], io, { rebuildCatalog: async () => {} }), 1);
+  assert.match(err.join('\n'), /Usage: yt-transcript/);
+});
+
+test('a successful single-video fetch rebuilds the catalog exactly once', async () => {
+  const { io, err } = capture();
+  let rebuilds = 0;
+
+  const code = await main(['o3CX_Y59_74'], io, {
+    preflight: async () => '2026.09.01',
+    fetchTranscript: async () => ({
+      file: 'transcripts/a-talk.md',
+      transcript: { url: URL, trackKind: 'auto' },
+    }),
+    rebuildCatalog: async () => {
+      rebuilds += 1;
+      return { file: 'transcripts/README.md', count: 1, warnings: ['a-bad-file.md is malformed'] };
+    },
+  });
+
+  assert.equal(code, 0);
+  assert.equal(rebuilds, 1);
+  // A malformed neighbour is reported, never fatal.
+  assert.match(err.join('\n'), /a-bad-file\.md/);
+});
+
+test('a failed fetch rebuilds nothing', async () => {
+  const { io } = capture();
+
+  const code = await main(['o3CX_Y59_74'], io, {
+    preflight: async () => '2026.09.01',
+    fetchTranscript: failingFetch(NO_SUBTITLES),
+    rebuildCatalog: async () => assert.fail('a failed fetch rebuilt the catalog'),
+  });
+
+  assert.equal(code, 1);
+});
+
+test('a written transcript is still reported when the rebuild itself fails', async () => {
+  const { out, err, io } = capture();
+
+  const code = await main(['o3CX_Y59_74'], io, {
+    preflight: async () => '2026.09.01',
+    fetchTranscript: async () => ({
+      file: 'transcripts/a-talk.md',
+      transcript: { url: URL, trackKind: 'auto' },
+    }),
+    rebuildCatalog: async () => {
+      throw Object.assign(new Error('EACCES: permission denied'), { code: 'EACCES' });
+    },
+  });
+
+  assert.equal(code, 1);
+  assert.match(out.join('\n'), /transcripts\/a-talk\.md/);
+  assert.match(err.join('\n'), /yt-transcript catalog/);
 });
