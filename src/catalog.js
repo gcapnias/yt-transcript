@@ -96,6 +96,32 @@ export function renderCatalog(files) {
   return { markdown: `${lines.join('\n')}\n`, warnings, count: rows.length };
 }
 
+/**
+ * The `url`s of every transcript in a set of files — a batch's skip set.
+ *
+ * Deliberately the **same scan** the catalog rebuild performs, sharing its
+ * parse rather than walking the directory a third way: two scan rules that
+ * could disagree about what a transcript is would let a batch re-fetch a video
+ * the catalog already lists.
+ *
+ * Matching is on the frontmatter `url`, never the filename, so a transcript
+ * renamed by hand is still recognised. A malformed file contributes no url and
+ * no warning here — it is re-fetched, which is what the catalog's warning tells
+ * the user to do anyway.
+ *
+ * @param {Array<{ path: string, text: string }>} files
+ * @returns {string[]}
+ */
+export function scanTranscriptUrls(files) {
+  const urls = [];
+  for (const file of files) {
+    const frontmatter = parseFrontmatter(file.text);
+    if (frontmatter === null || frontmatter.error) continue;
+    urls.push(frontmatter.values.url);
+  }
+  return urls;
+}
+
 function renderRow(row) {
   const cells = COLUMNS.map((column) =>
     column.key === 'title' ? `[${cell(row.title)}](${row.path})` : cell(row[column.key]),

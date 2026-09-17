@@ -13,7 +13,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
-import { renderCatalog } from './catalog.js';
+import { renderCatalog, scanTranscriptUrls } from './catalog.js';
 import { TRANSCRIPTS_DIR } from './transcript-store.js';
 
 /**
@@ -38,21 +38,44 @@ export const CATALOG_FILENAME = 'README.md';
  * @returns {Promise<{ file: string, count: number, warnings: string[] }>}
  */
 export async function rebuildCatalog({ dir = TRANSCRIPTS_DIR } = {}) {
+  const { markdown, warnings, count } = renderCatalog(await readTranscriptFiles(dir));
+  const file = path.join(dir, CATALOG_FILENAME);
+  await fs.writeFile(file, markdown, 'utf8');
+
+  return { file, count, warnings };
+}
+
+/**
+ * The `url`s `transcripts/` already holds — what a batch subtracts from its
+ * expansion.
+ *
+ * Reads the directory the same way a rebuild does, so a batch cannot disagree
+ * with the catalog about what is already there. Skipping is batch-only: this
+ * is never consulted for a single video URL, which still overwrites.
+ *
+ * @param {{ dir?: string }} [options]
+ * @returns {Promise<string[]>}
+ */
+export async function readExistingUrls({ dir = TRANSCRIPTS_DIR } = {}) {
+  return scanTranscriptUrls(await readTranscriptFiles(dir));
+}
+
+/**
+ * Every `.md` in the directory, the catalog's own file included — it is
+ * excluded by the scan rule, with no filename special case. Filtering it out
+ * here would make that claim one nothing checks.
+ */
+async function readTranscriptFiles(dir) {
   // A missing directory is zero transcripts, not a crash: `yt-transcript
   // catalog` in a fresh tree must still produce the empty catalog.
   await fs.mkdir(dir, { recursive: true });
 
   const names = (await fs.readdir(dir)).filter((name) => name.toLowerCase().endsWith('.md'));
 
-  // Every `.md` goes to the seam, the catalog's own file included. Filtering
-  // it out here would make "no filename special case" a claim nothing checks.
-  const files = await Promise.all(
-    names.map(async (name) => ({ path: name, text: await fs.readFile(path.join(dir, name), 'utf8') })),
+  return Promise.all(
+    names.map(async (name) => ({
+      path: name,
+      text: await fs.readFile(path.join(dir, name), 'utf8'),
+    })),
   );
-
-  const { markdown, warnings, count } = renderCatalog(files);
-  const file = path.join(dir, CATALOG_FILENAME);
-  await fs.writeFile(file, markdown, 'utf8');
-
-  return { file, count, warnings };
 }

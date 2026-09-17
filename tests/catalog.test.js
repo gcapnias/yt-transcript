@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { renderCatalog } from '../src/catalog.js';
+import { renderCatalog, scanTranscriptUrls } from '../src/catalog.js';
 import { renderFrontmatter } from '../src/frontmatter.js';
 
 /**
@@ -159,4 +159,35 @@ test('a title the writer had to escape survives the round trip into a cell', () 
     markdown,
     /\| \[\/wayfinder: Nothing \\\| is "too" big \\ wide\]\(wayfinder\.md\) \| freeCodeCamp\.org \| 41:18 \| 2026-09-10 \| auto \|/,
   );
+});
+
+// The skip set a batch subtracts, read through the very same scan.
+
+test('the scan reads back the url the writer really wrote', () => {
+  // Pinned against `renderFrontmatter`'s output, not a hand-typed imitation:
+  // a quoting change there must fail here rather than silently re-fetch every
+  // video in every batch.
+  const text = `${renderFrontmatter({
+    title: 'A Talk',
+    url: 'https://www.youtube.com/watch?v=o3CX_Y59_74',
+    channel: 'freeCodeCamp.org',
+    duration: '41:18',
+    uploadDate: '20260910',
+    fetchedAt: new Date('2026-09-16T14:03:05.123Z'),
+    subtitles: 'auto',
+  })}\n\nProse.\n`;
+
+  assert.deepEqual(scanTranscriptUrls([{ path: 'renamed-by-hand.md', text }]), [
+    'https://www.youtube.com/watch?v=o3CX_Y59_74',
+  ]);
+});
+
+test('the scan ignores the catalog and any file too broken to identify', () => {
+  const urls = scanTranscriptUrls([
+    { path: 'README.md', text: renderCatalog([]).markdown },
+    { path: 'broken.md', text: '---\ntitle: "Half"\n' },
+    { path: 'a-talk.md', text: transcript() },
+  ]);
+
+  assert.deepEqual(urls, ['https://www.youtube.com/watch?v=o3CX_Y59_74']);
 });

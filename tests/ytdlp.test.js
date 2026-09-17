@@ -5,7 +5,15 @@ import os from 'node:os';
 import path from 'node:path';
 
 import { NO_SUBTITLES, RATE_LIMITED } from '../src/fetch-outcome.js';
-import { fetchArgs, fetchFailure, FetchError, findSubtitleTrack } from '../src/ytdlp.js';
+import {
+  expandArgs,
+  ExpansionError,
+  fetchArgs,
+  fetchFailure,
+  FetchError,
+  findSubtitleTrack,
+  parseExpansion,
+} from '../src/ytdlp.js';
 
 const URL = 'https://www.youtube.com/watch?v=o3CX_Y59_74';
 
@@ -62,4 +70,50 @@ test('--lang reaches yt-dlp verbatim, and is matched exactly', () => {
     fetchArgs({ url: URL, lang: 'el', destDir: '/tmp/run' }).filter((arg) => arg === 'el'),
     ['el'],
   );
+});
+
+// Expansion: the only invocation that reads a playlist. Both halves below are
+// pure — the spawn between them stays outside the tested seams, by decision.
+
+test('expansion reads the listing flat, and downloads nothing', () => {
+  const args = expandArgs({ url: 'https://www.youtube.com/playlist?list=PL123' });
+
+  assert.ok(args.includes('--flat-playlist'), 'expansion walked the playlist member by member');
+  assert.ok(args.includes('--simulate'), 'expansion could download');
+  assert.equal(args[args.indexOf('--print') + 1], '%(id)s');
+  assert.equal(args.at(-1), 'https://www.youtube.com/playlist?list=PL123');
+  // The divergence flag belongs to the per-video fetch; forcing it here would
+  // reduce a playlist to its first video.
+  assert.ok(!args.includes('--no-playlist'), 'the expansion refused to read the playlist');
+});
+
+test('expansion output is normalised to the settled canonical url form', () => {
+  assert.deepEqual(parseExpansion('o3CX_Y59_74\r\n4JofSJIrjwU\n\n'), [
+    'https://www.youtube.com/watch?v=o3CX_Y59_74',
+    'https://www.youtube.com/watch?v=4JofSJIrjwU',
+  ]);
+});
+
+test('a listing row that is not a playable video costs that row, not the batch', () => {
+  assert.deepEqual(parseExpansion('[deleted]\no3CX_Y59_74\n'), [
+    'https://www.youtube.com/watch?v=o3CX_Y59_74',
+  ]);
+});
+
+test('an empty listing expands to zero videos rather than to a failure', () => {
+  assert.deepEqual(parseExpansion(''), []);
+});
+
+test('expansion failure names the playlist and what yt-dlp said', () => {
+  const error = new ExpansionError(
+    'https://www.youtube.com/playlist?list=PL404',
+    1,
+    'ERROR: [youtube:tab] PL404: The playlist does not exist.\n',
+  );
+
+  assert.ok(error instanceof ExpansionError);
+  assert.match(error.message, /Could not read the playlist or channel/);
+  assert.match(error.message, /PL404/);
+  assert.match(error.message, /The playlist does not exist\./);
+  assert.doesNotMatch(error.message, /at .*\(.*:\d+:\d+\)/, 'message reads like a stack trace');
 });

@@ -4,7 +4,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 
 import { renderCatalog } from '../src/catalog.js';
-import { CATALOG_FILENAME, rebuildCatalog } from '../src/catalog-store.js';
+import { CATALOG_FILENAME, readExistingUrls, rebuildCatalog } from '../src/catalog-store.js';
 import { withTempDir } from '../src/temp-dir.js';
 
 /** A transcript as the writer produces one. Only the catalog's keys vary. */
@@ -58,6 +58,24 @@ test('a malformed transcript on disk is reported but never fatal', async () => {
     assert.equal(count, 1);
     assert.equal(warnings.length, 1);
     assert.match(warnings[0], /broken\.md/);
+  });
+});
+
+test('a batch reads its skip set off the disk the same way a rebuild does', async () => {
+  await withTempDir(async (dir) => {
+    // Renamed by hand, and still recognised: identity is the frontmatter url.
+    await fs.writeFile(path.join(dir, 'whatever-i-called-it.md'), transcript('A Talk'), 'utf8');
+    await rebuildCatalog({ dir });
+
+    assert.deepEqual(await readExistingUrls({ dir }), [
+      'https://www.youtube.com/watch?v=o3CX_Y59_74',
+    ]);
+  });
+});
+
+test('a transcripts directory that does not exist yet holds nothing to skip', async () => {
+  await withTempDir(async (parent) => {
+    assert.deepEqual(await readExistingUrls({ dir: path.join(parent, 'transcripts') }), []);
   });
 });
 

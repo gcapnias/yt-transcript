@@ -1,16 +1,20 @@
-import { rebuildCatalog } from './catalog-store.js';
+import { describeBatch, runBatch } from './batch.js';
+import { planBatch } from './batch-plan.js';
+import { readExistingUrls, rebuildCatalog } from './catalog-store.js';
 import { fetchTranscript } from './fetch.js';
 import { describeRetry } from './fetch-outcome.js';
 import { parseTarget, TargetParseError } from './target.js';
-import { preflight, FetchError, YtDlpMissingError } from './ytdlp.js';
+import { preflight, expandPlaylist, ExpansionError, FetchError, YtDlpMissingError } from './ytdlp.js';
 
-const USAGE = `Usage: yt-transcript <url|id> [--lang <code>] [--playlist]
+const USAGE = `Usage: yt-transcript <url|id> [--lang <code>] [--playlist] [--force]
        yt-transcript catalog
 
   <url|id>      a YouTube video URL, a bare video id, a youtu.be or /shorts
                 link, a playlist URL, a channel URL, or a bare @handle
   --lang <code> subtitle language, matched exactly (default: en)
   --playlist    read a watch?v=...&list=... URL as the playlist, not the video
+  --force       in a batch, ignore the skip set and re-fetch everything. A
+                single video is re-fetched either way.
 
   catalog       rebuild transcripts/README.md from what is on disk, fetching
                 nothing. Takes no target and no flags.`;
@@ -28,7 +32,7 @@ const CATALOG_COMMAND = 'catalog';
  * unknown flag is a usage error rather than something passed on to `yt-dlp`.
  */
 export function parseArgs(argv) {
-  const options = { target: null, lang: 'en', playlist: false };
+  const options = { target: null, lang: 'en', playlist: false, force: false };
 
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
@@ -39,6 +43,10 @@ export function parseArgs(argv) {
       index += 1;
     } else if (arg === '--playlist') {
       options.playlist = true;
+    } else if (arg === '--force') {
+      // A no-op on a single video rather than an error: a single video URL
+      // overwrites anyway, so `--force` asks for what already happens.
+      options.force = true;
     } else if (arg.startsWith('-')) {
       throw new UsageError(`Unknown option: ${arg}`);
     } else if (options.target === null) {
@@ -65,9 +73,12 @@ export class UsageError extends Error {
  *
  * @param {string[]} argv arguments after the executable and script
  * @param {{ out?: (line: string) => void, err?: (line: string) => void }} [io]
- * @param {{ preflight?: Function, fetchTranscript?: Function }} [deps] injected
- *   so the exit codes can be tested against recorded process outcomes; the
- *   `yt-dlp` spawn itself stays outside the tested seams, by decision.
+ * @param {{ preflight?: Function, fetchTranscript?: Function, rebuildCatalog?: Function,
+ *           expandPlaylist?: Function, readExistingUrls?: Function,
+ *           sleep?: (ms: number) => Promise<void> }} [deps] injected so the
+ *   exit codes can be tested against recorded process outcomes; the `yt-dlp`
+ *   spawn itself stays outside the tested seams, by decision. `sleep` is the
+ *   batch's clock — real seconds in production, a recorded number in tests.
  * @returns {Promise<number>} the process exit code
  */
 export async function main(argv, io = {}, deps = {}) {
@@ -76,6 +87,8 @@ export async function main(argv, io = {}, deps = {}) {
   const checkYtDlp = deps.preflight ?? preflight;
   const fetchOne = deps.fetchTranscript ?? fetchTranscript;
   const rebuild = deps.rebuildCatalog ?? rebuildCatalog;
+  const expand = deps.expandPlaylist ?? expandPlaylist;
+  const readUrls = deps.readExistingUrls ?? readExistingUrls;
 
   if (argv[0] === CATALOG_COMMAND) {
     if (argv.length > 1) {
@@ -113,17 +126,18 @@ export async function main(argv, io = {}, deps = {}) {
     return 1;
   }
 
-  if (target.kind !== 'video') {
-    err(`A ${target.kind} expands into a batch of fetches, which is not built yet: ${target.url}`);
-    return 1;
-  }
-
   try {
     await checkYtDlp();
   } catch (error) {
     if (!(error instanceof YtDlpMissingError)) throw error;
     err(error.message);
     return 1;
+  }
+
+  // A playlist or channel is many fetches, and nothing else about a fetch
+  // changes: the same per-video invocation runs inside the loop.
+  if (target.kind !== 'video') {
+    return batch(target, options, { out, err }, { expand, readUrls, fetchOne, rebuild, sleep: deps.sleep });
   }
 
   try {
@@ -173,5 +187,71 @@ export async function main(argv, io = {}, deps = {}) {
 function report(out, transcript, file) {
   out(file);
   out(`  ${transcript.url}  (${transcript.trackKind} subtitle track)`);
+}
+
+/**
+ * The batch command: expand, subtract, fetch each, rebuild once, report.
+ *
+ * Exit code comes from the fetches alone. A rebuild warning about some other
+ * malformed transcript is reported and costs nothing, exactly as on the
+ * single-video path — a batch is not the place to fail over a neighbour.
+ *
+ * @returns {Promise<number>} the process exit code
+ */
+async function batch(target, options, { out, err }, { expand, readUrls, fetchOne, rebuild, sleep }) {
+  let expanded;
+  try {
+    expanded = await expand({ url: target.url });
+  } catch (error) {
+    if (!(error instanceof ExpansionError)) throw error;
+    // Expansion failure is a hard error, unlike a failure inside the batch: a
+    // batch that cannot learn what it contains has nothing to continue past,
+    // and nothing was fetched, so there is nothing to rebuild either.
+    err(error.message);
+    return 1;
+  }
+
+  // Skipping is batch-only, so the directory is read only here. `--force`
+  // means exactly "ignore the skip set": it changes nothing else, and the
+  // scan is not even paid for.
+  const existing = options.force ? [] : await readUrls();
+  const { fetch: toFetch, skipped } = planBatch(expanded, existing, options.force);
+
+  out(`${target.url}`);
+  out(`  ${expanded.length} videos, ${toFetch.length} to fetch, ${skipped.length} already on disk`);
+
+  const { fetched, failures } = await runBatch(toFetch, {
+    fetchOne,
+    lang: options.lang,
+    sleep,
+    onProgress: ({ url, position, total }) => out(`[${position}/${total}] ${url}`),
+    onRetry: (retry) => err(describeRetry(retry)),
+  });
+
+  // Once for the whole batch, never once per video: a rebuild is a full
+  // rescan, so per-video rebuilds would make a 200-video playlist quadratic.
+  // Unconditional, including a zero-video or all-skipped batch — "exactly
+  // once" is only a testable claim if nothing can skip it.
+  let rebuildError = null;
+  try {
+    const { warnings } = await rebuild();
+    for (const warning of warnings) err(warning);
+  } catch (error) {
+    rebuildError = error;
+  }
+
+  const { summary, failureLines } = describeBatch({ fetched, skipped, failures });
+  out(summary);
+  for (const line of failureLines) err(line);
+
+  if (rebuildError) {
+    // Reported after the summary, never instead of it: what the batch fetched
+    // is the more valuable fact, and a rebuild is recoverable by one command.
+    err(`The transcripts were written, but the catalog could not be rebuilt: ${rebuildError.message}`);
+    err('Run `yt-transcript catalog` to rebuild it.');
+  }
+
+  // Zero videos, and a batch where everything was skipped, are successes.
+  return failures.length > 0 || rebuildError ? 1 : 0;
 }
 
