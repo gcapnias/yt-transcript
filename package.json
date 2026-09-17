@@ -1,0 +1,17 @@
+{
+  "name": "yt-transcript",
+  "version": "0.1.0",
+  "description": "Turns YouTube videos into Markdown transcripts that read as prose.",
+  "type": "module",
+  "private": true,
+  "bin": {
+    "yt-transcript": "./bin/yt-transcript.js"
+  },
+  "scripts": {
+    "test": "node --test \"tests/**/*.test.js\""
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "license": "MIT"
+}
