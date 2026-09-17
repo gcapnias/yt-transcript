@@ -1,0 +1,4 @@
+# Test fixtures are real subtitle tracks and the whole evidence base for the
+# cleaning rules. Checked out byte-for-byte as recorded: line-ending conversion
+# would silently change what the tests read, and `core.autocrlf` is on here.
+tests/fixtures/** -text
