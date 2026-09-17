@@ -37,7 +37,7 @@ function stripTags(text) {
  * stripping then eats along with everything up to the next `>`.
  *
  * Not cosmetic — `>>`, the auto speaker marker, is `&gt;&gt;` on disk, so this
- * is what lets ytdlp-xmu.3 write one rule per notation.
+ * is what lets `./artifacts.js` write one rule per notation.
  */
 function decodeEntities(text) {
   return text

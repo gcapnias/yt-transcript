@@ -3,12 +3,12 @@
  * content comes out, and everything else stays.
  *
  * Every rule here branches on track kind, because **the same notation means
- * opposite things in the two kinds**: `[music]` on an auto track is noise,
- * while `[Caplin?]` on a manual one is content. A uniform bracket rule
- * silently deletes real speech; that is settled by measurement, not
+ * opposite things in the two kinds**: `[music]` on an auto track is an
+ * artifact, while `[Caplin?]` on a manual one is content. A uniform bracket
+ * rule silently deletes real speech; that is settled by measurement, not
  * preference.
  *
- * Four classes, and only two of them need code:
+ * Four classes, and only three of them need code:
  *
  * | Class                   | Manual           | Auto        | Disposition                    |
  * |-------------------------|------------------|-------------|--------------------------------|
@@ -22,9 +22,8 @@
  * `Matt [Caplin?],` into `Matt Caplin?,`, a question mark that now reads as
  * the speaker's.
  *
- * This runs **before dedup**, and that edge is forced: the overlap detection
- * has no minimum match length, so repeated boilerplate is exactly the
- * repetition it mis-fires on.
+ * Where in the pipeline this runs, and why that edge is forced, is settled in
+ * `./clean.js`.
  */
 
 /**
@@ -37,15 +36,22 @@
  */
 const CREDIT = /^(Transcriber|Reviewer|Translator|Subtitles by|Captions by|Amara)\b/i;
 
-/** Line-start speaker change, one notation per track kind. */
-const SPEAKER_MARKER = { manual: /^-\s+/, auto: /^>>\s*/ };
-
 /**
- * Sound events, one notation per track kind. Non-nesting by construction: the
- * enclosed text may not contain its own delimiters, so the match can never run
- * past the token it opened.
+ * What each kind's notation looks like, in one place per kind, because a kind
+ * is the only thing that selects between them.
+ *
+ * `marker` is line-start speaker change. `soundEvent` is non-nesting by
+ * construction: the enclosed text may not contain its own delimiters, so the
+ * match can never run past the token it opened.
+ *
+ * Each notation is applied only to its own kind. A `>>` on a manual track is
+ * someone quoting Markdown and a `[snorts]` never occurs there at all, so
+ * crossing them over could only ever delete content.
  */
-const SOUND_EVENT = { manual: /\(([^()]*)\)/g, auto: /\[([^[\]]*)\]/g };
+const NOTATION = {
+  manual: { marker: /^-\s+/, soundEvent: /\(([^()]*)\)/g },
+  auto: { marker: /^>>\s*/, soundEvent: /\[([^[\]]*)\]/g },
+};
 
 /**
  * The shape guard, and a deliberate cost. A curated vocabulary of event words
@@ -86,13 +92,14 @@ function dropsAsCredit(lines, index, total, trackKind) {
  * trimmed, and a cue left holding only whitespace is **dropped entirely** —
  * contributing no words and no whitespace.
  *
- * @param {string[][]} cues cue lines, already tag-stripped and entity-decoded
+ * @param {string[][]} cues cue lines, already tag-stripped, entity-decoded,
+ *   whitespace-collapsed and trimmed — `CREDIT` and both markers anchor at the
+ *   start of a line and read that trim as given
  * @param {'auto'|'manual'} trackKind
  * @returns {string[][]} the surviving cues, each a single-element line list
  */
 export function stripArtifacts(cues, trackKind) {
-  const marker = SPEAKER_MARKER[trackKind];
-  const soundEvent = SOUND_EVENT[trackKind];
+  const { marker, soundEvent } = NOTATION[trackKind];
   const stripped = [];
 
   for (const [index, lines] of cues.entries()) {

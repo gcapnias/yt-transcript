@@ -307,10 +307,19 @@ test('every artifact token the fixtures carry is gone from the rendered prose', 
   const amara = body(render(readFixture('manual', '8nHBGFKLHZQ')).contents);
   const auto = body(render(readFixture('auto', 'o3CX_Y59_74')).contents);
 
+  // Each fixture is anchored on a line it still carries before its token is
+  // asserted gone. A negated regex passes against `undefined` too, so without
+  // the anchor a change to the rendered shape would retire this whole test in
+  // silence.
+  assert.ok(warmth.includes('Vitamin D'), 'the warmth track did not render');
   assert.ok(!/(^|\s)- /.test(warmth), 'a manual speaker marker survived');
+  assert.ok(laughing.includes('Shakespeare'), 'the Shakespeare track did not render');
   assert.ok(!/\(Laughter\)|\(Applause\)|\(Sigh\)|\(Audience\)/.test(laughing), 'a manual sound event survived');
+  assert.ok(credited.includes('hold a plank'), 'the credited track did not render');
   assert.ok(!/Transcriber:|Reviewer:/.test(credited), 'a provenance credit survived');
+  assert.ok(amara.includes('neutron stars'), 'the Amara track did not render');
   assert.ok(!amara.includes('Subtitles by the Amara.org community'), 'a final-cue credit survived');
+  assert.ok(auto.includes('Codex'), 'the auto track did not render');
   assert.ok(!auto.includes('>>'), 'an auto speaker marker survived');
   assert.ok(!/\[snorts\]|\[music\]|\[laughter\]|\[clears throat\]/.test(auto), 'an auto sound event survived');
 });
@@ -375,6 +384,16 @@ test('a parenthetical over four words, or carrying sentence punctuation, survive
 
   assert.match(body(long.contents), /He paused \(and then he thought about it\) before answering\./);
   assert.match(body(punctuated.contents), /He paused \(wait\. really\) before answering\./);
+});
+
+test('the shape guard holds in auto notation too, where it guards against ASR inventing a token', () => {
+  // The guard is what makes the rule fail safe, and the ASR vocabulary it
+  // faces is open — so it has to hold on the kind that produces the surprises.
+  const long = render(track(['He paused [and then he thought about it] fully.'], { auto: true }));
+  const punctuated = render(track(['He paused [wait. really] fully.'], { auto: true }));
+
+  assert.match(body(long.contents), /He paused \[and then he thought about it\] fully\./);
+  assert.match(body(punctuated.contents), /He paused \[wait\. really\] fully\./);
 });
 
 test('a bracketed annotation survives verbatim on a manual track and is stripped on an auto one', () => {
