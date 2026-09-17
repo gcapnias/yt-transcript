@@ -156,3 +156,6 @@ dist
 
 # Generated transcripts and their catalog
 transcripts/
+
+# Skills are restored from skills-lock.json, not tracked
+.claude/skills/
