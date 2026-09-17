@@ -144,6 +144,13 @@ export async function main(argv, io = {}, deps = {}) {
       const { warnings } = await rebuild();
       for (const warning of warnings) err(warning);
     } catch (error) {
+      // The spec does not cover a rebuild that fails on I/O, so this is a
+      // reading rather than a rule: the rebuild is a *required* trigger, not a
+      // nicety, and a command with two required effects that manages one has
+      // not succeeded. Exit 1 covering several conditions distinguished only
+      // by the message is already this tool's shape — rate-limited and
+      // permanently unfetchable share it too.
+      //
       // The transcript is written and already reported. Losing that fact in a
       // stack trace would be the worse failure, so name both and say what
       // fixes it.

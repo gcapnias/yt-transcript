@@ -36,7 +36,10 @@ const REQUIRED_KEYS = ['title', 'url', 'channel', 'duration', 'upload_date', 'fe
  * @param {Array<{ path: string, text: string }>} files every `.md` in the
  *   transcripts directory, the catalog itself included — it is excluded by the
  *   scan rule below, with no filename special case.
- * @returns {{ markdown: string, warnings: string[] }}
+ * @returns {{ markdown: string, warnings: string[], count: number }} the spec's
+ *   seam names the two keys it covers, and every test exercises exactly those;
+ *   `count` is the row count handed back rather than re-parsed out of the
+ *   rendered note, so the two can never disagree.
  */
 export function renderCatalog(files) {
   const rows = [];
@@ -65,7 +68,11 @@ export function renderCatalog(files) {
   rows.sort((a, b) => {
     if (a.upload_date !== b.upload_date) return a.upload_date < b.upload_date ? 1 : -1;
     if (a.title !== b.title) return a.title < b.title ? -1 : 1;
-    return 0;
+    // Two files sharing an upload date *and* a title is the true title
+    // collision the store resolves by suffixing the filename. The spec leaves
+    // their order open; settling it on the path keeps the generated file
+    // identical across machines rather than following directory order.
+    return a.path < b.path ? -1 : a.path > b.path ? 1 : 0;
   });
 
   const lines = [
@@ -86,7 +93,7 @@ export function renderCatalog(files) {
     );
   }
 
-  return { markdown: `${lines.join('\n')}\n`, warnings };
+  return { markdown: `${lines.join('\n')}\n`, warnings, count: rows.length };
 }
 
 function renderRow(row) {

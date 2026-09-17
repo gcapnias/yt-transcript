@@ -50,18 +50,9 @@ export async function rebuildCatalog({ dir = TRANSCRIPTS_DIR } = {}) {
     names.map(async (name) => ({ path: name, text: await fs.readFile(path.join(dir, name), 'utf8') })),
   );
 
-  const { markdown, warnings } = renderCatalog(files);
+  const { markdown, warnings, count } = renderCatalog(files);
   const file = path.join(dir, CATALOG_FILENAME);
   await fs.writeFile(file, markdown, 'utf8');
 
-  return { file, count: countIn(markdown), warnings };
-}
-
-/**
- * The row count, read back off the rendered note rather than counted a second
- * time: the catalog states how many transcripts it lists, and two independent
- * counts are two things that can disagree.
- */
-function countIn(markdown) {
-  return Number(/^(\d+) transcripts,/m.exec(markdown)[1]);
+  return { file, count, warnings };
 }
