@@ -75,6 +75,16 @@ test('a rate-limited fetch is retried once per delay, in the settled ladder', as
     reported.map((entry) => entry.attempt),
     [1, 2, 3],
   );
+
+  // The ladder is what feeds describeRetry, so the keys it emits are the keys
+  // that function reads. Drift here reads as "retrying in NaNs" to a user.
+  assert.deepEqual(Object.keys(reported[0]).sort(), ['attempt', 'attempts', 'delayMs', 'error']);
+  assert.deepEqual(
+    reported.map((entry) => entry.delayMs),
+    RETRY_DELAYS_MS,
+  );
+  assert.equal(reported[0].attempts, RETRY_DELAYS_MS.length + 1);
+  assert.match(describeRetry(reported[0]), /attempt 1 of 4.*5s/);
 });
 
 test('a retried fetch that succeeds stops climbing the ladder', async () => {
