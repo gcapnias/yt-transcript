@@ -21,7 +21,7 @@ function quoted(value) {
 }
 
 /** `20260910` -> `2026-09-10`. A bare `20260910` is a number YAML and humans both misread. */
-export function formatUploadDate(uploadDate) {
+function formatUploadDate(uploadDate) {
   const match = /^(\d{4})(\d{2})(\d{2})$/.exec(String(uploadDate ?? '').trim());
   return match ? `${match[1]}-${match[2]}-${match[3]}` : String(uploadDate ?? '').trim();
 }
@@ -30,7 +30,7 @@ export function formatUploadDate(uploadDate) {
  * A full ISO-8601 UTC instant, `Z`-suffixed and second-precision. A date alone
  * loses same-day re-fetches, and milliseconds are noise in a provenance field.
  */
-export function formatFetched(date) {
+function formatFetched(date) {
   return date.toISOString().replace(/\.\d{3}Z$/, 'Z');
 }
 

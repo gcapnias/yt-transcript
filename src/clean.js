@@ -17,7 +17,7 @@
 import { classifyTrack, parseCues } from './subtitle-track.js';
 
 /** Settled across every speaker tested, and hard-coded by decision, not a flag. */
-export const PARAGRAPH_MIN_WORDS = 100;
+const PARAGRAPH_MIN_WORDS = 100;
 
 /** A word ends a sentence, allowing one closing quote or bracket after the stop. */
 const SENTENCE_END = /[.!?]["')\]]?$/;
@@ -26,7 +26,7 @@ const SENTENCE_END = /[.!?]["')\]]?$/;
  * Removes inline markup: `<c>` word-timing tags, their closers, and the
  * `<00:00:01.200>` timestamps between them.
  */
-export function stripTags(text) {
+function stripTags(text) {
   return text.replace(/<[^>]*>/g, '');
 }
 
@@ -38,7 +38,7 @@ export function stripTags(text) {
  * Not cosmetic — `>>`, the auto speaker marker, is `&gt;&gt;` on disk, so this
  * is what lets ytdlp-xmu.3 write one rule per notation.
  */
-export function decodeEntities(text) {
+function decodeEntities(text) {
   return text
     .replace(/&amp;/g, '&')
     .replace(/&lt;/g, '<')
@@ -47,25 +47,38 @@ export function decodeEntities(text) {
     .replace(/&quot;/g, '"');
 }
 
-/** Lowercased and stripped to word characters, so punctuation cannot break a match. */
-const normalize = (word) => word.toLowerCase().replace(/[^\w]/g, '');
+/**
+ * Lowercased and stripped to letters, digits and `_`, so punctuation cannot
+ * break a match.
+ *
+ * `\p{L}\p{N}` rather than `\w`: `\w` is ASCII-only, so a Greek or Japanese
+ * word normalises to the empty string, and two entirely different words then
+ * compare equal. `--lang` accepts any language, so that is a live path to
+ * deleted speech rather than a hypothetical one.
+ */
+const normalize = (word) => word.toLowerCase().replace(/[^\p{L}\p{N}_]/gu, '');
 
 /**
  * How many leading words of `cueWords` repeat the tail of `accumulatedWords`.
- * Ported verbatim from `clean-transcript.js`; the whole of YouTube's
- * rolling-window repetition is what it removes.
+ * Ported from `clean-transcript.js`; the whole of YouTube's rolling-window
+ * repetition is what it removes.
  *
  * It has **no minimum match length**, which is exactly why it must never see a
  * manual track: over five manual tracks it scored 13 deletions, all 13 false
  * positives and zero true positives, and no cutoff separates the two classes.
+ *
+ * A run that normalises to nothing at all — punctuation only — is not a match:
+ * every such run compares equal to every other, which is a match on no
+ * evidence. `trim`, not `length`, is what tests that, because joining k empty
+ * words yields k-1 spaces rather than an empty string.
  */
-export function overlapSize(accumulatedWords, cueWords) {
+function overlapSize(accumulatedWords, cueWords) {
   const maxCheck = Math.min(accumulatedWords.length, cueWords.length);
 
   for (let k = maxCheck; k > 0; k -= 1) {
     const tail = accumulatedWords.slice(-k).map(normalize).join(' ');
     const head = cueWords.slice(0, k).map(normalize).join(' ');
-    if (tail === head && tail.length > 0) return k;
+    if (tail === head && tail.trim().length > 0) return k;
   }
 
   return 0;
@@ -80,7 +93,7 @@ export function overlapSize(accumulatedWords, cueWords) {
  * @param {{ dedup: boolean }} options
  * @returns {string[]}
  */
-export function mergeCues(cues, { dedup }) {
+function mergeCues(cues, { dedup }) {
   const words = [];
 
   for (const lines of cues) {
@@ -94,13 +107,13 @@ export function mergeCues(cues, { dedup }) {
 
 /**
  * Breaks the word stream at the next sentence end once a paragraph has reached
- * `PARAGRAPH_MIN_WORDS`. Ported from `prototype/paragraph-rules`, where 100
+ * `PARAGRAPH_MIN_WORDS`. Ported from branch `prototype/paragraph-rules`, where 100
  * beat every timing-based candidate on all eight tracks.
  *
  * @param {string[]} words
  * @returns {string[]} paragraphs
  */
-export function toParagraphs(words) {
+function toParagraphs(words) {
   const paragraphs = [];
   let current = [];
 
@@ -120,12 +133,12 @@ export function toParagraphs(words) {
  * The whole pipeline.
  *
  * @param {string} rawText the subtitle track exactly as downloaded
- * @returns {{ kind: 'auto'|'manual', paragraphs: string[] }}
+ * @returns {{ trackKind: 'auto'|'manual', paragraphs: string[] }}
  */
 export function cleanTrack(rawText) {
   // Classify first: the rule reads raw cue text, and every later branch needs
   // the answer.
-  const kind = classifyTrack(rawText);
+  const trackKind = classifyTrack(rawText);
 
   const cues = parseCues(rawText)
     .map((cue) =>
@@ -141,5 +154,5 @@ export function cleanTrack(rawText) {
   // the overlap detection below has no minimum match length, so repeated
   // boilerplate is precisely the repetition it mis-fires on.
 
-  return { kind, paragraphs: toParagraphs(mergeCues(cues, { dedup: kind === 'auto' })) };
+  return { trackKind, paragraphs: toParagraphs(mergeCues(cues, { dedup: trackKind === 'auto' })) };
 }

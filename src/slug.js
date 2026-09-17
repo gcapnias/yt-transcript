@@ -7,7 +7,7 @@
  */
 
 /** The full title is never lost to this cap — it is in the frontmatter. */
-export const SLUG_MAX_LENGTH = 120;
+const SLUG_MAX_LENGTH = 120;
 
 /** Deleted outright rather than separated: `Don't` -> `dont`, not `don-t`. */
 const QUOTE_MARKS = /['‘’"“”]/g;
@@ -16,7 +16,7 @@ const QUOTE_MARKS = /['‘’"“”]/g;
  * @param {string} title
  * @returns {string} possibly empty, for a title with no Latin alphanumerics
  */
-export function slugify(title) {
+function slugify(title) {
   return String(title)
     .normalize('NFKD')
     .replace(/\p{M}/gu, '')

@@ -125,6 +125,6 @@ export async function main(argv, io = {}) {
 
 function report(out, transcript, file) {
   out(file);
-  out(`  ${transcript.url}  (${transcript.subtitles} subtitles)`);
+  out(`  ${transcript.url}  (${transcript.trackKind} subtitle track)`);
 }
 

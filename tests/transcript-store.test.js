@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
-import os from 'node:os';
 import path from 'node:path';
 
+import { withTempDir } from '../src/temp-dir.js';
 import { readTranscriptUrl, writeTranscript } from '../src/transcript-store.js';
 
 const transcript = (videoId, slug, marker) => ({
@@ -14,17 +14,8 @@ const transcript = (videoId, slug, marker) => ({
   contents: `---\ntitle: "A talk"\nurl: https://www.youtube.com/watch?v=${videoId}\n---\n\n${marker}\n`,
 });
 
-async function inTempDir(run) {
-  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'yt-transcript-test-'));
-  try {
-    return await run(dir);
-  } finally {
-    await fs.rm(dir, { recursive: true, force: true });
-  }
-}
-
 test('a transcript is written under its slug', async () => {
-  await inTempDir(async (dir) => {
+  await withTempDir(async (dir) => {
     const file = await writeTranscript(transcript('o3CX_Y59_74', 'a-talk', 'first'), { dir });
 
     assert.equal(path.basename(file), 'a-talk.md');
@@ -33,7 +24,7 @@ test('a transcript is written under its slug', async () => {
 });
 
 test('re-running the same video overwrites its transcript', async () => {
-  await inTempDir(async (dir) => {
+  await withTempDir(async (dir) => {
     await writeTranscript(transcript('o3CX_Y59_74', 'a-talk', 'first'), { dir });
     const file = await writeTranscript(transcript('o3CX_Y59_74', 'a-talk', 'second'), { dir });
 
@@ -44,7 +35,7 @@ test('re-running the same video overwrites its transcript', async () => {
 });
 
 test('two different videos sharing a title produce two files', async () => {
-  await inTempDir(async (dir) => {
+  await withTempDir(async (dir) => {
     await writeTranscript(transcript('o3CX_Y59_74', 'a-talk', 'first'), { dir });
     const file = await writeTranscript(transcript('4JofSJIrjwU', 'a-talk', 'second'), { dir });
 

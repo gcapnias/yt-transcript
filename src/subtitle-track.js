@@ -1,25 +1,21 @@
 /**
  * Reading a subtitle track: what kind it is, and what cues it holds.
  *
- * Ported from `clean-transcript.js` and the `prototype/paragraph-rules` cue
- * parser. Both were measured against the thirteen real tracks in
- * `tests/fixtures/`, so the shapes tolerated here are the shapes observed
- * there, not a guess at the WebVTT grammar.
+ * The cue parser is ported from `clean-transcript.js` and the parser on branch
+ * `prototype/paragraph-rules`, both measured against the thirteen real tracks
+ * in `tests/fixtures/`.
  *
- * Nothing in this module strips or decodes anything: cue lines come out
- * verbatim, because classification reads *raw* cue text and every later rule
- * needs the cues still separate.
+ * Nothing here strips or decodes anything: cue lines come out verbatim,
+ * because classification reads *raw* cue text and every later rule needs the
+ * cues still separate.
  */
 
 /**
- * Both timestamp separators, because no `--sub-format` is passed: `yt-dlp`
- * prefers `.vtt` but is not obliged to hand us one, and an `.srt` differs only
- * in using a comma and numbering its cues.
+ * Both timestamp separators. `yt-dlp` prefers `.vtt` but is not obliged to
+ * hand us one — no `--sub-format` is passed — and an `.srt` differs only in
+ * using a comma and numbering its cues.
  */
 const CUE_TIMING = /(\d{2}:\d{2}:\d{2}[.,]\d{3})\s*-->\s*(\d{2}:\d{2}:\d{2}[.,]\d{3})/;
-
-/** Lines that carry no speech: the WebVTT header and an SRT cue number. */
-const NOT_SPEECH = /^(WEBVTT|Kind:|Language:|NOTE\b|\d+$)/;
 
 /**
  * The two signals an auto track carries and a manual track never does:
@@ -53,10 +49,41 @@ function toMilliseconds(timestamp) {
 }
 
 /**
+ * Splits a track into blank-line-delimited blocks, which is the structure both
+ * WebVTT and SRT are actually written in: a header block, then one block per
+ * cue, each optionally preceded by an identifier line.
+ *
+ * Only a **truly empty** line ends a block. A line holding a single space does
+ * not: `yt-dlp`'s auto tracks emit exactly that inside a cue, and treating it
+ * as a terminator would cut those cues in half.
+ */
+function toBlocks(rawText) {
+  const blocks = [];
+  let block = [];
+
+  for (const line of rawText.split(/\r?\n/)) {
+    if (line === '') {
+      if (block.length > 0) blocks.push(block);
+      block = [];
+      continue;
+    }
+    block.push(line);
+  }
+
+  if (block.length > 0) blocks.push(block);
+  return blocks;
+}
+
+/**
  * Splits a subtitle track into its cues.
  *
+ * A line counts as speech by **position** — it follows a timing line inside
+ * the same block — and never by what it says. A lexical filter here would
+ * silently eat a cue reading `1995` or one opening with `NOTE`, which is
+ * exactly the class of failure the cleaning rules exist to make impossible.
+ *
  * Every cue carrying a timing line comes out, including the ones whose text is
- * empty: dropping them here would break the contiguity the timing tests read,
+ * empty: dropping them would break the cue contiguity the timing tests read,
  * and the cleaning pipeline discards them anyway.
  *
  * @param {string} rawText
@@ -64,31 +91,25 @@ function toMilliseconds(timestamp) {
  */
 export function parseCues(rawText) {
   const cues = [];
-  let current = null;
-  let lines = [];
 
-  const close = () => {
-    if (current) cues.push({ ...current, lines });
-    current = null;
-    lines = [];
-  };
+  for (const block of toBlocks(rawText)) {
+    let current = null;
 
-  for (const rawLine of rawText.split(/\r?\n/)) {
-    const line = rawLine.trim();
-    const timing = CUE_TIMING.exec(line);
+    for (const rawLine of block) {
+      const line = rawLine.trim();
+      const timing = CUE_TIMING.exec(line);
 
-    if (timing) {
-      close();
-      current = { startMs: toMilliseconds(timing[1]), endMs: toMilliseconds(timing[2]) };
-      continue;
+      if (timing) {
+        current = { startMs: toMilliseconds(timing[1]), endMs: toMilliseconds(timing[2]), lines: [] };
+        cues.push(current);
+        continue;
+      }
+
+      // Before the block's timing line sits its identifier, and a block with
+      // no timing line at all is a header or a NOTE. Neither is speech.
+      if (current && line) current.lines.push(line);
     }
-
-    // Anything before the first cue is header, not speech. Clearing the buffer
-    // unconditionally above is what keeps it from leaking into cue one.
-    if (!current || !line || NOT_SPEECH.test(line)) continue;
-    lines.push(line);
   }
 
-  close();
   return cues;
 }

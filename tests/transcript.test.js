@@ -1,14 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 
 import { renderTranscript } from '../src/transcript.js';
-
-const fixtures = path.join(path.dirname(fileURLToPath(import.meta.url)), 'fixtures');
-
-const readFixture = (kind, id) => fs.readFileSync(path.join(fixtures, kind, `${id}.en.vtt`), 'utf8');
+import { readFixture } from './fixtures.js';
 
 const METADATA = {
   title: 'OpenAI Codex Crash Course – Build & Deploy Apps with Autonomous AI',
@@ -211,6 +205,21 @@ test('a manual track keeps a cue that repeats the previous cue, because dedup ne
   const { contents } = render(track(['I love it.', 'I love it, truly.']));
 
   assert.equal(body(contents).trimEnd(), 'I love it. I love it, truly.');
+});
+
+test('a non-Latin auto track keeps words that share no letters', () => {
+  // Stripping to ASCII word characters normalises every Greek word to the
+  // empty string, at which point two unrelated words compare equal and real
+  // speech disappears. `--lang` accepts any language, so this is reachable.
+  const { contents } = render(track(['καλημέρα κόσμε', 'τότε άλλο πράγμα'], { auto: true }));
+
+  assert.equal(body(contents).trimEnd(), 'καλημέρα κόσμε τότε άλλο πράγμα');
+});
+
+test('a non-Latin auto track still loses its rolling-window repetition', () => {
+  const { contents } = render(track(['καλημέρα κόσμε', 'καλημέρα κόσμε αγαπητέ'], { auto: true }));
+
+  assert.equal(body(contents).trimEnd(), 'καλημέρα κόσμε αγαπητέ');
 });
 
 test('every auto fixture comes out free of the repetition its cues carry', () => {

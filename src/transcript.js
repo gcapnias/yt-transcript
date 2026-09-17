@@ -24,10 +24,10 @@ import { transcriptSlug } from './slug.js';
  * @param {{ title: string, channel: string, duration: string, uploadDate: string }} input.metadata
  * @param {Date} [input.fetchedAt]
  * @returns {{ slug: string, filename: string, contents: string,
- *             url: string, videoId: string, subtitles: 'auto'|'manual' }}
+ *             url: string, videoId: string, trackKind: 'auto'|'manual' }}
  */
 export function renderTranscript({ trackText, url, videoId, metadata, fetchedAt = new Date() }) {
-  const { kind, paragraphs } = cleanTrack(trackText);
+  const { trackKind, paragraphs } = cleanTrack(trackText);
   const slug = transcriptSlug(metadata?.title ?? '', videoId);
 
   const frontmatter = renderFrontmatter({
@@ -37,7 +37,9 @@ export function renderTranscript({ trackText, url, videoId, metadata, fetchedAt 
     duration: metadata?.duration ?? '',
     uploadDate: metadata?.uploadDate ?? '',
     fetchedAt,
-    subtitles: kind,
+    // `subtitles` is the frontmatter key's name, not the concept's: the track
+    // kind is what it records.
+    subtitles: trackKind,
   });
 
   // No H1 and no timestamps: the title is in the frontmatter, and repeating it
@@ -50,6 +52,6 @@ export function renderTranscript({ trackText, url, videoId, metadata, fetchedAt 
     contents: `${frontmatter}\n\n${body}\n`,
     url,
     videoId,
-    subtitles: kind,
+    trackKind,
   };
 }
