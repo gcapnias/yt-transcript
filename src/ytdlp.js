@@ -3,6 +3,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 
 import { sanitizeChildEnv } from './child-env.js';
+import { classifyFetch, describeFailure } from './fetch-outcome.js';
 
 /** The binary name looked up on PATH. Overridable so tests need not uninstall it. */
 export const YT_DLP = 'yt-dlp';
@@ -24,13 +25,20 @@ export class YtDlpMissingError extends Error {
   }
 }
 
-/** A fetch that produced no usable subtitle track. */
+/**
+ * A fetch that produced no usable subtitle track.
+ *
+ * `failure` is the classification (`no-subtitles` or `rate-limited`) and
+ * `retryable` is what the retry ladder reads; a batch reports on `failure`.
+ */
 export class FetchError extends Error {
-  constructor(message, { url, exitCode }) {
+  constructor(message, { url, exitCode, failure, retryable = false }) {
     super(message);
     this.name = 'FetchError';
     this.url = url;
     this.exitCode = exitCode;
+    this.failure = failure;
+    this.retryable = retryable;
   }
 }
 
@@ -146,19 +154,33 @@ export function fetchArgs({ url, lang, destDir }) {
 export async function fetchSubtitleTrack({ url, lang = 'en', destDir, binary = YT_DLP }) {
   const { exitCode, stdout } = await run(binary, fetchArgs({ url, lang, destDir }));
 
+  // One invocation, one verdict. The retry ladder lives a level up, in
+  // `fetch.js`, so every retry is a fresh invocation into a fresh directory.
   const trackPath = await findSubtitleTrack(destDir);
-  if (exitCode !== 0 || !trackPath) {
-    // Exit code alone separates the permanent failure from the retryable one:
-    // no captions exits 0 with no file, an HTTP 429 exits non-zero.
-    throw new FetchError(
-      exitCode === 0
-        ? `No subtitles in "${lang}" are available for ${url}.`
-        : `yt-dlp failed (exit ${exitCode}) for ${url}.`,
-      { url, exitCode },
-    );
-  }
+  const failure = fetchFailure({ exitCode, hasTrack: trackPath !== null, url, lang });
+  if (failure) throw failure;
 
   return { metadata: parseMetadata(stdout), trackPath };
+}
+
+/**
+ * Turns one recorded process outcome into the error it means, or `null` when
+ * the fetch succeeded. Separated from the spawn so the mapping from an exit
+ * code to a retryable failure is testable without a live invocation.
+ *
+ * @param {{ exitCode: number, hasTrack: boolean, url: string, lang: string }} outcome
+ * @returns {FetchError|null}
+ */
+export function fetchFailure({ exitCode, hasTrack, url, lang }) {
+  const outcome = classifyFetch({ exitCode, hasTrack });
+  if (outcome.ok) return null;
+
+  return new FetchError(describeFailure({ failure: outcome.failure, url, lang }), {
+    url,
+    exitCode,
+    failure: outcome.failure,
+    retryable: outcome.retryable,
+  });
 }
 
 /**
@@ -169,7 +191,7 @@ export async function fetchSubtitleTrack({ url, lang = 'en', destDir, binary = Y
  * `--sub-format` is passed, so treating a non-vtt track as "no subtitles"
  * would report the wrong failure.
  */
-async function findSubtitleTrack(destDir) {
+export async function findSubtitleTrack(destDir) {
   const entries = await fs.readdir(destDir, { withFileTypes: true });
 
   const candidates = [];

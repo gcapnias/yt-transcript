@@ -1,10 +1,7 @@
-import fs from 'node:fs/promises';
-
+import { fetchTranscript } from './fetch.js';
+import { describeRetry } from './fetch-outcome.js';
 import { parseTarget, TargetParseError } from './target.js';
-import { withTempDir } from './temp-dir.js';
-import { renderTranscript } from './transcript.js';
-import { writeTranscript } from './transcript-store.js';
-import { fetchSubtitleTrack, preflight, FetchError, YtDlpMissingError } from './ytdlp.js';
+import { preflight, FetchError, YtDlpMissingError } from './ytdlp.js';
 
 const USAGE = `Usage: yt-transcript <url|id> [--lang <code>] [--playlist]
 
@@ -55,11 +52,16 @@ export class UsageError extends Error {
  *
  * @param {string[]} argv arguments after the executable and script
  * @param {{ out?: (line: string) => void, err?: (line: string) => void }} [io]
+ * @param {{ preflight?: Function, fetchTranscript?: Function }} [deps] injected
+ *   so the exit codes can be tested against recorded process outcomes; the
+ *   `yt-dlp` spawn itself stays outside the tested seams, by decision.
  * @returns {Promise<number>} the process exit code
  */
-export async function main(argv, io = {}) {
+export async function main(argv, io = {}, deps = {}) {
   const out = io.out ?? ((line) => process.stdout.write(`${line}\n`));
   const err = io.err ?? ((line) => process.stderr.write(`${line}\n`));
+  const checkYtDlp = deps.preflight ?? preflight;
+  const fetchOne = deps.fetchTranscript ?? fetchTranscript;
 
   let options;
   try {
@@ -87,7 +89,7 @@ export async function main(argv, io = {}) {
   }
 
   try {
-    await preflight();
+    await checkYtDlp();
   } catch (error) {
     if (!(error instanceof YtDlpMissingError)) throw error;
     err(error.message);
@@ -95,28 +97,20 @@ export async function main(argv, io = {}) {
   }
 
   try {
-    // Only the rendered transcript leaves the temporary directory: the
-    // subtitle track is gone by the time this returns, on this path and on the
-    // throwing one alike.
-    const transcript = await withTempDir(async (destDir) => {
-      const { metadata, trackPath } = await fetchSubtitleTrack({
-        url: target.url,
-        lang: options.lang,
-        destDir,
-      });
+    // The temporary directory, the retry ladder and the write all live inside
+    // fetchTranscript: the subtitle track is gone by the time this returns, on
+    // this path and on the throwing one alike.
+    const { transcript, file } = await fetchOne(
+      { url: target.url, videoId: target.videoId, lang: options.lang },
+      { onRetry: (retry) => err(describeRetry({ url: target.url, ...retry })) },
+    );
 
-      return renderTranscript({
-        trackText: await fs.readFile(trackPath, 'utf8'),
-        url: target.url,
-        videoId: target.videoId,
-        metadata,
-      });
-    });
-
-    const file = await writeTranscript(transcript);
     report(out, transcript, file);
     return 0;
   } catch (error) {
+    // Rate-limited and permanently unfetchable share exit 1. There is no
+    // second exit code: the two are the same observable, and inventing a code
+    // for a distinction the tool cannot make would be a lie to a script.
     if (!(error instanceof FetchError)) throw error;
     err(error.message);
     return 1;
