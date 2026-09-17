@@ -23,7 +23,9 @@ for it on PATH and failing with an actionable message when it is absent.
   clear install message, not as a stack trace at first use.
 - We always pass **`--js-runtimes node`**. It costs nothing today, silences yt-dlp's deprecation
   warning, and keeps the pipeline working if subtitles ever do begin to require a JS runtime.
-  Node >= 22 is yt-dlp's floor for this flag, which is why `engines` demands it.
+  Node >= 22 is yt-dlp's floor for this flag, which is why `engines` demands it. The one
+  exception is expanding a playlist or channel: that is a flat listing, which runs no player
+  JavaScript, so `expandArgs` omits the flag.
 - The `yt-dlp` spawn is the tool's only impure seam; everything above it is text in, text out.
 
 Full evidence: `archive/research/yt-dlp-js-runtime-and-pure-js-paths.md`.

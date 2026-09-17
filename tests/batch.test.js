@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 
 import { describeBatch, FETCH_DELAY_MS, runBatch } from '../src/batch.js';
 import { describeFailure, NO_SUBTITLES, RATE_LIMITED } from '../src/fetch-outcome.js';
-import { FetchError } from '../src/ytdlp.js';
+import { recordedFailure } from './recorded-outcomes.js';
 
 const A = 'https://www.youtube.com/watch?v=4JofSJIrjwU';
 const B = 'https://www.youtube.com/watch?v=F3lL98Pj90o';
@@ -27,12 +27,7 @@ function recordingFetch(fetched = []) {
 }
 
 function failure(url, kind) {
-  return new FetchError(describeFailure({ failure: kind, url, lang: 'en' }), {
-    url,
-    exitCode: kind === NO_SUBTITLES ? 0 : 1,
-    failure: kind,
-    retryable: kind === RATE_LIMITED,
-  });
+  return recordedFailure({ failure: kind, url });
 }
 
 test('a batch fetches every video, one per-video fetch each', async () => {
