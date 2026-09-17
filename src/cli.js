@@ -1,14 +1,27 @@
+import { rebuildCatalog } from './catalog-store.js';
 import { fetchTranscript } from './fetch.js';
 import { describeRetry } from './fetch-outcome.js';
 import { parseTarget, TargetParseError } from './target.js';
 import { preflight, FetchError, YtDlpMissingError } from './ytdlp.js';
 
 const USAGE = `Usage: yt-transcript <url|id> [--lang <code>] [--playlist]
+       yt-transcript catalog
 
   <url|id>      a YouTube video URL, a bare video id, a youtu.be or /shorts
                 link, a playlist URL, a channel URL, or a bare @handle
   --lang <code> subtitle language, matched exactly (default: en)
-  --playlist    read a watch?v=...&list=... URL as the playlist, not the video`;
+  --playlist    read a watch?v=...&list=... URL as the playlist, not the video
+
+  catalog       rebuild transcripts/README.md from what is on disk, fetching
+                nothing. Takes no target and no flags.`;
+
+/**
+ * `catalog` is a subcommand, not a flag and not a second executable: it takes
+ * no target and does something categorically different from fetching. It is
+ * matched ahead of the flag parser rather than inside it, so the fetch
+ * command's own argument shape is left exactly as it was.
+ */
+const CATALOG_COMMAND = 'catalog';
 
 /**
  * Splits argv into a target and the settled flag set. Purely syntactic; an
@@ -62,6 +75,23 @@ export async function main(argv, io = {}, deps = {}) {
   const err = io.err ?? ((line) => process.stderr.write(`${line}\n`));
   const checkYtDlp = deps.preflight ?? preflight;
   const fetchOne = deps.fetchTranscript ?? fetchTranscript;
+  const rebuild = deps.rebuildCatalog ?? rebuildCatalog;
+
+  if (argv[0] === CATALOG_COMMAND) {
+    if (argv.length > 1) {
+      err(`${CATALOG_COMMAND} takes no target and no flags.`);
+      err('');
+      err(USAGE);
+      return 1;
+    }
+
+    // No preflight: a rebuild reads the disk and nothing else, so it must work
+    // on a machine that has no `yt-dlp` at all.
+    const { file, count, warnings } = await rebuild();
+    for (const warning of warnings) err(warning);
+    out(`${file}  (${count} transcripts)`);
+    return 0;
+  }
 
   let options;
   try {
@@ -106,6 +136,22 @@ export async function main(argv, io = {}, deps = {}) {
     );
 
     report(out, transcript, file);
+
+    // The rebuild is a full rescan rather than an appended row, so it runs
+    // after the write and reflects the whole directory. A batch (ytdlp-xmu.6)
+    // calls `rebuildCatalog` once at its end instead of once per video.
+    try {
+      const { warnings } = await rebuild();
+      for (const warning of warnings) err(warning);
+    } catch (error) {
+      // The transcript is written and already reported. Losing that fact in a
+      // stack trace would be the worse failure, so name both and say what
+      // fixes it.
+      err(`The transcript was written, but the catalog could not be rebuilt: ${error.message}`);
+      err('Run `yt-transcript catalog` to rebuild it.');
+      return 1;
+    }
+
     return 0;
   } catch (error) {
     // Rate-limited and permanently unfetchable share exit 1. There is no

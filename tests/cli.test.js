@@ -76,9 +76,9 @@ test('a playlist or channel says so plainly, since batches are not built yet', a
   assert.match(err.join('\n'), /channel expands into a batch/);
 });
 
-// No catalog rebuild is asserted below because there is nothing to rebuild yet
-// (ytdlp-xmu.4): the failure path returns before any post-success work runs at
-// all, which is the property that keeps it true once the catalog lands.
+// The failure path returns before any post-success work runs at all, which is
+// why no `rebuildCatalog` stub is needed below. The catalog's own triggers are
+// asserted in tests/catalog.test.js.
 test('no usable subtitles exits 1, having written nothing', async () => {
   const { err, io } = capture();
 
@@ -113,6 +113,8 @@ test('a successful fetch exits 0, and --lang reaches it', async () => {
       assert.equal(lang, 'el', '--lang did not reach the fetch');
       return { file: 'transcripts/a-talk.md', transcript: { url: URL, trackKind: 'auto' } };
     },
+    // Stubbed so no test writes into the repository's own transcripts/.
+    rebuildCatalog: async () => ({ file: 'transcripts/README.md', count: 1, warnings: [] }),
   });
 
   assert.equal(code, 0);
