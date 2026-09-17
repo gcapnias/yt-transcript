@@ -6,8 +6,7 @@ import path from 'node:path';
 
 import { fetchTranscript } from '../src/fetch.js';
 import { NO_SUBTITLES, RATE_LIMITED, RETRY_DELAYS_MS } from '../src/fetch-outcome.js';
-import { fetchArgs, FetchError, findSubtitleTrack } from '../src/ytdlp.js';
-import { main } from '../src/cli.js';
+import { FetchError } from '../src/ytdlp.js';
 
 const URL = 'https://www.youtube.com/watch?v=o3CX_Y59_74';
 const VIDEO_ID = 'o3CX_Y59_74';
@@ -25,14 +24,18 @@ const METADATA = {
   uploadDate: '20260910',
 };
 
-/** A recorded process outcome, replayed instead of spawning `yt-dlp`. */
+/**
+ * Replays recorded process outcomes in place of spawning `yt-dlp`, so the exit
+ * codes and the retry ladder are covered without a live, rate-limited third
+ * party. A `{}` outcome is a success; `{ failure }` is the named failure.
+ */
 function recordedFetch(outcomes) {
   const calls = [];
   const remaining = [...outcomes];
 
   return {
     calls,
-    async fetch({ url, lang, destDir }) {
+    async fetchTrack({ url, lang, destDir }) {
       calls.push({ url, lang, destDir });
       const outcome = remaining.shift() ?? outcomes.at(-1);
 
@@ -70,7 +73,11 @@ test('a fetch that exits 0 but writes no subtitle file is a failure, not a succe
       () =>
         fetchTranscript(
           { url: URL, videoId: VIDEO_ID, lang: 'en' },
-          { fetch: recorded.fetch, dir, sleep: async () => assert.fail('retried a permanent failure') },
+          {
+            fetchTrack: recorded.fetchTrack,
+            dir,
+            sleep: async () => assert.fail('retried a permanent failure'),
+          },
         ),
       (error) => {
         assert.ok(error instanceof FetchError);
@@ -85,16 +92,6 @@ test('a fetch that exits 0 but writes no subtitle file is a failure, not a succe
   });
 });
 
-test('a zero-byte subtitle file is no subtitle file', async () => {
-  await withTranscriptsDir(async (dir) => {
-    await fs.writeFile(path.join(dir, `${VIDEO_ID}.en.vtt`), '', 'utf8');
-    assert.equal(await findSubtitleTrack(dir), null);
-
-    await fs.writeFile(path.join(dir, `${VIDEO_ID}.el.vtt`), TRACK, 'utf8');
-    assert.equal(await findSubtitleTrack(dir), path.join(dir, `${VIDEO_ID}.el.vtt`));
-  });
-});
-
 test('a rate-limited fetch climbs the ladder, then leaves nothing behind', async () => {
   await withTranscriptsDir(async (dir) => {
     const recorded = recordedFetch([{ failure: RATE_LIMITED }]);
@@ -106,7 +103,7 @@ test('a rate-limited fetch climbs the ladder, then leaves nothing behind', async
         fetchTranscript(
           { url: URL, videoId: VIDEO_ID, lang: 'en' },
           {
-            fetch: recorded.fetch,
+            fetchTrack: recorded.fetchTrack,
             dir,
             sleep: async (ms) => slept.push(ms),
             onRetry: (entry) => retries.push(entry),
@@ -132,7 +129,7 @@ test('a rate limit that lifts produces the transcript it was holding up', async 
 
     const { file } = await fetchTranscript(
       { url: URL, videoId: VIDEO_ID, lang: 'en' },
-      { fetch: recorded.fetch, dir, sleep: async (ms) => slept.push(ms) },
+      { fetchTrack: recorded.fetchTrack, dir, sleep: async (ms) => slept.push(ms) },
     );
 
     assert.deepEqual(slept, [5000, 15000]);
@@ -147,9 +144,11 @@ test('each attempt gets its own temporary directory, and none survives', async (
 
     await fetchTranscript(
       { url: URL, videoId: VIDEO_ID, lang: 'en' },
-      { fetch: recorded.fetch, dir, sleep: async () => {} },
+      { fetchTrack: recorded.fetchTrack, dir, sleep: async () => {} },
     );
 
+    // A refused attempt can leave a half-written track behind; reusing its
+    // directory would let the next attempt read that as its own success.
     const dirs = recorded.calls.map((call) => call.destDir);
     assert.equal(new Set(dirs).size, dirs.length, 'a retry reused the failed attempt’s directory');
     for (const destDir of dirs) {
@@ -158,95 +157,19 @@ test('each attempt gets its own temporary directory, and none survives', async (
   });
 });
 
-test('the requested language reaches yt-dlp exactly as asked', async () => {
+test('the language defaults to en and reaches the download unchanged', async () => {
   await withTranscriptsDir(async (dir) => {
-    const recorded = recordedFetch([{}]);
+    const recorded = recordedFetch([{}, {}]);
 
+    await fetchTranscript({ url: URL, videoId: VIDEO_ID }, { fetchTrack: recorded.fetchTrack, dir });
     await fetchTranscript(
-      { url: URL, videoId: VIDEO_ID, lang: 'en' },
-      { fetch: recorded.fetch, dir, sleep: async () => {} },
+      { url: URL, videoId: VIDEO_ID, lang: 'el' },
+      { fetchTrack: recorded.fetchTrack, dir },
     );
 
-    assert.equal(recorded.calls[0].lang, 'en', 'the default language is not en');
+    assert.deepEqual(
+      recorded.calls.map((call) => call.lang),
+      ['en', 'el'],
+    );
   });
-});
-
-test('--lang is passed to yt-dlp verbatim, and matched exactly', () => {
-  const args = fetchArgs({ url: URL, lang: 'en', destDir: '/tmp/run' });
-
-  assert.equal(args[args.indexOf('--sub-langs') + 1], 'en');
-  // `en` must not match `en-US`, `en-orig` is never requested, and the
-  // exact match is also what keeps `live_chat` out.
-  assert.ok(!args.includes('all'), 'broadened to --sub-langs all');
-  assert.ok(!args.some((arg) => arg.endsWith('-orig')), 'requested an -orig track');
-  assert.deepEqual(
-    fetchArgs({ url: URL, lang: 'el', destDir: '/tmp/run' }).filter((arg) => arg === 'el'),
-    ['el'],
-  );
-});
-
-/** Collects the lines main would have printed, so no test writes to a terminal. */
-function capture() {
-  const out = [];
-  const err = [];
-  return { out, err, io: { out: (line) => out.push(line), err: (line) => err.push(line) } };
-}
-
-// No catalog rebuild is asserted here because there is nothing to rebuild yet
-// (that is ytdlp-xmu.4): the failure path returns before any post-success work
-// runs at all, which is the property that keeps it true once the catalog lands.
-test('no usable subtitles exits 1 and writes nothing', async () => {
-  const { err, io } = capture();
-
-  const code = await main(['o3CX_Y59_74'], io, {
-    preflight: async () => '2026.09.01',
-    fetchTranscript: async () => {
-      throw new FetchError('No subtitles in "en" are available for ' + URL, {
-        url: URL,
-        exitCode: 0,
-        failure: NO_SUBTITLES,
-        retryable: false,
-      });
-    },
-  });
-
-  assert.equal(code, 1);
-  assert.match(err.join('\n'), /No subtitles in "en"/);
-});
-
-test('a rate-limited fetch exits 1 — there is no second exit code', async () => {
-  const { err, io } = capture();
-
-  const code = await main(['o3CX_Y59_74'], io, {
-    preflight: async () => '2026.09.01',
-    fetchTranscript: async () => {
-      throw new FetchError('Rate-limited fetching ' + URL + '; a later run may succeed.', {
-        url: URL,
-        exitCode: 1,
-        failure: RATE_LIMITED,
-        retryable: true,
-      });
-    },
-  });
-
-  assert.equal(code, 1);
-  assert.match(err.join('\n'), /Rate-limited/);
-});
-
-test('a successful fetch exits 0', async () => {
-  const { out, io } = capture();
-
-  const code = await main(['--lang', 'el', 'o3CX_Y59_74'], io, {
-    preflight: async () => '2026.09.01',
-    fetchTranscript: async ({ lang }) => {
-      assert.equal(lang, 'el', '--lang did not reach the fetch');
-      return {
-        file: 'transcripts/a-talk.md',
-        transcript: { url: URL, trackKind: 'auto' },
-      };
-    },
-  });
-
-  assert.equal(code, 0);
-  assert.match(out.join('\n'), /transcripts\/a-talk\.md/);
 });

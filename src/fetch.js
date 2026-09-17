@@ -12,7 +12,7 @@
 
 import fs from 'node:fs/promises';
 
-import { RETRY_DELAYS_MS, withRateLimitRetries } from './fetch-outcome.js';
+import { withRateLimitRetries } from './fetch-outcome.js';
 import { withTempDir } from './temp-dir.js';
 import { renderTranscript } from './transcript.js';
 import { writeTranscript } from './transcript-store.js';
@@ -26,26 +26,22 @@ import { fetchSubtitleTrack } from './ytdlp.js';
  * returns, so a failed fetch leaves `transcripts/` untouched.
  *
  * @param {{ url: string, videoId: string, lang?: string }} video
- * @param {{ fetch?: Function, write?: Function, dir?: string,
+ * @param {{ fetchTrack?: Function, write?: Function, dir?: string,
  *           sleep?: (ms: number) => Promise<void>, delays?: number[],
  *           onRetry?: Function }} [deps]
  * @returns {Promise<{ transcript: object, file: string }>}
  * @throws {FetchError} carrying `failure` and `retryable`
  */
 export async function fetchTranscript({ url, videoId, lang = 'en' }, deps = {}) {
-  const {
-    fetch = fetchSubtitleTrack,
-    write = writeTranscript,
-    dir,
-    sleep,
-    delays = RETRY_DELAYS_MS,
-    onRetry,
-  } = deps;
+  // `fetchTrack` downloads the subtitle track; a *fetch*, in this codebase's
+  // vocabulary, is the whole operation this function performs.
+  const { fetchTrack = fetchSubtitleTrack, write = writeTranscript, dir, sleep, delays, onRetry } =
+    deps;
 
   const transcript = await withRateLimitRetries(
     () =>
       withTempDir(async (destDir) => {
-        const { metadata, trackPath } = await fetch({ url, lang, destDir });
+        const { metadata, trackPath } = await fetchTrack({ url, lang, destDir });
 
         // Rendered before the directory goes: only the transcript leaves it.
         return renderTranscript({
@@ -58,6 +54,6 @@ export async function fetchTranscript({ url, videoId, lang = 'en' }, deps = {}) 
     { sleep, delays, onRetry },
   );
 
-  const file = await write(transcript, dir === undefined ? {} : { dir });
+  const file = await write(transcript, { dir });
   return { transcript, file };
 }

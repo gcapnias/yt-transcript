@@ -1,9 +1,10 @@
 /**
  * What a fetch outcome means, and what to do about it.
  *
- * Pure, and deliberately above the `yt-dlp` spawn: everything here is decided
- * from a recorded process outcome, which is what makes the exit-code rules and
- * the retry ladder testable without a live, rate-limited third party.
+ * Pure and spawn-free: every rule here is decided from a recorded process
+ * outcome — an exit code and whether a track landed — which is what makes the
+ * exit-code rules and the retry ladder testable without a live, rate-limited
+ * third party. `ytdlp.js` applies them to a real invocation.
  */
 
 /** The requested language has no subtitle track. Permanent. */
@@ -13,13 +14,11 @@ export const NO_SUBTITLES = 'no-subtitles';
 export const RATE_LIMITED = 'rate-limited';
 
 /**
- * The settled ladder: one wait per retry, so the number of invocations is
- * `RETRY_DELAYS_MS.length + 1` and never a literal.
+ * The settled ladder: one wait per retry, so the invocation count is
+ * `RETRY_DELAYS_MS.length + 1` everywhere and never a literal.
  *
- * The spec says "3 attempts, 5s / 15s / 45s between them"; the ticket says
- * "retried 3 times with 5s / 15s / 45s waits before giving up". Three delays
- * are only all reachable on the second reading, so that is the one
- * implemented: the first invocation plus three retries.
+ * Three delays means three retries after the first invocation — the reading
+ * under which all three are reachable (ytdlp-xmu.5).
  */
 export const RETRY_DELAYS_MS = [5000, 15000, 45000];
 

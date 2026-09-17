@@ -2,7 +2,22 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { main, parseArgs, UsageError } from '../src/cli.js';
-import { preflight, YtDlpMissingError } from '../src/ytdlp.js';
+import { describeFailure, NO_SUBTITLES, RATE_LIMITED } from '../src/fetch-outcome.js';
+import { FetchError, preflight, YtDlpMissingError } from '../src/ytdlp.js';
+
+const URL = 'https://www.youtube.com/watch?v=o3CX_Y59_74';
+
+/** A fetch that failed the way a recorded process outcome says it did. */
+function failingFetch(failure, lang = 'en') {
+  return async () => {
+    throw new FetchError(describeFailure({ failure, url: URL, lang }), {
+      url: URL,
+      exitCode: failure === NO_SUBTITLES ? 0 : 1,
+      failure,
+      retryable: failure === RATE_LIMITED,
+    });
+  };
+}
 
 /** Collects the lines main would have printed, so no test writes to a terminal. */
 function capture() {
@@ -59,4 +74,62 @@ test('a playlist or channel says so plainly, since batches are not built yet', a
 
   assert.equal(await main(['@freecodecamp'], io), 1);
   assert.match(err.join('\n'), /channel expands into a batch/);
+});
+
+// No catalog rebuild is asserted below because there is nothing to rebuild yet
+// (ytdlp-xmu.4): the failure path returns before any post-success work runs at
+// all, which is the property that keeps it true once the catalog lands.
+test('no usable subtitles exits 1, having written nothing', async () => {
+  const { err, io } = capture();
+
+  const code = await main(['o3CX_Y59_74'], io, {
+    preflight: async () => '2026.09.01',
+    fetchTranscript: failingFetch(NO_SUBTITLES),
+  });
+
+  assert.equal(code, 1);
+  assert.match(err.join('\n'), /No subtitles in "en"/);
+});
+
+test('a rate-limited fetch exits 1 too — there is no second exit code', async () => {
+  const { err, io } = capture();
+
+  const code = await main(['o3CX_Y59_74'], io, {
+    preflight: async () => '2026.09.01',
+    fetchTranscript: failingFetch(RATE_LIMITED),
+  });
+
+  assert.equal(code, 1);
+  assert.match(err.join('\n'), /Rate-limited fetching/);
+  assert.match(err.join('\n'), /may succeed/);
+});
+
+test('a successful fetch exits 0, and --lang reaches it', async () => {
+  const { out, io } = capture();
+
+  const code = await main(['--lang', 'el', 'o3CX_Y59_74'], io, {
+    preflight: async () => '2026.09.01',
+    fetchTranscript: async ({ lang }) => {
+      assert.equal(lang, 'el', '--lang did not reach the fetch');
+      return { file: 'transcripts/a-talk.md', transcript: { url: URL, trackKind: 'auto' } };
+    },
+  });
+
+  assert.equal(code, 0);
+  assert.match(out.join('\n'), /transcripts\/a-talk\.md/);
+});
+
+test('each rung of the retry ladder is reported, naming the video', async () => {
+  const { err, io } = capture();
+
+  const code = await main(['o3CX_Y59_74'], io, {
+    preflight: async () => '2026.09.01',
+    fetchTranscript: async (_video, { onRetry }) => {
+      onRetry({ attempt: 1, attempts: 4, delayMs: 5000 });
+      return failingFetch(RATE_LIMITED)();
+    },
+  });
+
+  assert.equal(code, 1);
+  assert.match(err.join('\n'), /Rate-limited fetching https:\/\/www\.youtube\.com\/watch\?v=o3CX_Y59_74 \(attempt 1 of 4\); retrying in 5s\./);
 });

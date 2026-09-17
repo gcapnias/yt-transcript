@@ -157,17 +157,30 @@ export async function fetchSubtitleTrack({ url, lang = 'en', destDir, binary = Y
   // One invocation, one verdict. The retry ladder lives a level up, in
   // `fetch.js`, so every retry is a fresh invocation into a fresh directory.
   const trackPath = await findSubtitleTrack(destDir);
-  const outcome = classifyFetch({ exitCode, hasTrack: trackPath !== null });
-  if (!outcome.ok) {
-    throw new FetchError(describeFailure({ failure: outcome.failure, url, lang }), {
-      url,
-      exitCode,
-      failure: outcome.failure,
-      retryable: outcome.retryable,
-    });
-  }
+  const failure = fetchFailure({ exitCode, hasTrack: trackPath !== null, url, lang });
+  if (failure) throw failure;
 
   return { metadata: parseMetadata(stdout), trackPath };
+}
+
+/**
+ * Turns one recorded process outcome into the error it means, or `null` when
+ * the fetch succeeded. Separated from the spawn so the mapping from an exit
+ * code to a retryable failure is testable without a live invocation.
+ *
+ * @param {{ exitCode: number, hasTrack: boolean, url: string, lang: string }} outcome
+ * @returns {FetchError|null}
+ */
+export function fetchFailure({ exitCode, hasTrack, url, lang }) {
+  const outcome = classifyFetch({ exitCode, hasTrack });
+  if (outcome.ok) return null;
+
+  return new FetchError(describeFailure({ failure: outcome.failure, url, lang }), {
+    url,
+    exitCode,
+    failure: outcome.failure,
+    retryable: outcome.retryable,
+  });
 }
 
 /**
