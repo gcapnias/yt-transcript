@@ -61,8 +61,8 @@ const normalize = (word) => word.toLowerCase().replace(/[^\p{L}\p{N}_]/gu, '');
 
 /**
  * How many leading words of `cueWords` repeat the tail of `accumulatedWords`.
- * Ported from `clean-transcript.js`; the whole of YouTube's rolling-window
- * repetition is what it removes.
+ * Ported from the standalone cleaner this tool replaces; the whole of
+ * YouTube's rolling-window repetition is what it removes.
  *
  * It has **no minimum match length**, which is exactly why it must never see a
  * manual track: over five manual tracks it scored 13 deletions, all 13 false

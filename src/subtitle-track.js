@@ -1,9 +1,9 @@
 /**
  * Reading a subtitle track: what kind it is, and what cues it holds.
  *
- * The cue parser is ported from `clean-transcript.js` and the parser on branch
- * `prototype/paragraph-rules`, both measured against the thirteen real tracks
- * in `tests/fixtures/`.
+ * The cue parser is ported from the standalone cleaner this tool replaces and
+ * the parser on branch `prototype/paragraph-rules`, both measured against the
+ * thirteen real tracks in `tests/fixtures/`.
  *
  * Nothing here strips or decodes anything: cue lines come out verbatim,
  * because classification reads *raw* cue text and every later rule needs the
