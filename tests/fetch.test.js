@@ -5,7 +5,10 @@ import path from 'node:path';
 
 import { fetchTranscript } from '../src/fetch.js';
 import { NO_SUBTITLES, RATE_LIMITED, RETRY_DELAYS_MS } from '../src/fetch-outcome.js';
-import { withTempDir } from '../src/temp-dir.js';
+// Production's own: there is no second temporary-directory rule to keep in
+// step with it. Renamed at the import because what it holds here is the
+// throwaway transcripts directory, so no test writes into the repository's.
+import { withTempDir as withTranscriptsDir } from '../src/temp-dir.js';
 import { FetchError } from '../src/ytdlp.js';
 import { recordedFailure } from './recorded-outcomes.js';
 
@@ -55,13 +58,6 @@ function recordedFetch(outcomes) {
     },
   };
 }
-
-/**
- * A throwaway transcripts directory, so no test writes into the repository's
- * own. `withTempDir` is production's — there is no second temporary-directory
- * rule to keep in step with it.
- */
-const withTranscriptsDir = withTempDir;
 
 test('a fetch that exits 0 but writes no subtitle file is a failure, not a success', async () => {
   await withTranscriptsDir(async (dir) => {

@@ -26,18 +26,17 @@ export const TRANSCRIPTS_DIR = 'transcripts';
  * byte-order mark — this reader missed it, dropped the file's identity, and
  * `resolveFilename` overwrote another video's transcript.
  *
- * Structural completeness is not asked for here. A file carrying a `url` and
- * missing some other key is still unmistakably about that video, and the
- * catalog's "re-download it" warning is a milder answer than destroying it.
+ * Neither completeness nor readability is asked for here — only the `url`. A
+ * file carrying one, whatever else is wrong with its block, is unmistakably
+ * about that video, and the catalog's "re-download it" warning is a milder
+ * answer than destroying it. Anything stricter reopens the overwrite on some
+ * other malformed input.
  *
  * @param {string} text a transcript's full contents
  * @returns {string|null}
  */
 export function readTranscriptUrl(text) {
-  const frontmatter = readFrontmatter(text);
-  if (frontmatter === null || frontmatter.error) return null;
-
-  return frontmatter.values.url ?? null;
+  return readFrontmatter(text)?.values?.url ?? null;
 }
 
 /**

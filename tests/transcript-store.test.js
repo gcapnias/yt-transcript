@@ -61,6 +61,24 @@ test('a byte-order mark does not hide a transcript identity', () => {
   assert.equal(readTranscriptUrl(`﻿${contents}`), 'https://www.youtube.com/watch?v=o3CX_Y59_74');
 });
 
+test('a line the frontmatter parser cannot read does not cost a transcript its identity', () => {
+  // Same failure as the byte-order mark, on a different input: anything that
+  // makes the block unreadable as a whole must not make the *video* unknown,
+  // because an unknown video is one the next write is free to overwrite.
+  const contents = [
+    '---',
+    'title: "A talk"',
+    '  wrapped continuation of something',
+    'url: https://www.youtube.com/watch?v=o3CX_Y59_74',
+    '---',
+    '',
+    'prose',
+    '',
+  ].join('\n');
+
+  assert.equal(readTranscriptUrl(contents), 'https://www.youtube.com/watch?v=o3CX_Y59_74');
+});
+
 test('a byte-order marked transcript survives a different video of the same title', async () => {
   await withTempDir(async (dir) => {
     const existing = transcript('o3CX_Y59_74', 'a-talk', 'first');

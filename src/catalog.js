@@ -154,6 +154,9 @@ function cell(value) {
  * is answerable from a `url` alone, and refusing to answer it is what loses a
  * file.
  *
+ * For the same reason an `error` and `values` arrive together: a block that is
+ * not wholly readable can still say, unambiguously, which video it is about.
+ *
  * Line-oriented rather than a regex per key, so CRLF costs nothing and the
  * fixtures' line endings are never normalised.
  *
@@ -162,8 +165,9 @@ function cell(value) {
  * it.
  *
  * @param {string} text a transcript's full contents
- * @returns {null | { error: string } | { values: Record<string, string> }}
- *   `null` when the file is not a transcript at all.
+ * @returns {null | { error: string, values?: Record<string, string> }
+ *           | { values: Record<string, string> }} `null` when the file is not
+ *   a transcript at all.
  */
 export function readFrontmatter(text) {
   // A byte-order mark is not a reason to drop a transcript from its own
@@ -177,15 +181,23 @@ export function readFrontmatter(text) {
   // malformed one rather than something else entirely.
   if (closing === -1) return { error: 'its frontmatter block is never closed' };
 
+  // An unreadable line does not stop the scan, and the keys either side of it
+  // are still returned with the error. The catalog ignores them and warns, but
+  // the store asks this same parse which video a file is about, and answering
+  // "no idea" over one stray line is how that file gets overwritten.
   const values = {};
+  let error = null;
   for (const line of lines.slice(1, closing)) {
     if (line.trim() === '') continue;
     const match = /^([A-Za-z_][A-Za-z0-9_]*):[ \t]*(.*)$/.exec(line);
-    if (!match) return { error: 'its frontmatter is not readable' };
+    if (!match) {
+      error ??= 'its frontmatter is not readable';
+      continue;
+    }
     values[match[1]] = unquote(match[2].trim());
   }
 
-  return { values };
+  return error ? { error, values } : { values };
 }
 
 /**

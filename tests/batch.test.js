@@ -26,10 +26,6 @@ function recordingFetch(fetched = []) {
   };
 }
 
-function failure(url, kind) {
-  return recordedFailure({ failure: kind, url });
-}
-
 test('a batch fetches every video, one per-video fetch each', async () => {
   const fetched = [];
   const { sleep } = clock();
@@ -77,7 +73,7 @@ test('the delay is paid before a failing fetch too, so a retry storm is still sp
 
   await runBatch([A, B], {
     fetchOne: async ({ url }) => {
-      throw failure(url, RATE_LIMITED);
+      throw recordedFailure({ failure: RATE_LIMITED, url });
     },
     sleep,
   });
@@ -90,7 +86,7 @@ test('one failing video does not stop the batch; the run collects and reports it
 
   const result = await runBatch([A, B, C], {
     fetchOne: async ({ url, videoId }) => {
-      if (url === B) throw failure(url, NO_SUBTITLES);
+      if (url === B) throw recordedFailure({ failure: NO_SUBTITLES, url });
       return { file: `transcripts/${videoId}.md`, transcript: { url, trackKind: 'auto' } };
     },
     sleep,
@@ -168,7 +164,7 @@ test('each failure is reported in full as it happens, not only counted at the en
 
   await runBatch([A], {
     fetchOne: async ({ url }) => {
-      throw failure(url, RATE_LIMITED);
+      throw recordedFailure({ failure: RATE_LIMITED, url });
     },
     sleep,
     onFailure: (entry) => reported.push(entry.message),
