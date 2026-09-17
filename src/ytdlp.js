@@ -4,6 +4,7 @@ import path from 'node:path';
 
 import { sanitizeChildEnv } from './child-env.js';
 import { classifyFetch, describeFailure } from './fetch-outcome.js';
+import { parseTarget, TargetParseError } from './target.js';
 
 /** The binary name looked up on PATH. Overridable so tests need not uninstall it. */
 export const YT_DLP = 'yt-dlp';
@@ -181,6 +182,93 @@ export function fetchFailure({ exitCode, hasTrack, url, lang }) {
     failure: outcome.failure,
     retryable: outcome.retryable,
   });
+}
+
+/**
+ * Raised when a playlist or channel could not be read at all.
+ *
+ * **Expansion failure is a hard error**, unlike a failure inside the batch: a
+ * batch that cannot learn what it contains has nothing to continue past.
+ */
+export class ExpansionError extends Error {
+  constructor(url, exitCode, stderr) {
+    const detail = String(stderr ?? '')
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .at(-1);
+
+    super(
+      `Could not read the playlist or channel: ${url}` +
+        (detail ? `\n  yt-dlp said: ${detail}` : '') +
+        `\n  yt-dlp exited ${exitCode}. Check the URL is right and public, then try again.`,
+    );
+    this.name = 'ExpansionError';
+    this.url = url;
+    this.exitCode = exitCode;
+  }
+}
+
+/**
+ * Builds the expansion invocation — the **only** one that reads a playlist.
+ *
+ * `--flat-playlist` is what keeps it to the two HTTP requests a listing costs
+ * rather than one per member, and `--simulate` is what stops it downloading
+ * anything. `%(id)s` is printed rather than a URL: the id is the stable part,
+ * and `parseTarget` normalises it to the settled canonical form.
+ *
+ * `--js-runtimes node` is deliberately absent. Its rationale is subtitle
+ * extraction; a flat listing does not run player JavaScript.
+ */
+export function expandArgs({ url }) {
+  return ['--flat-playlist', '--simulate', '--print', '%(id)s', url];
+}
+
+/**
+ * Turns the expansion's stdout into canonical video urls.
+ *
+ * Normalisation goes through `parseTarget`, the one place that knows the
+ * settled url form. A line it cannot read is dropped rather than fatal: a
+ * channel listing can carry a row that is not a playable video, and losing the
+ * whole batch over one is worse than fetching the rest.
+ *
+ * @param {string} stdout
+ * @returns {string[]}
+ */
+export function parseExpansion(stdout) {
+  const urls = [];
+  for (const line of String(stdout ?? '').split(/\r?\n/)) {
+    const candidate = line.trim();
+    if (!candidate) continue;
+
+    let target;
+    try {
+      target = parseTarget(candidate);
+    } catch (error) {
+      if (!(error instanceof TargetParseError)) throw error;
+      continue;
+    }
+    if (target.kind === 'video') urls.push(target.url);
+  }
+  return urls;
+}
+
+/**
+ * Expands a playlist or channel url into the videos it contains.
+ *
+ * One invocation for the whole listing; each video is then fetched by the
+ * ordinary per-video invocation above, `--no-playlist` and all.
+ *
+ * @returns {Promise<string[]>} canonical video urls, in listing order
+ * @throws {ExpansionError}
+ */
+export async function expandPlaylist({ url, binary = YT_DLP }) {
+  const { exitCode, stdout, stderr } = await run(binary, expandArgs({ url }));
+  if (exitCode !== 0) throw new ExpansionError(url, exitCode, stderr);
+
+  // Exit 0 with no lines is an empty playlist, which is a success with zero
+  // videos rather than a failure to expand.
+  return parseExpansion(stdout);
 }
 
 /**
