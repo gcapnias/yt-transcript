@@ -11,25 +11,33 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
+import { readFrontmatter } from './catalog.js';
+
 /** Flat, by decision: a directory listing is the browse experience. */
 export const TRANSCRIPTS_DIR = 'transcripts';
 
 /**
- * Reads the `url` out of a transcript's frontmatter.
+ * Reads the `url` out of a transcript's frontmatter — which video this file is
+ * already about, and nothing else.
  *
- * Deliberately narrow — it answers "which video is this file already about?"
- * and nothing else. The general "any `.md` with parseable frontmatter is a
- * transcript" scan belongs inside the catalog seam (ytdlp-xmu.4).
+ * The parse itself is the catalog's (`readFrontmatter`), deliberately: a
+ * second reader with its own rules is how a transcript comes to be owned by
+ * one module and unowned by the other. It was, and the divergence was a
+ * byte-order mark — this reader missed it, dropped the file's identity, and
+ * `resolveFilename` overwrote another video's transcript.
+ *
+ * Structural completeness is not asked for here. A file carrying a `url` and
+ * missing some other key is still unmistakably about that video, and the
+ * catalog's "re-download it" warning is a milder answer than destroying it.
  *
  * @param {string} text a transcript's full contents
  * @returns {string|null}
  */
 export function readTranscriptUrl(text) {
-  const block = /^---\r?\n([\s\S]*?)\r?\n---(\r?\n|$)/.exec(text);
-  if (!block) return null;
+  const frontmatter = readFrontmatter(text);
+  if (frontmatter === null || frontmatter.error) return null;
 
-  const url = /^url:[ \t]*(\S+)[ \t]*$/m.exec(block[1]);
-  return url ? url[1] : null;
+  return frontmatter.values.url ?? null;
 }
 
 /**
