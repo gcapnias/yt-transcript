@@ -1,3 +1,5 @@
+import path from 'node:path';
+
 import { parseTarget, TargetParseError } from './target.js';
 import { withTempDir } from './temp-dir.js';
 import { fetchSubtitleTrack, preflight, FetchError, YtDlpMissingError } from './ytdlp.js';
@@ -97,8 +99,8 @@ export async function main(argv, io = {}) {
         lang: options.lang,
         destDir,
       });
-      // Reported while the temporary directory still exists; it is removed on
-      // the way out of withTempDir, on this path and on the throwing one.
+      // Only what survives the directory leaves it: the track itself is gone by
+      // the time this returns, on this path and on the throwing one alike.
       return { metadata: result.metadata, trackPath: result.trackPath };
     });
 
@@ -117,7 +119,7 @@ function report(out, target, metadata, trackPath) {
   out(`  channel     ${metadata?.channel ?? '(unknown)'}`);
   out(`  duration    ${metadata?.duration ?? '(unknown)'}`);
   out(`  uploaded    ${displayDate(metadata?.uploadDate)}`);
-  out(`  track       ${basename(trackPath)} (in a temporary directory, now removed)`);
+  out(`  track       ${path.basename(trackPath)} (in a temporary directory, now removed)`);
   out('');
   out('No transcript written: this build fetches the subtitle track only.');
 }
@@ -127,6 +129,3 @@ function displayDate(uploadDate) {
   return match ? `${match[1]}-${match[2]}-${match[3]}` : (uploadDate || '(unknown)');
 }
 
-function basename(filePath) {
-  return filePath.split(/[\\/]/).pop();
-}

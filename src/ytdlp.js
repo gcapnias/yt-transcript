@@ -10,11 +10,14 @@ export const YT_DLP = 'yt-dlp';
 export class YtDlpMissingError extends Error {
   constructor(binary) {
     super(
-      `${binary} was not found on PATH, and yt-transcript needs it to download subtitle tracks.\n` +
+      `${binary} was not found on PATH as an executable, and yt-transcript needs ` +
+        'it to download subtitle tracks.\n' +
         '\nInstall it, then run yt-transcript again:\n' +
         '  winget install yt-dlp.yt-dlp     (Windows)\n' +
         '  brew install yt-dlp              (macOS)\n' +
         '  pipx install yt-dlp              (any platform with Python)\n' +
+        '\nOn Windows, install one that puts yt-dlp.exe on PATH: a .cmd or .bat\n' +
+        'wrapper cannot be launched directly, and looks the same as absent here.\n' +
         '\nOther options: https://github.com/yt-dlp/yt-dlp#installation',
     );
     this.name = 'YtDlpMissingError';
@@ -37,13 +40,12 @@ export class FetchError extends Error {
  * `shell: false` throughout: the `--print` template must reach `yt-dlp`
  * byte-for-byte, and a shell layer mangles `%(...)` and `{}`.
  */
-function run(binary, args, options = {}) {
+function run(binary, args) {
   return new Promise((resolve, reject) => {
     const child = spawn(binary, args, {
       env: sanitizeChildEnv(),
       windowsHide: true,
       stdio: ['ignore', 'pipe', 'pipe'],
-      ...options,
     });
 
     let stdout = '';
@@ -139,10 +141,10 @@ export function fetchArgs({ url, lang, destDir }) {
  * and emits the metadata on stdout. No pre-flight query, no second round-trip,
  * and no `.info.json` is ever written.
  *
- * @returns {Promise<{ metadata: object, trackPath: string, exitCode: number, stderr: string }>}
+ * @returns {Promise<{ metadata: object, trackPath: string }>}
  */
 export async function fetchSubtitleTrack({ url, lang = 'en', destDir, binary = YT_DLP }) {
-  const { exitCode, stdout, stderr } = await run(binary, fetchArgs({ url, lang, destDir }));
+  const { exitCode, stdout } = await run(binary, fetchArgs({ url, lang, destDir }));
 
   const trackPath = await findSubtitleTrack(destDir);
   if (exitCode !== 0 || !trackPath) {
@@ -156,17 +158,27 @@ export async function fetchSubtitleTrack({ url, lang = 'en', destDir, binary = Y
     );
   }
 
-  return { metadata: parseMetadata(stdout), trackPath, exitCode, stderr };
+  return { metadata: parseMetadata(stdout), trackPath };
 }
 
-/** Success requires a subtitle file that is actually there and not empty. */
+/**
+ * Success requires a subtitle file that is actually there and not empty.
+ *
+ * `--skip-download` means nothing else can land in the directory, so any
+ * non-empty file is the track. Extension is a preference, not a filter: no
+ * `--sub-format` is passed, so treating a non-vtt track as "no subtitles"
+ * would report the wrong failure.
+ */
 async function findSubtitleTrack(destDir) {
   const entries = await fs.readdir(destDir, { withFileTypes: true });
+
+  const candidates = [];
   for (const entry of entries) {
-    if (!entry.isFile() || !entry.name.toLowerCase().endsWith('.vtt')) continue;
+    if (!entry.isFile()) continue;
     const trackPath = path.join(destDir, entry.name);
     const { size } = await fs.stat(trackPath);
-    if (size > 0) return trackPath;
+    if (size > 0) candidates.push(trackPath);
   }
-  return null;
+
+  return candidates.find((file) => file.toLowerCase().endsWith('.vtt')) ?? candidates[0] ?? null;
 }

@@ -11,19 +11,29 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
  * so merely importing it wrote a file. Every module must stay import-safe:
  * only bin/yt-transcript.js may run anything.
  */
-test('importing every src module writes no file and spawns nothing', async () => {
-  const modules = fs.readdirSync(path.join(root, 'src')).filter((name) => name.endsWith('.js'));
-  assert.ok(modules.length > 0, 'no modules found to check');
+test('importing any module writes no file and spawns nothing', async () => {
+  const modules = [
+    ...fs
+      .readdirSync(path.join(root, 'src'))
+      .filter((name) => name.endsWith('.js'))
+      .map((name) => `src/${name}`),
+    // The entry point is a module too: its guard is what stops an import of it
+    // running the whole command. That guard is `import.meta.main`, so it can
+    // only be exercised on a runtime that has it (Node 24.2+).
+    ...(import.meta.main === undefined ? [] : ['bin/yt-transcript.js']),
+  ];
+  assert.ok(modules.length > 1, 'no modules found to check');
 
   const before = fs.readdirSync(root).sort();
   const cwdBefore = fs.readdirSync(process.cwd()).sort();
 
   for (const name of modules) {
-    await import(new URL(`../src/${name}`, import.meta.url));
+    await import(new URL(`../${name}`, import.meta.url));
   }
 
   assert.deepEqual(fs.readdirSync(root).sort(), before);
   assert.deepEqual(fs.readdirSync(process.cwd()).sort(), cwdBefore);
+  assert.equal(process.exitCode ?? 0, 0, 'importing the entry point ran the command');
 });
 
 test('bin/yt-transcript.js is the only module that calls main', () => {

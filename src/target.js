@@ -8,7 +8,8 @@
  */
 
 const VIDEO_ID = /^[A-Za-z0-9_-]{11}$/;
-const PLAYLIST_ID = /^[A-Za-z0-9_-]+$/;
+/** A shape guard, not a playlist-id format: rejects empty and junk `list=` values. */
+const LIST_ID_SHAPE = /^[A-Za-z0-9_-]+$/;
 const HANDLE = /^@[A-Za-z0-9_.-]+$/;
 
 /** Channel tabs yt-dlp recognises, dropped so the Videos tab can be imposed. */
@@ -42,7 +43,7 @@ function video(videoId) {
 }
 
 function playlist(listId, input) {
-  if (!listId || !PLAYLIST_ID.test(listId)) throw new TargetParseError(input);
+  if (!listId || !LIST_ID_SHAPE.test(listId)) throw new TargetParseError(input);
   return {
     kind: 'playlist',
     url: `https://www.youtube.com/playlist?list=${listId}`,
