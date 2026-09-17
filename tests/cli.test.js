@@ -342,6 +342,29 @@ test('one failing video does not stop the batch, and the run exits non-zero nami
   assert.match(err.join('\n'), /F3lL98Pj90o/);
 });
 
+test('a batch reports a failure in the same words the single-video path does', async () => {
+  const { deps } = batchDeps({
+    expandPlaylist: async () => VIDEOS.slice(0, 1),
+    fetchTranscript: async ({ url }) => {
+      throw new FetchError(describeFailure({ failure: RATE_LIMITED, url, lang: 'en' }), {
+        url,
+        exitCode: 1,
+        failure: RATE_LIMITED,
+        retryable: true,
+      });
+    },
+  });
+  const { err, io } = capture();
+
+  assert.equal(await main([PLAYLIST], io, deps), 1);
+  // Normative wording, whole: naming the video, and saying a later run *may*
+  // succeed and nothing stronger.
+  assert.ok(
+    err.includes(describeFailure({ failure: RATE_LIMITED, url: VIDEOS[0], lang: 'en' })),
+    'the batch abbreviated a failure message the spec settles word by word',
+  );
+});
+
 test('consecutive fetches are spaced, and the catalog is rebuilt exactly once', async () => {
   const { counters, deps } = batchDeps();
   const { io } = capture();

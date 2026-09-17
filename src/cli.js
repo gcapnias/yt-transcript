@@ -137,7 +137,12 @@ export async function main(argv, io = {}, deps = {}) {
   // A playlist or channel is many fetches, and nothing else about a fetch
   // changes: the same per-video invocation runs inside the loop.
   if (target.kind !== 'video') {
-    return batch(target, options, { out, err }, { expand, readUrls, fetchOne, rebuild, sleep: deps.sleep });
+    return batch({
+      target,
+      options,
+      io: { out, err },
+      deps: { expand, readUrls, fetchOne, rebuild, sleep: deps.sleep },
+    });
   }
 
   try {
@@ -192,30 +197,32 @@ function report(out, transcript, file) {
 /**
  * The batch command: expand, subtract, fetch each, rebuild once, report.
  *
- * Exit code comes from the fetches alone. A rebuild warning about some other
+ * A failed fetch sets the exit code; a rebuild *warning* about some other
  * malformed transcript is reported and costs nothing, exactly as on the
- * single-video path — a batch is not the place to fail over a neighbour.
+ * single-video path — a batch is not the place to fail over a neighbour. A
+ * rebuild that throws does set it, following the single-video path again: the
+ * rebuild is a required trigger, not a nicety.
  *
  * @returns {Promise<number>} the process exit code
  */
-async function batch(target, options, { out, err }, { expand, readUrls, fetchOne, rebuild, sleep }) {
+async function batch({ target, options, io: { out, err }, deps }) {
+  const { expand, readUrls, fetchOne, rebuild, sleep } = deps;
+
   let expanded;
   try {
     expanded = await expand({ url: target.url });
   } catch (error) {
     if (!(error instanceof ExpansionError)) throw error;
-    // Expansion failure is a hard error, unlike a failure inside the batch: a
-    // batch that cannot learn what it contains has nothing to continue past,
-    // and nothing was fetched, so there is nothing to rebuild either.
+    // See `ExpansionError` for why this one is hard. Nothing was fetched, so
+    // there is nothing to rebuild either.
     err(error.message);
     return 1;
   }
 
-  // Skipping is batch-only, so the directory is read only here. `--force`
-  // means exactly "ignore the skip set": it changes nothing else, and the
-  // scan is not even paid for.
+  // The skip set is read only here — see `planBatch` for why skipping is
+  // batch-only. Under `--force` the scan is not even paid for.
   const existing = options.force ? [] : await readUrls();
-  const { fetch: toFetch, skipped } = planBatch(expanded, existing, options.force);
+  const { toFetch, skipped } = planBatch(expanded, existing, options.force);
 
   out(`${target.url}`);
   out(`  ${expanded.length} videos, ${toFetch.length} to fetch, ${skipped.length} already on disk`);
@@ -226,11 +233,13 @@ async function batch(target, options, { out, err }, { expand, readUrls, fetchOne
     sleep,
     onProgress: ({ url, position, total }) => out(`[${position}/${total}] ${url}`),
     onRetry: (retry) => err(describeRetry(retry)),
+    // In full, exactly as the single-video path reports it: the wording is
+    // normative and a batch is not allowed to abbreviate it away.
+    onFailure: ({ message }) => err(message),
   });
 
-  // Once for the whole batch, never once per video: a rebuild is a full
-  // rescan, so per-video rebuilds would make a 200-video playlist quadratic.
-  // Unconditional, including a zero-video or all-skipped batch — "exactly
+  // Once for the whole batch — see `runBatch` for why never once per video.
+  // Unconditional, including a zero-video or all-skipped batch: "exactly
   // once" is only a testable claim if nothing can skip it.
   let rebuildError = null;
   try {

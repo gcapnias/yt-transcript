@@ -75,6 +75,13 @@ test('--lang reaches yt-dlp verbatim, and is matched exactly', () => {
 // Expansion: the only invocation that reads a playlist. Both halves below are
 // pure — the spawn between them stays outside the tested seams, by decision.
 
+test('every per-video invocation refuses the playlist, inside a batch as much as outside', () => {
+  // This flag is the whole implementation of the divergence: a
+  // `watch?v=...&list=...` URL means the video, and the fetch is always
+  // exactly one video — including each fetch a batch performs.
+  assert.ok(fetchArgs({ url: URL, lang: 'en', destDir: '/tmp/run' }).includes('--no-playlist'));
+});
+
 test('expansion reads the listing flat, and downloads nothing', () => {
   const args = expandArgs({ url: 'https://www.youtube.com/playlist?list=PL123' });
 

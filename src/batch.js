@@ -31,7 +31,8 @@ const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
  *
  * @param {string[]} urls canonical video urls, already stripped of what is on disk
  * @param {{ fetchOne: Function, lang?: string, sleep?: (ms: number) => Promise<void>,
- *           delayMs?: number, onProgress?: Function, onRetry?: Function }} deps
+ *           delayMs?: number, onProgress?: Function, onRetry?: Function,
+ *           onFailure?: Function }} deps
  * @returns {Promise<{ fetched: Array<{ url: string, file: string }>,
  *                     failures: Array<{ url: string, failure: string|null, message: string }> }>}
  */
@@ -43,6 +44,7 @@ export async function runBatch(urls, deps) {
     delayMs = FETCH_DELAY_MS,
     onProgress,
     onRetry,
+    onFailure,
   } = deps;
 
   const fetched = [];
@@ -66,7 +68,14 @@ export async function runBatch(urls, deps) {
       // reaching here is still collected rather than thrown past the loop:
       // running to the end is the batch's contract, and an uncaught surprise
       // would discard every transcript the run had already reported.
-      failures.push({ url, failure: error.failure ?? null, message: error.message });
+      const entry = { url, failure: error.failure ?? null, message: error.message };
+      failures.push(entry);
+
+      // Reported in full as it happens, which is what lets the end-of-batch
+      // summary be a terse roll-call. The failure messages are normative —
+      // a rate-limited one must say a later run *may* succeed — so a batch
+      // must not be the path on which that wording is lost.
+      onFailure?.(entry);
     }
   }
 
@@ -88,17 +97,6 @@ export function describeBatch({ fetched, skipped, failures }) {
 
   return {
     summary,
-    failureLines: [
-      `${failures.length} of ${fetched.length + failures.length} fetches failed:`,
-      ...failures.map((entry) => `  ${entry.url}: ${firstLine(entry.message)}`),
-    ],
+    failureLines: ['Failed:', ...failures.map((entry) => `  ${entry.url}`)],
   };
-}
-
-/**
- * A failure message may run to several lines; a summary naming twenty videos
- * must stay readable. The full message was already reported as it happened.
- */
-function firstLine(message) {
-  return String(message ?? '').split('\n')[0].trim();
 }

@@ -17,14 +17,14 @@
  * @param {string[]} expanded canonical video urls, in expansion order
  * @param {string[]} existing the `url`s already present in `transcripts/`
  * @param {boolean} [force] `--force` means exactly "ignore the skip set"
- * @returns {{ fetch: string[], skipped: string[] }} `skipped` names only videos
- *   this batch expanded to, so it reads as a report about this run rather than
- *   about the directory.
+ * @returns {{ toFetch: string[], skipped: string[] }} `skipped` names only
+ *   videos this batch expanded to, so it reads as a report about this run
+ *   rather than about the directory.
  */
 export function planBatch(expanded, existing = [], force = false) {
   const onDisk = new Set(existing);
   const seen = new Set();
-  const fetch = [];
+  const toFetch = [];
   const skipped = [];
 
   for (const url of expanded) {
@@ -33,8 +33,8 @@ export function planBatch(expanded, existing = [], force = false) {
     seen.add(url);
 
     if (!force && onDisk.has(url)) skipped.push(url);
-    else fetch.push(url);
+    else toFetch.push(url);
   }
 
-  return { fetch, skipped };
+  return { toFetch, skipped };
 }

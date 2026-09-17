@@ -167,6 +167,25 @@ test('progress is reported per video, and so is each rung of the retry ladder', 
   ]);
 });
 
+test('each failure is reported in full as it happens, not only counted at the end', async () => {
+  const { sleep } = clock();
+  const reported = [];
+
+  await runBatch([A], {
+    fetchOne: async ({ url }) => {
+      throw failure(url, RATE_LIMITED);
+    },
+    sleep,
+    onFailure: (entry) => reported.push(entry.message),
+  });
+
+  // The wording is normative: a rate-limited message names the video and says
+  // a later run *may* succeed. A batch must not abbreviate that away.
+  assert.equal(reported.length, 1);
+  assert.equal(reported[0], describeFailure({ failure: RATE_LIMITED, url: A, lang: 'en' }));
+  assert.match(reported[0], /may succeed/);
+});
+
 test('the summary counts all three outcomes and names every failure', () => {
   const { summary, failureLines } = describeBatch({
     fetched: [{ url: A, file: 'transcripts/a.md' }],

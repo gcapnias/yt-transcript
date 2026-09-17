@@ -2,16 +2,21 @@
  * The catalog: a Markdown table of every transcript on disk, derived wholly
  * from frontmatter so it cannot drift from what is actually there.
  *
- * This module is the seam — `(array of { path, text }) -> { markdown,
- * warnings }`. It takes **raw file text, not parsed frontmatter**, deliberately:
- * the scan rule and the malformed-file warning are the two things most worth
- * testing, and both live in the parse. Nothing here touches the filesystem;
- * `catalog-store.js` does the reading and the writing.
+ * The catalog seam is `renderCatalog` — `(array of { path, text }) -> {
+ * markdown, warnings }`. It takes **raw file text, not parsed frontmatter**,
+ * deliberately: the scan rule and the malformed-file warning are the two
+ * things most worth testing, and both live in the parse. Nothing here touches
+ * the filesystem; `catalog-store.js` does the reading and the writing.
  *
  * **Derivability is the standing test for any future column**: computable from
  * the seven frontmatter keys plus the file path, or it does not belong. `url`
- * and `fetched` are deliberately not surfaced — `fetched` would churn a row on
- * every re-fetch.
+ * and `fetched` are deliberately not surfaced **in the table** — `fetched`
+ * would churn a row on every re-fetch.
+ *
+ * `scanTranscriptUrls` shares that same parse for a different question — which
+ * videos the directory already holds — and so lives here rather than beside
+ * the batch. Two scan rules that could disagree about what a transcript is
+ * would let a batch re-fetch a video the catalog already lists.
  */
 
 /** The five settled columns, in order. Each reads one frontmatter key. */
@@ -98,11 +103,6 @@ export function renderCatalog(files) {
 
 /**
  * The `url`s of every transcript in a set of files — a batch's skip set.
- *
- * Deliberately the **same scan** the catalog rebuild performs, sharing its
- * parse rather than walking the directory a third way: two scan rules that
- * could disagree about what a transcript is would let a batch re-fetch a video
- * the catalog already lists.
  *
  * Matching is on the frontmatter `url`, never the filename, so a transcript
  * renamed by hand is still recognised. A malformed file contributes no url and
