@@ -12,7 +12,10 @@ const VIDEO_ID = /^[A-Za-z0-9_-]{11}$/;
 const LIST_ID_SHAPE = /^[A-Za-z0-9_-]+$/;
 const HANDLE = /^@[A-Za-z0-9_.-]+$/;
 
-/** Channel tabs yt-dlp recognises, dropped so the Videos tab can be imposed. */
+/**
+ * Channel tabs yt-dlp recognises. A URL already ending in one of these names
+ * the tab it wants, so nothing is imposed on it.
+ */
 const CHANNEL_TABS = new Set([
   'videos',
   'shorts',
@@ -52,17 +55,20 @@ function playlist(listId, input) {
 }
 
 /**
- * A channel always resolves to its Videos tab. Left alone, `yt-dlp` expands a
+ * A *bare* channel resolves to its Videos tab: left alone, `yt-dlp` expands a
  * channel to Videos plus Shorts plus Live.
+ *
+ * A tab the user typed is left exactly as typed. Imposing Videos on
+ * `/@handle/shorts` would fetch something other than what was asked for, and
+ * the rewrite exists only to settle the bare case's ambiguity.
  */
-function channel(pathSegments) {
-  const segments = [...pathSegments];
-  if (segments.length > 1 && CHANNEL_TABS.has(segments[segments.length - 1].toLowerCase())) {
-    segments.pop();
-  }
+function channel(segments) {
+  const tab = CHANNEL_TABS.has(segments[segments.length - 1].toLowerCase());
+  const pathname = tab ? segments.join('/') : `${segments.join('/')}/videos`;
+
   return {
     kind: 'channel',
-    url: `https://www.youtube.com/${segments.join('/')}/videos`,
+    url: `https://www.youtube.com/${pathname}`,
     videoId: null,
   };
 }

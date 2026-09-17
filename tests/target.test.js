@@ -62,7 +62,24 @@ test('a bare handle is rewritten to the channel videos tab', () => {
   assert.deepEqual(parseTarget('@freecodecamp'), expected);
   assert.deepEqual(parseTarget('https://www.youtube.com/@freecodecamp'), expected);
   assert.deepEqual(parseTarget('https://www.youtube.com/@freecodecamp/videos'), expected);
-  assert.deepEqual(parseTarget('https://www.youtube.com/@freecodecamp/streams'), expected);
+});
+
+test('a tab the user typed is the tab that is fetched', () => {
+  // Only a *bare* handle or channel is rewritten to Videos. Rewriting a tab
+  // someone asked for by name fetches something other than what they typed.
+  for (const tab of ['shorts', 'streams', 'live', 'playlists']) {
+    assert.deepEqual(parseTarget(`https://www.youtube.com/@freecodecamp/${tab}`), {
+      kind: 'channel',
+      url: `https://www.youtube.com/@freecodecamp/${tab}`,
+      videoId: null,
+    });
+  }
+
+  assert.deepEqual(parseTarget('https://www.youtube.com/channel/UC8butISFwT-Wl7EV0hUK0BQ/streams'), {
+    kind: 'channel',
+    url: 'https://www.youtube.com/channel/UC8butISFwT-Wl7EV0hUK0BQ/streams',
+    videoId: null,
+  });
 });
 
 test('a channel id url resolves to that channel videos tab', () => {

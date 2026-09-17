@@ -67,7 +67,7 @@ function slugify(title) {
 /**
  * Cuts an over-long slug at the last `-` boundary at or before the cap, so the
  * last word is never a fragment. A slug with no boundary to cut at is cut
- * hard: the title is not empty, and the video-id fallback is for empty slugs.
+ * hard: the cap never sends a title to the video id, it only shortens it.
  */
 function cap(slug) {
   if (slug.length <= SLUG_MAX_LENGTH) return slug;
@@ -90,11 +90,16 @@ function cap(slug) {
  * it gave up. Nothing functional rests on the filename: identity is the
  * frontmatter `url`, and the real title is in the frontmatter and the catalog.
  *
+ * Retention is measured on the slug the title produced, **before** the cap.
+ * The cap is a later step answering a filesystem question, not a fidelity one;
+ * measuring after it would let sheer length send a perfectly faithful long
+ * title to the video id.
+ *
  * @param {string} title
  * @param {string} videoId
  * @returns {string}
  */
 export function transcriptSlug(title, videoId) {
-  const slug = cap(slugify(title));
-  return retention(slug, title) >= MIN_RETENTION ? slug : videoId;
+  const slug = slugify(title);
+  return retention(slug, title) >= MIN_RETENTION ? cap(slug) : videoId;
 }

@@ -13,7 +13,7 @@
  */
 
 import { cleanTrack } from './clean.js';
-import { renderFrontmatter } from './frontmatter.js';
+import { formatUploadDate, renderFrontmatter } from './frontmatter.js';
 import { transcriptSlug } from './slug.js';
 
 /**
@@ -24,7 +24,9 @@ import { transcriptSlug } from './slug.js';
  * @param {{ title: string, channel: string, duration: string, uploadDate: string }} input.metadata
  * @param {Date} [input.fetchedAt]
  * @returns {{ slug: string, filename: string, contents: string,
- *             url: string, videoId: string, trackKind: 'auto'|'manual' }}
+ *             url: string, videoId: string, trackKind: 'auto'|'manual',
+ *             video: { title: string, channel: string, duration: string,
+ *                      uploaded: string } }}
  */
 export function renderTranscript({ trackText, url, videoId, metadata, fetchedAt = new Date() }) {
   const { trackKind, paragraphs } = cleanTrack(trackText);
@@ -53,5 +55,14 @@ export function renderTranscript({ trackText, url, videoId, metadata, fetchedAt 
     url,
     videoId,
     trackKind,
+    // What the run tells the human it just fetched. Carried out here rather
+    // than re-read from the file or re-formatted by the CLI, so the terminal
+    // and the frontmatter can only ever say the same thing.
+    video: {
+      title: metadata?.title ?? '',
+      channel: metadata?.channel ?? '',
+      duration: metadata?.duration ?? '',
+      uploaded: formatUploadDate(metadata?.uploadDate ?? ''),
+    },
   };
 }

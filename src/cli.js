@@ -173,8 +173,7 @@ export async function main(argv, io = {}, deps = {}) {
       // The transcript is written and already reported. Losing that fact in a
       // stack trace would be the worse failure, so name both and say what
       // fixes it.
-      err(`The transcript was written, but the catalog could not be rebuilt: ${error.message}`);
-      err('Run `yt-transcript catalog` to rebuild it.');
+      reportRebuildFailure(err, error, 'The transcript was written');
       return 1;
     }
 
@@ -189,9 +188,43 @@ export async function main(argv, io = {}, deps = {}) {
   }
 }
 
+/**
+ * What one fetch tells the human: where the transcript landed, which video it
+ * came from, and which video that *is*.
+ *
+ * The four description fields are the ticket's own acceptance criterion — a
+ * path and a url alone make the reader open the file to learn whether the
+ * right video was fetched. A field the metadata did not carry is left out
+ * rather than printed empty or as a placeholder.
+ *
+ * Single-video only. A batch reports per-video progress and a roll-call
+ * instead, and four lines per video would bury both.
+ */
 function report(out, transcript, file) {
   out(file);
   out(`  ${transcript.url}  (${transcript.trackKind} subtitle track)`);
+
+  const video = transcript.video ?? {};
+  for (const field of ['title', 'channel', 'duration', 'uploaded']) {
+    if (video[field]) out(`  ${field.padEnd(8)}  ${video[field]}`);
+  }
+}
+
+/**
+ * What a failed rebuild says, on either path: the work that survived, then the
+ * one command that finishes the job.
+ *
+ * Shared because only the subject differs between the single-video path and
+ * the batch. Two copies of a settled sentence drift, and the half that drifts
+ * is always the one nobody reads.
+ *
+ * @param {(line: string) => void} err
+ * @param {Error} error
+ * @param {string} written what is already on disk, as a sentence opening
+ */
+function reportRebuildFailure(err, error, written) {
+  err(`${written}, but the catalog could not be rebuilt: ${error.message}`);
+  err('Run `yt-transcript catalog` to rebuild it.');
 }
 
 /**
@@ -256,8 +289,7 @@ async function batch({ target, options, io: { out, err }, deps }) {
   if (rebuildError) {
     // Reported after the summary, never instead of it: what the batch fetched
     // is the more valuable fact, and a rebuild is recoverable by one command.
-    err(`The transcripts were written, but the catalog could not be rebuilt: ${rebuildError.message}`);
-    err('Run `yt-transcript catalog` to rebuild it.');
+    reportRebuildFailure(err, rebuildError, 'The transcripts were written');
   }
 
   // Zero videos, and a batch where everything was skipped, are successes.
