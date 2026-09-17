@@ -31,7 +31,14 @@ Create a GitHub issue.
 
 ## When a skill says "fetch the relevant ticket"
 
-Run `gh pr view <number> --comments` and, if that fails, run `gh issue view <number> --comments`.
+Issues and pull requests share one number space and PRs are a request surface here, so a bare
+`#42` may be either. Try the PR first and fall back to the issue, using the same JSON shape the
+**Read an issue** convention above uses:
+
+```bash
+gh pr view <number> --json number,title,body,labels,comments \
+  || gh issue view <number> --json number,title,body,labels,comments
+```
 
 ## Wayfinding operations
 
