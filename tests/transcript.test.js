@@ -77,6 +77,41 @@ test('a title that slugs to nothing falls back to the video id', () => {
   }
 });
 
+test('latin letters NFKD cannot decompose are transliterated, not turned into separators', () => {
+  // Without the table each of these carries no combining mark to strip, so it
+  // becomes punctuation and then a separator: `s-ren`, `pawe-`, `stra-e`.
+  const vectors = [
+    ['Søren on agents', 'soren-on-agents'],
+    ['Paweł and Straße', 'pawel-and-strasse'],
+    ['Æon œuvre Þor and ð', 'aeon-oeuvre-thor-and-d'],
+  ];
+
+  for (const [title, slug] of vectors) {
+    const transcript = render(track(['Hello.']), { metadata: { ...METADATA, title } });
+    assert.equal(transcript.filename, `${slug}.md`, `slug wrong for: ${title}`);
+  }
+});
+
+test('a slug retaining under half the title is discarded for the video id', () => {
+  // The case an emptiness test misses: non-empty, plausible-looking, and it
+  // has silently swallowed most of the title. The video id at least admits it.
+  const transcript = render(track(['Hello.']), {
+    metadata: { ...METADATA, title: 'Πώς να μάθεις AI' },
+  });
+
+  assert.equal(transcript.filename, 'o3CX_Y59_74.md');
+});
+
+test('a mostly-latin title keeps its slug even with non-latin words in it', () => {
+  // The other side of the ratio: retention here is well above half, so falling
+  // back would throw away a filename that genuinely describes the video.
+  const transcript = render(track(['Hello.']), {
+    metadata: { ...METADATA, title: 'Νέα Skills! v1.2 για agents' },
+  });
+
+  assert.equal(transcript.filename, 'skills-v1-2-agents.md');
+});
+
 test('a slug past 120 characters is cut at a dash boundary with no trailing dash', () => {
   const title = `${'alpha bravo charlie delta '.repeat(8)}omega`;
   const transcript = render(track(['Hello.']), { metadata: { ...METADATA, title } });
