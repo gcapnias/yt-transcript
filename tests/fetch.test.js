@@ -1,12 +1,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
-import os from 'node:os';
 import path from 'node:path';
 
 import { fetchTranscript } from '../src/fetch.js';
 import { NO_SUBTITLES, RATE_LIMITED, RETRY_DELAYS_MS } from '../src/fetch-outcome.js';
+// Production's own: there is no second temporary-directory rule to keep in
+// step with it. Renamed at the import because what it holds here is the
+// throwaway transcripts directory, so no test writes into the repository's.
+import { withTempDir as withTranscriptsDir } from '../src/temp-dir.js';
 import { FetchError } from '../src/ytdlp.js';
+import { recordedFailure } from './recorded-outcomes.js';
 
 const URL = 'https://www.youtube.com/watch?v=o3CX_Y59_74';
 const VIDEO_ID = 'o3CX_Y59_74';
@@ -40,11 +44,10 @@ function recordedFetch(outcomes) {
       const outcome = remaining.shift() ?? outcomes.at(-1);
 
       if (outcome.failure) {
-        throw new FetchError(`recorded ${outcome.failure}`, {
-          url,
-          exitCode: outcome.failure === NO_SUBTITLES ? 0 : 1,
+        throw recordedFailure({
           failure: outcome.failure,
-          retryable: outcome.failure === RATE_LIMITED,
+          url,
+          message: `recorded ${outcome.failure}`,
         });
       }
 
@@ -54,15 +57,6 @@ function recordedFetch(outcomes) {
       return { metadata: METADATA, trackPath };
     },
   };
-}
-
-async function withTranscriptsDir(use) {
-  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'yt-transcript-test-'));
-  try {
-    return await use(dir);
-  } finally {
-    await fs.rm(dir, { recursive: true, force: true });
-  }
 }
 
 test('a fetch that exits 0 but writes no subtitle file is a failure, not a success', async () => {

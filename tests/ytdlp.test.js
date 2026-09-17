@@ -1,7 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
-import os from 'node:os';
 import path from 'node:path';
 
 import { NO_SUBTITLES, RATE_LIMITED } from '../src/fetch-outcome.js';
@@ -14,17 +13,10 @@ import {
   findSubtitleTrack,
   parseExpansion,
 } from '../src/ytdlp.js';
+import { withTempDir } from '../src/temp-dir.js';
 
 const URL = 'https://www.youtube.com/watch?v=o3CX_Y59_74';
 
-async function withTempDir(use) {
-  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'yt-transcript-test-'));
-  try {
-    return await use(dir);
-  } finally {
-    await fs.rm(dir, { recursive: true, force: true });
-  }
-}
 
 // The other half of the success test — exit 0 alone is not success — and the
 // only half that is about bytes on disk rather than the exit code.

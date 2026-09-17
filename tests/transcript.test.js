@@ -124,9 +124,35 @@ test('a slug past 120 characters is cut at a dash boundary with no trailing dash
   assert.ok(/-(alpha|bravo|charlie|delta|omega)$/.test(slug), slug);
 });
 
+test('a long latin title is truncated, never discarded for the video id', () => {
+  // Retention is measured on the slug the title produces, before the cap:
+  // the cap is a later, separate step, and letting it drive the ratio would
+  // send every sufficiently long title to the video id.
+  const title = `${'alpha bravo charlie delta '.repeat(20)}omega`;
+  const transcript = render(track(['Hello.']), { metadata: { ...METADATA, title } });
+  const slug = transcript.filename.replace(/\.md$/, '');
+
+  assert.notEqual(slug, 'o3CX_Y59_74', 'a perfectly good latin title fell back to the video id');
+  assert.ok(slug.length <= 120, `slug is ${slug.length} characters`);
+  assert.ok(slug.startsWith('alpha-bravo-charlie-delta-alpha'));
+});
+
 test('a title carrying combining marks folds to plain ascii', () => {
   const transcript = render(track(['Hello.']), { metadata: { ...METADATA, title: 'Café Крем naïve' } });
   assert.equal(transcript.filename, 'cafe-naive.md');
+});
+
+test('the rendered transcript carries what the run reports about the video', () => {
+  // The same four values the frontmatter records, formatted once here so the
+  // terminal and the file cannot disagree about the upload date.
+  const { video } = render(track(['Hello.']));
+
+  assert.deepEqual(video, {
+    title: METADATA.title,
+    channel: 'freeCodeCamp.org',
+    duration: '41:18',
+    uploaded: '2026-09-10',
+  });
 });
 
 // -------------------------------------------------------- frontmatter

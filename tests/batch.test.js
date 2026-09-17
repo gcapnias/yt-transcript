@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 
 import { describeBatch, FETCH_DELAY_MS, runBatch } from '../src/batch.js';
 import { describeFailure, NO_SUBTITLES, RATE_LIMITED } from '../src/fetch-outcome.js';
-import { FetchError } from '../src/ytdlp.js';
+import { recordedFailure } from './recorded-outcomes.js';
 
 const A = 'https://www.youtube.com/watch?v=4JofSJIrjwU';
 const B = 'https://www.youtube.com/watch?v=F3lL98Pj90o';
@@ -24,15 +24,6 @@ function recordingFetch(fetched = []) {
     fetched.push({ url, videoId, lang });
     return { file: `transcripts/${videoId}.md`, transcript: { url, trackKind: 'auto' } };
   };
-}
-
-function failure(url, kind) {
-  return new FetchError(describeFailure({ failure: kind, url, lang: 'en' }), {
-    url,
-    exitCode: kind === NO_SUBTITLES ? 0 : 1,
-    failure: kind,
-    retryable: kind === RATE_LIMITED,
-  });
 }
 
 test('a batch fetches every video, one per-video fetch each', async () => {
@@ -82,7 +73,7 @@ test('the delay is paid before a failing fetch too, so a retry storm is still sp
 
   await runBatch([A, B], {
     fetchOne: async ({ url }) => {
-      throw failure(url, RATE_LIMITED);
+      throw recordedFailure({ failure: RATE_LIMITED, url });
     },
     sleep,
   });
@@ -95,7 +86,7 @@ test('one failing video does not stop the batch; the run collects and reports it
 
   const result = await runBatch([A, B, C], {
     fetchOne: async ({ url, videoId }) => {
-      if (url === B) throw failure(url, NO_SUBTITLES);
+      if (url === B) throw recordedFailure({ failure: NO_SUBTITLES, url });
       return { file: `transcripts/${videoId}.md`, transcript: { url, trackKind: 'auto' } };
     },
     sleep,
@@ -173,7 +164,7 @@ test('each failure is reported in full as it happens, not only counted at the en
 
   await runBatch([A], {
     fetchOne: async ({ url }) => {
-      throw failure(url, RATE_LIMITED);
+      throw recordedFailure({ failure: RATE_LIMITED, url });
     },
     sleep,
     onFailure: (entry) => reported.push(entry.message),

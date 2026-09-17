@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 
 import { main, parseArgs, UsageError } from '../src/cli.js';
 import { describeFailure, NO_SUBTITLES, RATE_LIMITED } from '../src/fetch-outcome.js';
-import { ExpansionError, FetchError, preflight, YtDlpMissingError } from '../src/ytdlp.js';
+import { ExpansionError, preflight, YtDlpMissingError } from '../src/ytdlp.js';
+import { recordedFailure } from './recorded-outcomes.js';
 
 const URL = 'https://www.youtube.com/watch?v=o3CX_Y59_74';
 const PLAYLIST = 'https://www.youtube.com/playlist?list=PLWKjhJtqVAbk';
@@ -16,12 +17,7 @@ const VIDEOS = [
 /** A fetch that failed the way a recorded process outcome says it did. */
 function failingFetch(failure, lang = 'en') {
   return async () => {
-    throw new FetchError(describeFailure({ failure, url: URL, lang }), {
-      url: URL,
-      exitCode: failure === NO_SUBTITLES ? 0 : 1,
-      failure,
-      retryable: failure === RATE_LIMITED,
-    });
+    throw recordedFailure({ failure, url: URL, lang });
   };
 }
 
@@ -126,6 +122,37 @@ test('a successful fetch exits 0, and --lang reaches it', async () => {
 
   assert.equal(code, 0);
   assert.match(out.join('\n'), /transcripts\/a-talk\.md/);
+});
+
+test('a successful fetch reports the video title, channel, duration and upload date', async () => {
+  const { out, io } = capture();
+
+  const code = await main(['o3CX_Y59_74'], io, {
+    preflight: async () => '2026.09.01',
+    fetchTranscript: async () => ({
+      file: 'transcripts/a-talk.md',
+      transcript: {
+        url: URL,
+        trackKind: 'auto',
+        video: {
+          title: 'OpenAI Codex Crash Course',
+          channel: 'freeCodeCamp.org',
+          duration: '41:18',
+          uploaded: '2026-09-10',
+        },
+      },
+    }),
+    rebuildCatalog: async () => ({ file: 'transcripts/README.md', count: 1, warnings: [] }),
+  });
+
+  assert.equal(code, 0);
+  const report = out.join('\n');
+  assert.match(report, /^transcripts\/a-talk\.md$/m);
+  assert.match(report, /^ +title +OpenAI Codex Crash Course$/m);
+  assert.match(report, /^ +channel +freeCodeCamp\.org$/m);
+  assert.match(report, /^ +duration +41:18$/m);
+  assert.match(report, /^ +uploaded +2026-09-10$/m);
+  assert.match(report, /\(auto subtitle track\)/);
 });
 
 test('each rung of the retry ladder is reported, naming the video', async () => {
@@ -322,13 +349,7 @@ test('--force on a single video is accepted, since one video overwrites anyway',
 test('one failing video does not stop the batch, and the run exits non-zero naming it', async () => {
   const { counters, deps } = batchDeps({
     fetchTranscript: async ({ url, videoId }) => {
-      if (url === VIDEOS[1]) {
-        throw new FetchError(describeFailure({ failure: NO_SUBTITLES, url, lang: 'en' }), {
-          url,
-          exitCode: 0,
-          failure: NO_SUBTITLES,
-        });
-      }
+      if (url === VIDEOS[1]) throw recordedFailure({ failure: NO_SUBTITLES, url });
       return { file: `transcripts/${videoId}.md`, transcript: { url, trackKind: 'auto' } };
     },
   });
@@ -346,12 +367,7 @@ test('a batch reports a failure in the same words the single-video path does', a
   const { deps } = batchDeps({
     expandPlaylist: async () => VIDEOS.slice(0, 1),
     fetchTranscript: async ({ url }) => {
-      throw new FetchError(describeFailure({ failure: RATE_LIMITED, url, lang: 'en' }), {
-        url,
-        exitCode: 1,
-        failure: RATE_LIMITED,
-        retryable: true,
-      });
+      throw recordedFailure({ failure: RATE_LIMITED, url });
     },
   });
   const { err, io } = capture();

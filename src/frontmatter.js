@@ -20,8 +20,14 @@ function quoted(value) {
   return `"${String(value ?? '').replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
 }
 
-/** `20260910` -> `2026-09-10`. A bare `20260910` is a number YAML and humans both misread. */
-function formatUploadDate(uploadDate) {
+/**
+ * `20260910` -> `2026-09-10`. A bare `20260910` is a number YAML and humans
+ * both misread.
+ *
+ * Exported because the run's report shows the same date to the same human: two
+ * formatters for one field is how the file and the terminal come to disagree.
+ */
+export function formatUploadDate(uploadDate) {
   const match = /^(\d{4})(\d{2})(\d{2})$/.exec(String(uploadDate ?? '').trim());
   return match ? `${match[1]}-${match[2]}-${match[3]}` : String(uploadDate ?? '').trim();
 }

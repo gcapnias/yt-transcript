@@ -5,12 +5,13 @@ input or reference material. It produces transcripts, never summaries.
 
 Each fetch downloads a subtitle track, cleans it into paragraphs, and writes one
 Markdown file under `transcripts/` with frontmatter describing the video. A catalog
-at `transcripts/README.md` indexes every transcript on disk.
+at `transcripts/README.md` lists every transcript on disk, derived from their
+frontmatter so it cannot drift from what is there.
 
 ## Prerequisites
 
 - **Node >= 22**
-- **`yt-dlp`** on `PATH` — every download is a `yt-dlp` spawn; nothing is bundled
+- **`yt-dlp`** on `PATH` — every fetch is a `yt-dlp` spawn; nothing is bundled
 
 ## Usage
 

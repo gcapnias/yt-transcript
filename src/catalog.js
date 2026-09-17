@@ -17,6 +17,9 @@
  * videos the directory already holds — and so lives here rather than beside
  * the batch. Two scan rules that could disagree about what a transcript is
  * would let a batch re-fetch a video the catalog already lists.
+ *
+ * `readFrontmatter` is exported for the same reason: the store's collision
+ * check reads frontmatter too, and it must read it identically.
  */
 
 /** The five settled columns, in order. Each reads one frontmatter key. */
@@ -140,7 +143,19 @@ function cell(value) {
 }
 
 /**
- * Reads a transcript's frontmatter block.
+ * Reads a transcript's frontmatter block — **the only frontmatter reader in
+ * the codebase**, shared by the catalog and by the store's collision check.
+ * Two readers disagreeing about what a transcript is once cost a byte-order
+ * marked transcript its identity, and the store overwrote it.
+ *
+ * Structural only: it says what the block contains, not whether that is a
+ * complete transcript. Completeness is a catalog judgement (`REQUIRED_KEYS`),
+ * because the store's question — "which video is this file already about?" —
+ * is answerable from a `url` alone, and refusing to answer it is what loses a
+ * file.
+ *
+ * For the same reason an `error` and `values` arrive together: a block that is
+ * not wholly readable can still say, unambiguously, which video it is about.
  *
  * Line-oriented rather than a regex per key, so CRLF costs nothing and the
  * fixtures' line endings are never normalised.
@@ -149,10 +164,12 @@ function cell(value) {
  * formats, and the catalog's job is to report what is on disk, not to re-judge
  * it.
  *
- * @returns {null | { error: string } | { values: Record<string, string> }}
- *   `null` when the file is not a transcript at all.
+ * @param {string} text a transcript's full contents
+ * @returns {null | { error: string, values?: Record<string, string> }
+ *           | { values: Record<string, string> }} `null` when the file is not
+ *   a transcript at all.
  */
-function parseFrontmatter(text) {
+export function readFrontmatter(text) {
   // A byte-order mark is not a reason to drop a transcript from its own
   // catalog, and the failure mode without this is a silent skip.
   const lines = String(text).replace(/^\uFEFF/, '').split(/\r?\n/);
@@ -164,20 +181,43 @@ function parseFrontmatter(text) {
   // malformed one rather than something else entirely.
   if (closing === -1) return { error: 'its frontmatter block is never closed' };
 
+  // An unreadable line does not stop the scan, and the keys either side of it
+  // are still returned with the error. The catalog ignores them and warns, but
+  // the store asks this same parse which video a file is about, and answering
+  // "no idea" over one stray line is how that file gets overwritten.
   const values = {};
+  let error = null;
   for (const line of lines.slice(1, closing)) {
     if (line.trim() === '') continue;
     const match = /^([A-Za-z_][A-Za-z0-9_]*):[ \t]*(.*)$/.exec(line);
-    if (!match) return { error: 'its frontmatter is not readable' };
+    if (!match) {
+      error ??= 'its frontmatter is not readable';
+      continue;
+    }
     values[match[1]] = unquote(match[2].trim());
   }
 
-  const missing = REQUIRED_KEYS.filter((key) => !(key in values));
+  return error ? { error, values } : { values };
+}
+
+/**
+ * `readFrontmatter` plus the catalog's completeness judgement.
+ *
+ * The frontmatter contract is closed at seven keys, so a file missing one did
+ * not come from this tool and earns the warning that says so.
+ *
+ * @returns {null | { error: string } | { values: Record<string, string> }}
+ */
+function parseFrontmatter(text) {
+  const frontmatter = readFrontmatter(text);
+  if (frontmatter === null || frontmatter.error) return frontmatter;
+
+  const missing = REQUIRED_KEYS.filter((key) => !(key in frontmatter.values));
   if (missing.length > 0) {
     return { error: `its frontmatter is missing ${missing.join(', ')}` };
   }
 
-  return { values };
+  return frontmatter;
 }
 
 /**
