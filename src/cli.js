@@ -1,7 +1,9 @@
-import path from 'node:path';
+import fs from 'node:fs/promises';
 
 import { parseTarget, TargetParseError } from './target.js';
 import { withTempDir } from './temp-dir.js';
+import { renderTranscript } from './transcript.js';
+import { writeTranscript } from './transcript-store.js';
 import { fetchSubtitleTrack, preflight, FetchError, YtDlpMissingError } from './ytdlp.js';
 
 const USAGE = `Usage: yt-transcript <url|id> [--lang <code>] [--playlist]
@@ -93,18 +95,26 @@ export async function main(argv, io = {}) {
   }
 
   try {
-    const { metadata, trackPath } = await withTempDir(async (destDir) => {
-      const result = await fetchSubtitleTrack({
+    // Only the rendered transcript leaves the temporary directory: the
+    // subtitle track is gone by the time this returns, on this path and on the
+    // throwing one alike.
+    const transcript = await withTempDir(async (destDir) => {
+      const { metadata, trackPath } = await fetchSubtitleTrack({
         url: target.url,
         lang: options.lang,
         destDir,
       });
-      // Only what survives the directory leaves it: the track itself is gone by
-      // the time this returns, on this path and on the throwing one alike.
-      return { metadata: result.metadata, trackPath: result.trackPath };
+
+      return renderTranscript({
+        trackText: await fs.readFile(trackPath, 'utf8'),
+        url: target.url,
+        videoId: target.videoId,
+        metadata,
+      });
     });
 
-    report(out, target, metadata, trackPath);
+    const file = await writeTranscript(transcript);
+    report(out, transcript, file);
     return 0;
   } catch (error) {
     if (!(error instanceof FetchError)) throw error;
@@ -113,19 +123,8 @@ export async function main(argv, io = {}) {
   }
 }
 
-function report(out, target, metadata, trackPath) {
-  out(target.url);
-  out(`  title       ${metadata?.title ?? '(unknown)'}`);
-  out(`  channel     ${metadata?.channel ?? '(unknown)'}`);
-  out(`  duration    ${metadata?.duration ?? '(unknown)'}`);
-  out(`  uploaded    ${displayDate(metadata?.uploadDate)}`);
-  out(`  track       ${path.basename(trackPath)} (in a temporary directory, now removed)`);
-  out('');
-  out('No transcript written: this build fetches the subtitle track only.');
-}
-
-function displayDate(uploadDate) {
-  const match = /^(\d{4})(\d{2})(\d{2})$/.exec(uploadDate ?? '');
-  return match ? `${match[1]}-${match[2]}-${match[3]}` : (uploadDate || '(unknown)');
+function report(out, transcript, file) {
+  out(file);
+  out(`  ${transcript.url}  (${transcript.trackKind} subtitle track)`);
 }
 
