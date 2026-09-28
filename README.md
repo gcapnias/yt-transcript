@@ -17,25 +17,49 @@ frontmatter so it cannot drift from what is there.
 
 Fetch one video, by URL or by bare id:
 
-```
+```bash
 npx . https://www.youtube.com/watch?v=o3CX_Y59_74
 npx . o3CX_Y59_74
 ```
 
 Fetch a playlist or a channel — the URL expands into a batch, one fetch per video:
 
-```
+```bash
 npx . "https://www.youtube.com/watch?v=o3CX_Y59_74&list=PLxxxxxxxx" --playlist
 ```
 
 Rebuild the catalog from what is on disk, fetching nothing:
 
-```
+```bash
 npx . catalog
 ```
 
 A target may be a video URL, a bare video id, a `youtu.be` or `/shorts` link, a
 playlist URL, a channel URL, or a bare `@handle`.
+
+### Without cloning
+
+Run straight from this repository, no `git clone` first:
+
+```bash
+npx --allow-git=root github:gcapnias/yt-transcript o3CX_Y59_74
+npx --allow-git=root github:gcapnias/yt-transcript catalog
+```
+
+`--allow-git=root` is required. Since npm 12 the default for `allow-git` is
+`"none"`, so a git-sourced spec is refused outright:
+
+```
+npm error code EALLOWGIT
+npm error Fetching packages of type "git" have been disabled
+```
+
+`root` permits the git dependency you are explicitly running; `all` would permit
+any, which is broader than this needs. The first run also prints a
+`gitignore-fallback` warning about the missing `.npmignore` — harmless, npm falls
+back to `.gitignore` to decide what to ship.
+
+Both forms need `yt-dlp` on `PATH`; npx does not bundle it.
 
 ## Flags
 
