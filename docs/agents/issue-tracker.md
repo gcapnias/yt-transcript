@@ -37,7 +37,9 @@ Issues and pull requests share one number space and PRs are a request surface he
 
 ```bash
 gh pr view <number> --json number,title,body,labels,comments \
-  || gh issue view <number> --json number,title,body,labels,comments
+  --jq '{number, title, body, labels: [.labels[].name], comments: [.comments[].body]}' \
+  || gh issue view <number> --json number,title,body,labels,comments \
+    --jq '{number, title, body, labels: [.labels[].name], comments: [.comments[].body]}'
 ```
 
 ## Wayfinding operations
