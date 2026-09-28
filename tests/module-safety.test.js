@@ -35,13 +35,12 @@ test('importing every src module writes no file and spawns nothing', async () =>
 });
 
 // The entry point is a module too, and its guard is `import.meta.main`, which
-// arrived in Node 24.2 — above this package's Node 22 floor. On Node 22 the
-// guard is absent by design (failing closed would break the tool on a
-// supported runtime), so this skips loudly rather than passing over a case it
-// never checked.
+// is supported on Node >=22.18.0 <23 || >=24.2.0. Outside that range the guard
+// is absent (failing closed would break the tool), so this skips loudly rather
+// than passing over a case it never checked.
 test('importing the entry point does not run the command', async (t) => {
   if (import.meta.main === undefined) {
-    t.skip('entry guard needs import.meta.main (Node 24.2+); unguarded on this runtime');
+    t.skip('entry guard needs import.meta.main (Node >=22.18.0 <23 || >=24.2.0); unguarded on this runtime');
     return;
   }
 

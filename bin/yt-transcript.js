@@ -10,10 +10,10 @@
  * genuinely different, so a path comparison reports "imported" for the very
  * invocation the tool exists to serve. Measured, not assumed.
  *
- * `import.meta.main` arrived in Node 24.2, above this package's Node 22 floor,
- * so on an older runtime it is `undefined` and the command runs unguarded —
- * which is the correct behaviour for an entry point, just unprotected against
- * being imported.
+ * `import.meta.main` arrived in Node 24.2 and was backported to Node 22.18,
+ * which is why `engines` demands >= 22.18.0. Below that floor the property is
+ * `undefined` and the command runs unguarded — the correct behaviour for an
+ * entry point, just unprotected against being imported.
  */
 import { main } from '../src/cli.js';
 
