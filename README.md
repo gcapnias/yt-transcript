@@ -10,7 +10,7 @@ frontmatter so it cannot drift from what is there.
 
 ## Prerequisites
 
-- **Node >= 22**
+- **Node >= 22.18.0** — the floor where `import.meta.main` exists; see [#2](https://github.com/gcapnias/yt-transcript/issues/2)
 - **`yt-dlp`** on `PATH` — every fetch is a `yt-dlp` spawn; nothing is bundled
 
 ## Usage
