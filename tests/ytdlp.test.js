@@ -14,6 +14,7 @@ import {
   parseExpansion,
   parseMetadata,
 } from '../src/ytdlp.js';
+import { xPost } from '../src/site.js';
 import { withTempDir } from '../src/temp-dir.js';
 import { readXPrintLine } from './fixtures.js';
 
@@ -146,7 +147,7 @@ test('the youtube invocation is exactly what it was', () => {
 });
 
 test('a post is fetched as playlist entry 1, still in one invocation', () => {
-  const args = fetchArgs({ url: POST_URL, lang: 'en', destDir: '/tmp/run', post: true });
+  const args = fetchArgs({ url: POST_URL, lang: 'en', destDir: '/tmp/run', site: xPost(1) });
 
   assert.ok(args.includes('--no-playlist'), 'dropped --no-playlist, which honours /video/N');
   // `--no-playlist` alone still processes both entries of a multi-video or
@@ -191,7 +192,8 @@ test('a recorded post outcome becomes the failure it means', () => {
     ...outcome,
     exitCode: 1,
     hasTrack: false,
-    post: { stderr: 'ERROR: [twitter] 20: No video could be found in this tweet\n' },
+    site: xPost(1),
+    stderr: 'ERROR: [twitter] 20: No video could be found in this tweet\n',
   });
   assert.ok(noVideo instanceof FetchError);
   assert.equal(noVideo.failure, NO_VIDEO);
@@ -202,7 +204,8 @@ test('a recorded post outcome becomes the failure it means', () => {
     ...outcome,
     exitCode: 0,
     hasTrack: true,
-    post: { stderr: '', extractorKey: 'Youtube' },
+    site: xPost(1),
+    extractorKey: 'Youtube',
   });
   assert.equal(elsewhere.failure, NOT_AN_X_POST);
 

@@ -176,8 +176,8 @@ function recordedPostFetch(name) {
   const calls = [];
   return {
     calls,
-    async fetchTrack({ url, lang, destDir, post }) {
-      calls.push({ url, lang, post });
+    async fetchTrack({ url, lang, destDir, site }) {
+      calls.push({ url, lang, site: site.name });
       const trackPath = path.join(destDir, `${X_TRACK_ID}.en.vtt`);
       await fs.writeFile(trackPath, readXTrack(), 'utf8');
       return { metadata: parseMetadata(readXPrintLine(name)), trackPath };
@@ -198,8 +198,8 @@ test('a post is fetched as a post, and filed under the url yt-dlp reported', asy
     }
 
     assert.deepEqual(
-      recorded.calls.map((call) => [call.url, call.post]),
-      spellings.map((url) => [url, true]),
+      recorded.calls.map((call) => [call.url, call.site]),
+      spellings.map((url) => [url, 'x']),
     );
     // Two spellings, one post: the second overwrote the first.
     const files = await fs.readdir(dir);

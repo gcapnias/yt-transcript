@@ -14,8 +14,7 @@
 
 import { cleanTrack } from './clean.js';
 import { formatUploadDate, renderFrontmatter } from './frontmatter.js';
-import { transcriptSlug } from './slug.js';
-import { postIdentity } from './x-post.js';
+import { YOUTUBE } from './site.js';
 
 /**
  * @param {object} input
@@ -23,8 +22,8 @@ import { postIdentity } from './x-post.js';
  * @param {string} input.url for a YouTube video, the canonical
  *   `https://www.youtube.com/watch?v=<id>` form
  * @param {string} input.videoId for a YouTube video, its id
- * @param {{ videoNumber: number }} [input.post] present for an X post: `url` and
- *   `videoId` are then ignored, and rebuilt from the metadata (see `x-post.js`)
+ * @param {import('./site.js').Site} [input.site] YouTube unless given; an X post
+ *   ignores `url` and `videoId`, and rebuilds both from the metadata
  * @param {{ title: string, channel: string, duration: string, uploadDate: string,
  *           description?: string, uploader?: string, uploaderId?: string,
  *           displayId?: string }} input.metadata
@@ -43,23 +42,17 @@ export function renderTranscript({
   trackText,
   url: fetchedUrl,
   videoId: fetchedVideoId,
-  post,
+  site = YOUTUBE,
   metadata,
   fetchedAt = new Date(),
 }) {
   const { trackKind: detectedKind, paragraphs } = cleanTrack(trackText);
-  const identity = post ? postIdentity(metadata ?? {}, post.videoNumber) : null;
-
-  // For an X post the identity comes from what yt-dlp reported, never from the
-  // url fetched (ADR-0004), and every track is auto, whatever it looks like
-  // (ADR-0003). The *cleaning* above still follows what the track looks like:
-  // the recorded kind is a claim about provenance, not a cleaning rule.
-  const url = identity?.url ?? fetchedUrl;
-  const collisionId = identity?.collisionId ?? fetchedVideoId;
-  const trackKind = identity ? 'auto' : detectedKind;
-  const title = identity?.title ?? metadata?.title ?? '';
-  const channel = identity?.channel ?? metadata?.channel ?? '';
-  const slug = identity?.slug ?? transcriptSlug(title, fetchedVideoId);
+  const { url, collisionId, trackKind, title, channel, slug } = site.identify({
+    metadata,
+    url: fetchedUrl,
+    videoId: fetchedVideoId,
+    trackKind: detectedKind,
+  });
 
   const frontmatter = renderFrontmatter({
     title,

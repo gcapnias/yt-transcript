@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { renderCatalog } from '../src/catalog.js';
+import { xPost } from '../src/site.js';
 import { renderTranscript } from '../src/transcript.js';
 import { videoSuffix } from '../src/x-post.js';
 import { parseMetadata } from '../src/ytdlp.js';
@@ -23,7 +24,7 @@ function render(metadata, { videoNumber = 1, trackText = readXTrack() } = {}) {
     // What a post target carries: the url fetched, which is never the identity.
     url: 'https://mobile.x.com/POTETO/status/2102050467505430555?s=20',
     videoId: null,
-    post: { videoNumber },
+    site: xPost(videoNumber),
     metadata,
     fetchedAt: FETCHED_AT,
   });

@@ -3,7 +3,8 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 
 import { sanitizeChildEnv } from './child-env.js';
-import { classifyFetch, classifyPostFetch, describeFailure } from './fetch-outcome.js';
+import { describeFailure } from './fetch-outcome.js';
+import { YOUTUBE } from './site.js';
 import { parseTarget, TargetParseError } from './target.js';
 
 /** The binary name looked up on PATH. Overridable so tests need not uninstall it. */
@@ -132,39 +133,26 @@ export function parseMetadata(stdout) {
   };
 }
 
-const VIDEO_FIELDS = 'title,channel,duration_string,upload_date';
-/**
- * What an X post adds: the text, the channel (`uploader` is the display name,
- * `uploader_id` the handle), the post id (`display_id`; `id` is the media id)
- * and which extractor answered. `channel` is absent on X, so it is not asked
- * for. `title` is printed but unused: it is `<name> - <text>` cut at 72.
- */
-const POST_FIELDS =
-  'title,description,uploader,uploader_id,display_id,extractor_key,duration_string,upload_date';
-
 /**
  * Builds the one settled per-video invocation. Every flag is load-bearing; see
  * the spec's Fetching section before changing any of them.
  *
- * `post` is the X variant. `--no-playlist` is kept, because it is what makes
- * yt-dlp honour a `/video/N` suffix, but it does not stop X's extractor from
- * returning a multi-video or quote post as a playlist and processing every
- * entry; `--playlist-items 1` selects the post's own first video.
+ * The `site` adds its own flags and names what is printed (see `site.js`).
  */
-export function fetchArgs({ url, lang, destDir, post = false }) {
+export function fetchArgs({ url, lang, destDir, site = YOUTUBE }) {
   return [
     '--js-runtimes',
     'node',
     '--skip-download',
     '--no-playlist',
-    ...(post ? ['--playlist-items', '1'] : []),
+    ...site.extraArgs,
     '--write-sub',
     '--write-auto-sub',
     '--sub-langs',
     lang,
     '--no-simulate',
     '--print',
-    `%(.{${post ? POST_FIELDS : VIDEO_FIELDS}})j`,
+    `%(.{${site.printFields}})j`,
     '-P',
     destDir,
     '-o',
@@ -178,12 +166,10 @@ export function fetchArgs({ url, lang, destDir, post = false }) {
  * and emits the metadata on stdout. No pre-flight query, no second round-trip,
  * and no `.info.json` is ever written.
  *
- * `post: true` is an X post, fetched as its first video (see `fetchArgs`).
- *
  * @returns {Promise<{ metadata: object, trackPath: string }>}
  */
-export async function fetchSubtitleTrack({ url, lang = 'en', destDir, post = false, binary = YT_DLP }) {
-  const { exitCode, stdout, stderr } = await run(binary, fetchArgs({ url, lang, destDir, post }));
+export async function fetchSubtitleTrack({ url, lang = 'en', destDir, site = YOUTUBE, binary = YT_DLP }) {
+  const { exitCode, stdout, stderr } = await run(binary, fetchArgs({ url, lang, destDir, site }));
 
   // One invocation, one verdict. The retry ladder lives a level up, in
   // `fetch.js`, so every retry is a fresh invocation into a fresh directory.
@@ -194,7 +180,9 @@ export async function fetchSubtitleTrack({ url, lang = 'en', destDir, post = fal
     hasTrack: trackPath !== null,
     url,
     lang,
-    post: post ? { stderr, extractorKey: metadata?.extractorKey } : undefined,
+    site,
+    stderr,
+    extractorKey: metadata?.extractorKey,
   });
   if (failure) throw failure;
 
@@ -206,17 +194,16 @@ export async function fetchSubtitleTrack({ url, lang = 'en', destDir, post = fal
  * the fetch succeeded. Separated from the spawn so the mapping from an exit
  * code to a retryable failure is testable without a live invocation.
  *
- * `post` is present for an X post, and is what lets stderr and the reported
- * extractor be read; a YouTube outcome is classified by its exit code alone.
+ * The whole outcome is handed to the `site`, which decides what of it to read:
+ * an X post reads stderr and the reported extractor, a YouTube video neither.
  *
  * @param {{ exitCode: number, hasTrack: boolean, url: string, lang: string,
- *           post?: { stderr?: string, extractorKey?: string } }} outcome
+ *           site?: import('./site.js').Site, stderr?: string,
+ *           extractorKey?: string }} outcome
  * @returns {FetchError|null}
  */
-export function fetchFailure({ exitCode, hasTrack, url, lang, post }) {
-  const outcome = post
-    ? classifyPostFetch({ exitCode, hasTrack, ...post })
-    : classifyFetch({ exitCode, hasTrack });
+export function fetchFailure({ exitCode, hasTrack, url, lang, site = YOUTUBE, stderr, extractorKey }) {
+  const outcome = site.classify({ exitCode, hasTrack, stderr, extractorKey });
   if (outcome.ok) return null;
 
   return new FetchError(describeFailure({ failure: outcome.failure, url, lang }), {

@@ -13,6 +13,7 @@
 import fs from 'node:fs/promises';
 
 import { withRateLimitRetries } from './fetch-outcome.js';
+import { xPost, YOUTUBE } from './site.js';
 import { withTempDir } from './temp-dir.js';
 import { renderTranscript } from './transcript.js';
 import { writeTranscript } from './transcript-store.js';
@@ -27,7 +28,8 @@ import { fetchSubtitleTrack } from './ytdlp.js';
  *
  * An X post is fetched with `post: { videoNumber }` and no `videoId`: its
  * identity is not known until yt-dlp has reported on it (ADR-0004), so the
- * transcript is rendered, and named, from that report.
+ * transcript is rendered, and named, from that report. This is the one place a
+ * request is turned into the site every layer below asks (see `site.js`).
  *
  * @param {{ url: string, videoId: string|null, post?: { videoNumber: number },
  *           lang?: string }} video
@@ -42,18 +44,19 @@ export async function fetchTranscript({ url, videoId, post, lang = 'en' }, deps 
   // vocabulary, is the whole operation this function performs.
   const { fetchTrack = fetchSubtitleTrack, write = writeTranscript, dir, sleep, delays, onRetry } =
     deps;
+  const site = post ? xPost(post.videoNumber) : YOUTUBE;
 
   const transcript = await withRateLimitRetries(
     () =>
       withTempDir(async (destDir) => {
-        const { metadata, trackPath } = await fetchTrack({ url, lang, destDir, post: Boolean(post) });
+        const { metadata, trackPath } = await fetchTrack({ url, lang, destDir, site });
 
         // Rendered before the directory goes: only the transcript leaves it.
         return renderTranscript({
           trackText: await fs.readFile(trackPath, 'utf8'),
           url,
           videoId,
-          post,
+          site,
           metadata,
         });
       }),
