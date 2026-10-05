@@ -10,6 +10,8 @@
  * carries the url to *fetch* and nothing a transcript is identified by.
  */
 
+import { videoSuffix } from './x-post.js';
+
 const VIDEO_ID = /^[A-Za-z0-9_-]{11}$/;
 /** A shape guard, not a playlist-id format: rejects empty and junk `list=` values. */
 const LIST_ID_SHAPE = /^[A-Za-z0-9_-]+$/;
@@ -18,9 +20,13 @@ const HANDLE = /^@[A-Za-z0-9_.-]+$/;
 /** An X host, with the `www.`, `mobile.` and `m.` subdomains `yt-dlp` accepts. */
 const X_HOST = /^(?:(?:www|m|mobile)\.)?(?:x|twitter)\.com$/;
 /**
- * A status url: `/<handle>/status/<id>`, `/i/status/<id>` (the handle `i`) or
+ * A status url: `/<handle>/status/<id>`, `/i/status/<id>` or
  * `/i/web/status/<id>`, optionally naming one of the post's videos. `/photo/N`
  * is the same selector as `/video/N` to `yt-dlp`, so it is read the same way.
+ *
+ * What precedes `/status` is captured as the url's prefix, not as a handle:
+ * `i` and `i/web` name nobody, and the handle a transcript records comes from
+ * `yt-dlp` anyway (ADR-0004).
  */
 const X_STATUS = /^\/(i\/web|[A-Za-z0-9_]+)\/status\/(\d+)(?:\/(?:video|photo)\/([1-9]\d*))?\/?$/;
 /** Neither carries a subtitle track, so there is nothing for this tool to fetch. */
@@ -66,7 +72,7 @@ function video(videoId) {
  * one thing kept explicitly, so `/video/1` and the bare url are one target.
  */
 function post(url, path, videoNumber = 1) {
-  const suffix = videoNumber > 1 ? `/video/${videoNumber}` : '';
+  const suffix = videoSuffix(videoNumber, '/video/');
   return { kind: 'post', url: `https://${url.hostname}${path}${suffix}`, videoId: null, videoNumber };
 }
 
@@ -85,8 +91,8 @@ function xTarget(url, input) {
 
   const match = X_STATUS.exec(url.pathname);
   if (!match) throw new TargetParseError(input);
-  const [, owner, postId, videoNumber] = match;
-  return post(url, `/${owner}/status/${postId}`, videoNumber ? Number(videoNumber) : 1);
+  const [, prefix, postId, videoNumber] = match;
+  return post(url, `/${prefix}/status/${postId}`, videoNumber ? Number(videoNumber) : 1);
 }
 
 function playlist(listId, input) {

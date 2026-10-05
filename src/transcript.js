@@ -29,12 +29,13 @@ import { postIdentity } from './x-post.js';
  *           description?: string, uploader?: string, uploaderId?: string,
  *           displayId?: string }} input.metadata
  * @param {Date} [input.fetchedAt]
- * `videoId` in the result is what the filename collision rule suffixes: the
+ *
+ * `collisionId` in the result is what the filename collision rule suffixes: the
  * YouTube video id, or for an X post the post id (plus `-<N>` for video N ≥ 2).
  * `url` is the frontmatter `url`, for an X post the one built from metadata.
  *
  * @returns {{ slug: string, filename: string, contents: string,
- *             url: string, videoId: string, trackKind: 'auto'|'manual',
+ *             url: string, collisionId: string, trackKind: 'auto'|'manual',
  *             video: { title: string, channel: string, duration: string,
  *                      uploaded: string } }}
  */
@@ -54,17 +55,11 @@ export function renderTranscript({
   // (ADR-0003). The *cleaning* above still follows what the track looks like:
   // the recorded kind is a claim about provenance, not a cleaning rule.
   const url = identity?.url ?? fetchedUrl;
-  const videoId = identity?.videoId ?? fetchedVideoId;
+  const collisionId = identity?.collisionId ?? fetchedVideoId;
   const trackKind = identity ? 'auto' : detectedKind;
   const title = identity?.title ?? metadata?.title ?? '';
   const channel = identity?.channel ?? metadata?.channel ?? '';
-  // A post with no text has no title to slug: `@alice post 1` would read as
-  // `alice-post-1`, so it goes straight to the fallback.
-  const slug = identity
-    ? identity.hasText
-      ? transcriptSlug(title, identity.fallbackSlug)
-      : identity.fallbackSlug
-    : transcriptSlug(title, videoId);
+  const slug = identity?.slug ?? transcriptSlug(title, fetchedVideoId);
 
   const frontmatter = renderFrontmatter({
     title,
@@ -87,7 +82,7 @@ export function renderTranscript({
     filename: `${slug}.md`,
     contents: `${frontmatter}\n\n${body}\n`,
     url,
-    videoId,
+    collisionId,
     trackKind,
     // What the run tells the human it just fetched. Carried out here rather
     // than re-read from the file or re-formatted by the CLI, so the terminal

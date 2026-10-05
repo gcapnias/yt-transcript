@@ -134,7 +134,7 @@ export function parseMetadata(stdout) {
 
 const VIDEO_FIELDS = 'title,channel,duration_string,upload_date';
 /**
- * What an X post adds: the text, the author (`uploader` is the display name,
+ * What an X post adds: the text, the channel (`uploader` is the display name,
  * `uploader_id` the handle), the post id (`display_id`; `id` is the media id)
  * and which extractor answered. `channel` is absent on X, so it is not asked
  * for. `title` is printed but unused: it is `<name> - <text>` cut at 72.

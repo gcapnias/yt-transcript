@@ -9,6 +9,8 @@
  * `display_id`.
  */
 
+import { transcriptSlug } from './slug.js';
+
 /** Links, `t.co` ones included, are removed from the post text. */
 const LINK = /https?:\/\/\S+/g;
 
@@ -25,26 +27,39 @@ function postText(description) {
 }
 
 /**
+ * What names video N of a post, wherever a post is named: video 1 gets nothing,
+ * so the bare post url and `/video/1` are one transcript.
+ *
+ * @param {number} videoNumber which of the post's own videos, from 1
+ * @param {string} separator `/video/` in a url, `-` in a filename
+ * @returns {string}
+ */
+export function videoSuffix(videoNumber, separator) {
+  return videoNumber > 1 ? `${separator}${videoNumber}` : '';
+}
+
+/**
  * @param {{ description: string, uploader: string, uploaderId: string, displayId: string }} metadata
  * @param {number} videoNumber which of the post's own videos was fetched, from 1
- * @returns {{ title: string, hasText: boolean, url: string, channel: string,
- *             videoId: string, fallbackSlug: string }}
+ * @returns {{ title: string, url: string, channel: string, collisionId: string,
+ *             slug: string }}
  */
 export function postIdentity(metadata, videoNumber) {
   const { uploader, uploaderId, displayId } = metadata;
-  // Video 1 has no suffix, so the bare post url and `/video/1` are one transcript.
-  const suffix = videoNumber > 1 ? `/video/${videoNumber}` : '';
   const text = postText(metadata.description);
+  // Lowercased, unlike YouTube's mixed-case video id: deliberately, and only
+  // the case changes, so a handle's underscores are kept.
+  const fallbackSlug = `${uploaderId}-${displayId}${videoSuffix(videoNumber, '-')}`.toLowerCase();
 
   return {
     title: text || `@${uploaderId} post ${displayId}`,
-    hasText: text !== '',
-    url: `https://x.com/${uploaderId}/status/${displayId}${suffix}`,
+    url: `https://x.com/${uploaderId}/status/${displayId}${videoSuffix(videoNumber, '/video/')}`,
     channel: uploader ? `${uploader} (@${uploaderId})` : `@${uploaderId}`,
-    // What the filename collision rule suffixes, where YouTube uses the video id.
-    videoId: videoNumber > 1 ? `${displayId}-${videoNumber}` : displayId,
-    // Lowercased, unlike YouTube's mixed-case video id: deliberately, and only
-    // the case changes, so a handle's underscores are kept.
-    fallbackSlug: `${uploaderId}-${displayId}${videoNumber > 1 ? `-${videoNumber}` : ''}`.toLowerCase(),
+    // What the filename collision rule suffixes, where YouTube uses the video
+    // id: the post, never the video's own id (CONTEXT.md, Post).
+    collisionId: `${displayId}${videoSuffix(videoNumber, '-')}`,
+    // A post with no text has no title to slug: `@alice post 1` would read as
+    // `alice-post-1`, so it goes straight to the fallback.
+    slug: text ? transcriptSlug(text, fallbackSlug) : fallbackSlug,
   };
 }

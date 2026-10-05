@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 
 import { renderCatalog } from '../src/catalog.js';
 import { renderTranscript } from '../src/transcript.js';
+import { videoSuffix } from '../src/x-post.js';
 import { parseMetadata } from '../src/ytdlp.js';
 import { readXPrintLine, readXTrack } from './fixtures.js';
 
@@ -85,6 +86,13 @@ test('the same post in any spelling is one url, and a later video is its own', (
   assert.equal(render(metadata, { videoNumber: 2 }).url, `${bare}/video/2`);
 });
 
+test('video 1 is never numbered, in a url or a filename, and a later video always is', () => {
+  assert.equal(videoSuffix(1, '/video/'), '');
+  assert.equal(videoSuffix(1, '-'), '');
+  assert.equal(videoSuffix(2, '/video/'), '/video/2');
+  assert.equal(videoSuffix(12, '-'), '-12');
+});
+
 test('the url uses the handle yt-dlp reports, not the one the input spelled', () => {
   // twitter.com/CTVJLaidlaw/status/1600649710662213632 reports JocelynVLaidlaw.
   const first = render(recorded('ctv-1600649710662213632-video1'));
@@ -99,8 +107,8 @@ test('the url uses the handle yt-dlp reports, not the one the input spelled', ()
 test('the post id identifies the transcript, never the media id', () => {
   const transcript = render(recorded('poteto-2102050467505430555'));
 
-  assert.equal(transcript.videoId, '2102050467505430555');
-  assert.equal(render(recorded('poteto-2102050467505430555'), { videoNumber: 3 }).videoId, '2102050467505430555-3');
+  assert.equal(transcript.collisionId, '2102050467505430555');
+  assert.equal(render(recorded('poteto-2102050467505430555'), { videoNumber: 3 }).collisionId, '2102050467505430555-3');
 });
 
 test('every X track is recorded as auto, whatever the track itself says', () => {
@@ -148,7 +156,7 @@ test('the slug comes from the title, and falls back to the lowercased handle and
   assert.equal(render(weidel, { videoNumber: 2 }).slug, 'alice_weidel-1877462752526053592-2');
 });
 
-test('a post with no text is titled by its author and id, and filed under them', () => {
+test('a post with no text is titled by its handle and id, and filed under them', () => {
   const empty = {
     ...recorded('kw5hine-2106578219269005639'),
     description: ' https://t.co/cTiQ5Oo5WA ',

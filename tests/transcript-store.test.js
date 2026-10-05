@@ -10,7 +10,7 @@ const transcript = (videoId, slug, marker) => ({
   slug,
   filename: `${slug}.md`,
   url: `https://www.youtube.com/watch?v=${videoId}`,
-  videoId,
+  collisionId: videoId,
   contents: `---\ntitle: "A talk"\nurl: https://www.youtube.com/watch?v=${videoId}\n---\n\n${marker}\n`,
 });
 
