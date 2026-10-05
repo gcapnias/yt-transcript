@@ -105,6 +105,35 @@ test('the url uses the handle yt-dlp reports, not the one the input spelled', ()
   assert.equal(frontmatter(second).duration, '"1:42"');
 });
 
+test('the video number is the one yt-dlp reports, so a t.co link to video 2 is video 2', () => {
+  // A t.co link carries no number of its own, so it is requested as video 1;
+  // `webpage_url` is the expanded url yt-dlp extracted from (as observed for
+  // t.co/NgrGz7tmPM), here hand-set to name the post's second video.
+  const viaShortLink = {
+    ...recorded('ctv-1600649710662213632-video2'),
+    webpageUrl: 'https://twitter.com/CTVJLaidlaw/status/1600649710662213632/video/2',
+  };
+  const transcript = render(viaShortLink, { videoNumber: 1 });
+
+  assert.equal(transcript.url, 'https://x.com/JocelynVLaidlaw/status/1600649710662213632/video/2');
+  assert.equal(transcript.collisionId, '1600649710662213632-2');
+
+  // /photo/N in the report is the same selector, and video 1 is never numbered.
+  const photo = { ...viaShortLink, webpageUrl: viaShortLink.webpageUrl.replace('/video/2', '/photo/2') };
+  assert.equal(render(photo).url, transcript.url);
+  const first = { ...viaShortLink, webpageUrl: 'https://x.com/CTVJLaidlaw/status/1600649710662213632/video/1' };
+  assert.equal(render(first, { videoNumber: 2 }).url, 'https://x.com/JocelynVLaidlaw/status/1600649710662213632');
+});
+
+test('a report that names no video number leaves the requested one standing', () => {
+  const bare = {
+    ...recorded('ctv-1600649710662213632-video2'),
+    webpageUrl: 'https://x.com/poteto/status/1600649710662213632',
+  };
+  assert.match(render(bare, { videoNumber: 2 }).url, /\/video\/2$/);
+  assert.match(render({ ...bare, webpageUrl: '' }, { videoNumber: 2 }).url, /\/video\/2$/);
+});
+
 test('the post id identifies the transcript, never the media id', () => {
   const transcript = render(recorded('poteto-2102050467505430555'));
 

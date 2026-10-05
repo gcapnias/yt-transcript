@@ -8,6 +8,7 @@ import {
   describeRetry,
   withRateLimitRetries,
   LOGIN_REQUIRED,
+  NO_POST_IDENTITY,
   NO_SUBTITLES,
   NO_SUCH_VIDEO,
   NO_VIDEO,
@@ -194,7 +195,8 @@ const POST_URL = 'https://x.com/poteto/status/2102050467505430555';
 const post = (overrides) => ({ exitCode: 1, hasTrack: false, stderr: '', extractorKey: '', ...overrides });
 
 test('a post fetch succeeds, or has no subtitles, exactly as a YouTube one does', () => {
-  assert.deepEqual(classifyPostFetch(post({ exitCode: 0, hasTrack: true, extractorKey: 'Twitter' })), {
+  const identity = { uploaderId: 'poteto', displayId: '2102050467505430555' };
+  assert.deepEqual(classifyPostFetch(post({ exitCode: 0, hasTrack: true, extractorKey: 'Twitter', ...identity })), {
     ok: true,
   });
   assert.deepEqual(classifyPostFetch(post({ exitCode: 0, extractorKey: 'Twitter' })), {
@@ -252,8 +254,29 @@ test('a video that came from another site is never a post transcript', () => {
   });
 });
 
+test('an X success with no handle or post id is refused: there is nothing to file it under', () => {
+  const identified = { exitCode: 0, hasTrack: true, extractorKey: 'Twitter' };
+
+  for (const missing of [
+    { uploaderId: '', displayId: '2102050467505430555' },
+    { uploaderId: 'poteto', displayId: '' },
+    {},
+  ]) {
+    assert.deepEqual(
+      classifyPostFetch(post({ ...identified, ...missing })),
+      { ok: false, failure: NO_POST_IDENTITY, retryable: false },
+      JSON.stringify(missing),
+    );
+  }
+
+  assert.deepEqual(
+    classifyPostFetch(post({ ...identified, uploaderId: 'poteto', displayId: '2102050467505430555' })),
+    { ok: true },
+  );
+});
+
 test('every post failure message names the post and says nothing was written', () => {
-  for (const failure of [NO_VIDEO, NO_SUCH_VIDEO, LOGIN_REQUIRED, NOT_AN_X_POST]) {
+  for (const failure of [NO_VIDEO, NO_SUCH_VIDEO, LOGIN_REQUIRED, NOT_AN_X_POST, NO_POST_IDENTITY]) {
     const message = describeFailure({ failure, url: POST_URL, lang: 'en' });
     assert.ok(message.includes(POST_URL), `${failure} did not name the post`);
     assert.match(message, /Nothing was written/);

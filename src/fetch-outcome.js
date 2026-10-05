@@ -29,6 +29,8 @@ export const NO_SUCH_VIDEO = 'no-such-video';
 export const LOGIN_REQUIRED = 'login-required';
 /** The fetch led away from X, e.g. a link-only post followed to another site. */
 export const NOT_AN_X_POST = 'not-an-x-post';
+/** X answered, but without the handle or post id a transcript is filed under. */
+export const NO_POST_IDENTITY = 'no-post-identity';
 
 /**
  * The settled ladder: one wait per retry, so the invocation count is
@@ -94,16 +96,29 @@ const OTHER_SITE_ERROR = /^ERROR: (?:\[(?!twitter)[^\]]+\]|Unsupported URL)/m;
  *
  * `extractorKey` is what `yt-dlp` reports for a fetch that succeeded in
  * extracting; anything but `Twitter` means a link-only post was followed to
- * another site, whose video must not be filed under the post's url.
+ * another site, whose video must not be filed under the post's url. A track
+ * from X that came without its handle or post id is refused too: the url a
+ * transcript is identified by is built from both (ADR-0004).
  *
- * @param {{ exitCode: number, hasTrack: boolean, stderr?: string, extractorKey?: string }} outcome
+ * @param {{ exitCode: number, hasTrack: boolean, stderr?: string, extractorKey?: string,
+ *           uploaderId?: string, displayId?: string }} outcome
  * @returns {{ ok: true } | { ok: false, failure: string, retryable: boolean }}
  */
-export function classifyPostFetch({ exitCode, hasTrack, stderr = '', extractorKey = '' }) {
+export function classifyPostFetch({
+  exitCode,
+  hasTrack,
+  stderr = '',
+  extractorKey = '',
+  uploaderId = '',
+  displayId = '',
+}) {
   if (exitCode === 0) {
     // A success that did not say it came from X's extractor is not filed as an
     // X post: with no report there is no handle or post id to identify it by.
     if (extractorKey !== 'Twitter') return { ok: false, failure: NOT_AN_X_POST, retryable: false };
+    if (hasTrack && (!uploaderId || !displayId)) {
+      return { ok: false, failure: NO_POST_IDENTITY, retryable: false };
+    }
     return classifyFetch({ exitCode, hasTrack });
   }
 
@@ -158,6 +173,13 @@ export function describeFailure({ failure, url, lang }) {
     return (
       `${url} does not lead to a video in an X post: the post is a link to another site.\n` +
       'Nothing was written.'
+    );
+  }
+
+  if (failure === NO_POST_IDENTITY) {
+    return (
+      `yt-dlp did not report the handle and post id of ${url}, so there is no url to ` +
+      'identify its transcript by.\nNothing was written.'
     );
   }
 

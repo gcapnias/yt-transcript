@@ -98,12 +98,12 @@ export async function preflight({ binary = YT_DLP } = {}) {
  * `yt-dlp` reported them; reformatting is the transcript's business.
  *
  * @param {string} stdout
- * The last five fields are printed for an X post only, and are empty strings
+ * The last six fields are printed for an X post only, and are empty strings
  * for a YouTube video.
  *
  * @returns {{ title: string, channel: string, duration: string, uploadDate: string,
  *             description: string, uploader: string, uploaderId: string,
- *             displayId: string, extractorKey: string }|null}
+ *             displayId: string, extractorKey: string, webpageUrl: string }|null}
  */
 export function parseMetadata(stdout) {
   const line = stdout
@@ -130,6 +130,7 @@ export function parseMetadata(stdout) {
     uploaderId: parsed.uploader_id ?? '',
     displayId: parsed.display_id ?? '',
     extractorKey: parsed.extractor_key ?? '',
+    webpageUrl: parsed.webpage_url ?? '',
   };
 }
 
@@ -182,7 +183,7 @@ export async function fetchSubtitleTrack({ url, lang = 'en', destDir, site = YOU
     lang,
     site,
     stderr,
-    extractorKey: metadata?.extractorKey,
+    metadata,
   });
   if (failure) throw failure;
 
@@ -199,11 +200,11 @@ export async function fetchSubtitleTrack({ url, lang = 'en', destDir, site = YOU
  *
  * @param {{ exitCode: number, hasTrack: boolean, url: string, lang: string,
  *           site?: import('./site.js').Site, stderr?: string,
- *           extractorKey?: string }} outcome
+ *           metadata?: object|null }} outcome
  * @returns {FetchError|null}
  */
-export function fetchFailure({ exitCode, hasTrack, url, lang, site = YOUTUBE, stderr, extractorKey }) {
-  const outcome = site.classify({ exitCode, hasTrack, stderr, extractorKey });
+export function fetchFailure({ exitCode, hasTrack, url, lang, site = YOUTUBE, stderr, metadata }) {
+  const outcome = site.classify({ exitCode, hasTrack, stderr, metadata });
   if (outcome.ok) return null;
 
   return new FetchError(describeFailure({ failure: outcome.failure, url, lang }), {

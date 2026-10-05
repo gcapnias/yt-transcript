@@ -20,7 +20,7 @@ import { postIdentity } from './x-post.js';
  * @property {string} printFields what the one invocation prints, as JSON
  * @property {string[]} extraArgs flags the site adds to that invocation
  * @property {(outcome: { exitCode: number, hasTrack: boolean, stderr?: string,
- *             extractorKey?: string }) => object} classify
+ *             metadata?: object|null }) => object} classify
  * @property {(fetched: { metadata: object|null, url: string, videoId: string|null,
  *             trackKind: 'auto'|'manual' }) => { url: string, collisionId: string,
  *             title: string, channel: string, trackKind: 'auto'|'manual',
@@ -50,11 +50,12 @@ export const YOUTUBE = {
 /**
  * What an X post prints: the text, the channel (`uploader` is the display
  * name, `uploader_id` the handle), the post id (`display_id`; `id` is the media
- * id) and which extractor answered. `channel` is absent on X, so it is not
- * asked for. `title` is printed but unused: it is `<name> - <text>` cut at 72.
+ * id), which extractor answered, and the url it extracted from (`webpage_url`,
+ * which names the video number). `channel` is absent on X, so it is not asked
+ * for. `title` is printed but unused: it is `<name> - <text>` cut at 72.
  */
 const POST_FIELDS =
-  'title,description,uploader,uploader_id,display_id,extractor_key,duration_string,upload_date';
+  'title,description,uploader,uploader_id,display_id,extractor_key,webpage_url,duration_string,upload_date';
 
 /**
  * An X post, fetched as its video number `videoNumber`.
@@ -72,7 +73,13 @@ export function xPost(videoNumber) {
     name: 'x',
     printFields: POST_FIELDS,
     extraArgs: ['--playlist-items', '1'],
-    classify: (outcome) => classifyPostFetch(outcome),
+    classify: ({ metadata, ...outcome }) =>
+      classifyPostFetch({
+        ...outcome,
+        extractorKey: metadata?.extractorKey,
+        uploaderId: metadata?.uploaderId,
+        displayId: metadata?.displayId,
+      }),
     // The identity comes from what yt-dlp reported, never from the url fetched
     // (ADR-0004), and every track is auto, whatever it looks like (ADR-0003).
     // The *cleaning* still follows what the track looks like: the recorded kind

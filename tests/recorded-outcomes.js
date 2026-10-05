@@ -18,6 +18,7 @@ import {
   classifyFetch,
   describeFailure,
   LOGIN_REQUIRED,
+  NO_POST_IDENTITY,
   NO_SUBTITLES,
   NO_SUCH_VIDEO,
   NO_VIDEO,
@@ -26,7 +27,7 @@ import {
 import { FetchError } from '../src/ytdlp.js';
 
 /** The X post failures, none of which is a rate limit and so none retryable. */
-const POST_FAILURES = [NO_VIDEO, NO_SUCH_VIDEO, LOGIN_REQUIRED, NOT_AN_X_POST];
+const POST_FAILURES = [NO_VIDEO, NO_SUCH_VIDEO, LOGIN_REQUIRED, NOT_AN_X_POST, NO_POST_IDENTITY];
 
 /**
  * @param {{ failure: string, url: string, lang?: string, message?: string }} outcome

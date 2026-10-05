@@ -11,6 +11,9 @@
 
 import { transcriptSlug } from './slug.js';
 
+/** The `/video/N` or `/photo/N` at the end of a status url. */
+const VIDEO_NUMBER = /\/status\/\d+\/(?:video|photo)\/([1-9]\d*)\/?(?:[?#].*)?$/;
+
 /** Links, `t.co` ones included, are removed from the post text. */
 const LINK = /https?:\/\/\S+/g;
 
@@ -39,13 +42,28 @@ export function videoSuffix(videoNumber, separator) {
 }
 
 /**
- * @param {{ description: string, uploader: string, uploaderId: string, displayId: string }} metadata
- * @param {number} videoNumber which of the post's own videos was fetched, from 1
+ * Which of the post's videos was fetched, as `yt-dlp` reports it.
+ *
+ * `webpage_url` is the url the extractor worked from: the input as typed, or
+ * for a `t.co` link the url it expands to. A short link carries no number of
+ * its own, so only the report can say it named video 2. With no number in the
+ * report, the one requested stands.
+ */
+function reportedVideoNumber(webpageUrl, requested) {
+  const match = VIDEO_NUMBER.exec(webpageUrl ?? '');
+  return match ? Number(match[1]) : requested;
+}
+
+/**
+ * @param {{ description: string, uploader: string, uploaderId: string, displayId: string,
+ *           webpageUrl?: string }} metadata
+ * @param {number} requested which of the post's own videos was asked for, from 1
  * @returns {{ title: string, url: string, channel: string, collisionId: string,
  *             slug: string }}
  */
-export function postIdentity(metadata, videoNumber) {
+export function postIdentity(metadata, requested) {
   const { uploader, uploaderId, displayId } = metadata;
+  const videoNumber = reportedVideoNumber(metadata.webpageUrl, requested);
   const text = postText(metadata.description);
   // Lowercased, unlike YouTube's mixed-case video id: deliberately, and only
   // the case changes, so a handle's underscores are kept.

@@ -3,7 +3,13 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
-import { NO_SUBTITLES, NO_VIDEO, NOT_AN_X_POST, RATE_LIMITED } from '../src/fetch-outcome.js';
+import {
+  NO_POST_IDENTITY,
+  NO_SUBTITLES,
+  NO_VIDEO,
+  NOT_AN_X_POST,
+  RATE_LIMITED,
+} from '../src/fetch-outcome.js';
 import {
   expandArgs,
   ExpansionError,
@@ -165,6 +171,7 @@ test('a post is fetched as playlist entry 1, still in one invocation', () => {
     'uploader_id',
     'display_id',
     'extractor_key',
+    'webpage_url',
     'duration_string',
     'upload_date',
   ]) {
@@ -183,6 +190,13 @@ test('recorded post metadata is read as reported', () => {
   assert.equal(metadata.duration, '38:01');
   assert.equal(metadata.uploadDate, '20260921');
   assert.match(metadata.description, /^here's how i shipped 2,500 PRs.* https:\/\/t\.co\/NgrGz7tmPM$/);
+});
+
+test('the url yt-dlp extracted from is read, for the video number it names', () => {
+  const metadata = parseMetadata(
+    '{"display_id": "1", "webpage_url": "https://x.com/a/status/1/video/2"}\n',
+  );
+  assert.equal(metadata.webpageUrl, 'https://x.com/a/status/1/video/2');
 });
 
 test('a recorded post outcome becomes the failure it means', () => {
@@ -205,9 +219,19 @@ test('a recorded post outcome becomes the failure it means', () => {
     exitCode: 0,
     hasTrack: true,
     site: xPost(1),
-    extractorKey: 'Youtube',
+    metadata: { extractorKey: 'Youtube' },
   });
   assert.equal(elsewhere.failure, NOT_AN_X_POST);
+
+  // X's extractor answered, but with nothing to file the post under.
+  const anonymous = fetchFailure({
+    ...outcome,
+    exitCode: 0,
+    hasTrack: true,
+    site: xPost(1),
+    metadata: { extractorKey: 'Twitter', uploaderId: '', displayId: '2102050467505430555' },
+  });
+  assert.equal(anonymous.failure, NO_POST_IDENTITY);
 
   // The same stderr on a YouTube fetch is still just a non-zero exit.
   const youtube = fetchFailure({
