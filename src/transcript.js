@@ -1,7 +1,7 @@
 /**
  * The transcript rendering seam:
  *
- *   (raw subtitle track text, video metadata[, post]) -> { filename, contents }
+ *   (raw subtitle track text, video metadata[, site]) -> { filename, contents }
  *
  * One call, one diffable string. Everything the cleaning pipeline, the slug
  * and the frontmatter decide is visible in that string, which is why the tests
