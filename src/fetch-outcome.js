@@ -2,9 +2,14 @@
  * What a fetch outcome means, and what to do about it.
  *
  * Pure and spawn-free: every rule here is decided from a recorded process
- * outcome — an exit code and whether a track landed — which is what makes the
- * exit-code rules and the retry ladder testable without a live, rate-limited
- * third party. `ytdlp.js` applies them to a real invocation.
+ * outcome, which is what makes the exit-code rules and the retry ladder
+ * testable without a live, rate-limited third party. `ytdlp.js` applies them
+ * to a real invocation.
+ *
+ * A YouTube video's outcome is an exit code and whether a track landed, and
+ * nothing more (`classifyFetch`). An X post's outcome adds the stderr text and
+ * the reported extractor (`classifyPostFetch`), because its permanent failures
+ * exit like a 429 and only their words tell them apart.
  */
 
 /** The requested language has no subtitle track. Permanent. */
@@ -47,7 +52,8 @@ export const RETRY_DELAYS_MS = [5000, 15000, 45000];
  *
  * A consequence worth stating plainly: every non-zero exit is treated as
  * rate-limited and retried, including a private or deleted video. The spec
- * forbids reading the stderr text that would tell them apart, so "every other
+ * forbids reading a video's stderr text that would tell them apart (an X post
+ * is the one exception, in `classifyPostFetch`), so "every other
  * failure is permanent" is the reasoning behind the rule rather than a
  * distinction this code can draw. `describeFailure` is worded accordingly.
  *

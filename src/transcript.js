@@ -1,7 +1,7 @@
 /**
  * The transcript rendering seam:
  *
- *   (raw subtitle track text, video metadata) -> { filename, contents }
+ *   (raw subtitle track text, video metadata[, post]) -> { filename, contents }
  *
  * One call, one diffable string. Everything the cleaning pipeline, the slug
  * and the frontmatter decide is visible in that string, which is why the tests
@@ -20,14 +20,19 @@ import { postIdentity } from './x-post.js';
 /**
  * @param {object} input
  * @param {string} input.trackText the subtitle track exactly as downloaded
- * @param {string} input.url the canonical `https://www.youtube.com/watch?v=<id>` form
- * @param {string} input.videoId
+ * @param {string} input.url for a YouTube video, the canonical
+ *   `https://www.youtube.com/watch?v=<id>` form
+ * @param {string} input.videoId for a YouTube video, its id
  * @param {{ videoNumber: number }} [input.post] present for an X post: `url` and
  *   `videoId` are then ignored, and rebuilt from the metadata (see `x-post.js`)
  * @param {{ title: string, channel: string, duration: string, uploadDate: string,
  *           description?: string, uploader?: string, uploaderId?: string,
  *           displayId?: string }} input.metadata
  * @param {Date} [input.fetchedAt]
+ * `videoId` in the result is what the filename collision rule suffixes: the
+ * YouTube video id, or for an X post the post id (plus `-<N>` for video N ≥ 2).
+ * `url` is the frontmatter `url`, for an X post the one built from metadata.
+ *
  * @returns {{ slug: string, filename: string, contents: string,
  *             url: string, videoId: string, trackKind: 'auto'|'manual',
  *             video: { title: string, channel: string, duration: string,

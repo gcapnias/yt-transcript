@@ -97,7 +97,12 @@ export async function preflight({ binary = YT_DLP } = {}) {
  * `yt-dlp` reported them; reformatting is the transcript's business.
  *
  * @param {string} stdout
- * @returns {{ title: string, channel: string, duration: string, uploadDate: string }|null}
+ * The last five fields are printed for an X post only, and are empty strings
+ * for a YouTube video.
+ *
+ * @returns {{ title: string, channel: string, duration: string, uploadDate: string,
+ *             description: string, uploader: string, uploaderId: string,
+ *             displayId: string, extractorKey: string }|null}
  */
 export function parseMetadata(stdout) {
   const line = stdout
