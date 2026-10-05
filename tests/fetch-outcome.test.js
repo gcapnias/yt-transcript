@@ -223,6 +223,10 @@ test('the permanent post failures are told apart from rate limiting, and never r
     // A link-only post followed to another site's extractor, and failing there.
     ['ERROR: [generic] https://example.com/a: HTTP Error 404: Not Found', NOT_AN_X_POST],
     ['ERROR: Unsupported URL: https://www.nasa.gov/live', NOT_AN_X_POST],
+    // The same words mean different things by who said them: X's extractor
+    // finding no video in the post, or another site's finding none at the link.
+    ['ERROR: [twitter] 1: No video formats found!; please report this issue', NO_VIDEO],
+    ['ERROR: [generic] https://example.com/a: No video formats found!', NOT_AN_X_POST],
   ];
 
   for (const [stderr, failure] of recorded) {

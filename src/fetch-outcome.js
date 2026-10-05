@@ -72,8 +72,9 @@ export function classifyFetch({ exitCode, hasTrack }) {
  * The stderr lines that mean a post failure, matched on the extractor's own
  * words. Recorded from `yt-dlp` 2026.08.19, except the login pair, which come
  * from the extractor's source (no protected or NSFW post was reachable).
- * `No video formats found` is what a link-only post gives when the link it
- * followed turned out to hold no video.
+ * `No video formats found` is what X's extractor gives for a link-only post
+ * whose link held no video; from another site's extractor it is that site's
+ * failure, which `OTHER_SITE_ERROR` is checked first to catch.
  */
 const POST_FAILURES = [
   [/No video could be found in this tweet|No video formats found/, NO_VIDEO],
@@ -122,10 +123,12 @@ export function classifyPostFetch({
     return classifyFetch({ exitCode, hasTrack });
   }
 
+  // Who failed comes before what failed: another site's words are never read
+  // as a verdict on the post.
+  if (OTHER_SITE_ERROR.test(stderr)) return { ok: false, failure: NOT_AN_X_POST, retryable: false };
   for (const [pattern, failure] of POST_FAILURES) {
     if (pattern.test(stderr)) return { ok: false, failure, retryable: false };
   }
-  if (OTHER_SITE_ERROR.test(stderr)) return { ok: false, failure: NOT_AN_X_POST, retryable: false };
 
   return classifyFetch({ exitCode, hasTrack });
 }
