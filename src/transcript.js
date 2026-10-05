@@ -15,27 +15,56 @@
 import { cleanTrack } from './clean.js';
 import { formatUploadDate, renderFrontmatter } from './frontmatter.js';
 import { transcriptSlug } from './slug.js';
+import { postIdentity } from './x-post.js';
 
 /**
  * @param {object} input
  * @param {string} input.trackText the subtitle track exactly as downloaded
  * @param {string} input.url the canonical `https://www.youtube.com/watch?v=<id>` form
  * @param {string} input.videoId
- * @param {{ title: string, channel: string, duration: string, uploadDate: string }} input.metadata
+ * @param {{ videoNumber: number }} [input.post] present for an X post: `url` and
+ *   `videoId` are then ignored, and rebuilt from the metadata (see `x-post.js`)
+ * @param {{ title: string, channel: string, duration: string, uploadDate: string,
+ *           description?: string, uploader?: string, uploaderId?: string,
+ *           displayId?: string }} input.metadata
  * @param {Date} [input.fetchedAt]
  * @returns {{ slug: string, filename: string, contents: string,
  *             url: string, videoId: string, trackKind: 'auto'|'manual',
  *             video: { title: string, channel: string, duration: string,
  *                      uploaded: string } }}
  */
-export function renderTranscript({ trackText, url, videoId, metadata, fetchedAt = new Date() }) {
-  const { trackKind, paragraphs } = cleanTrack(trackText);
-  const slug = transcriptSlug(metadata?.title ?? '', videoId);
+export function renderTranscript({
+  trackText,
+  url: fetchedUrl,
+  videoId: fetchedVideoId,
+  post,
+  metadata,
+  fetchedAt = new Date(),
+}) {
+  const { trackKind: detectedKind, paragraphs } = cleanTrack(trackText);
+  const identity = post ? postIdentity(metadata ?? {}, post.videoNumber) : null;
+
+  // For an X post the identity comes from what yt-dlp reported, never from the
+  // url fetched (ADR-0004), and every track is auto, whatever it looks like
+  // (ADR-0003). The *cleaning* above still follows what the track looks like:
+  // the recorded kind is a claim about provenance, not a cleaning rule.
+  const url = identity?.url ?? fetchedUrl;
+  const videoId = identity?.videoId ?? fetchedVideoId;
+  const trackKind = identity ? 'auto' : detectedKind;
+  const title = identity?.title ?? metadata?.title ?? '';
+  const channel = identity?.channel ?? metadata?.channel ?? '';
+  // A post with no text has no title to slug: `@alice post 1` would read as
+  // `alice-post-1`, so it goes straight to the fallback.
+  const slug = identity
+    ? identity.hasText
+      ? transcriptSlug(title, identity.fallbackSlug)
+      : identity.fallbackSlug
+    : transcriptSlug(title, videoId);
 
   const frontmatter = renderFrontmatter({
-    title: metadata?.title ?? '',
+    title,
     url,
-    channel: metadata?.channel ?? '',
+    channel,
     duration: metadata?.duration ?? '',
     uploadDate: metadata?.uploadDate ?? '',
     fetchedAt,
@@ -59,8 +88,8 @@ export function renderTranscript({ trackText, url, videoId, metadata, fetchedAt 
     // than re-read from the file or re-formatted by the CLI, so the terminal
     // and the frontmatter can only ever say the same thing.
     video: {
-      title: metadata?.title ?? '',
-      channel: metadata?.channel ?? '',
+      title,
+      channel,
       duration: metadata?.duration ?? '',
       uploaded: formatUploadDate(metadata?.uploadDate ?? ''),
     },

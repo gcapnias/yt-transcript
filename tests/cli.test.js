@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { main, parseArgs, UsageError } from '../src/cli.js';
-import { describeFailure, NO_SUBTITLES, RATE_LIMITED } from '../src/fetch-outcome.js';
+import { describeFailure, NO_SUBTITLES, NO_VIDEO, RATE_LIMITED } from '../src/fetch-outcome.js';
 import { ExpansionError, preflight, YtDlpMissingError } from '../src/ytdlp.js';
 import { recordedFailure } from './recorded-outcomes.js';
 
@@ -477,4 +477,88 @@ test('each rung of the retry ladder is reported inside a batch too', async () =>
 
   assert.equal(await main([PLAYLIST], io, deps), 0);
   assert.match(err.join('\n'), /4JofSJIrjwU \(attempt 1 of 4\); retrying in 5s\./);
+});
+
+// X posts: one fetch, however the post is spelled, with the video number the
+// input chose.
+
+const POST_URL = 'https://x.com/poteto/status/2102050467505430555';
+
+test('a post is a single fetch of that post, never a batch', async () => {
+  const { out, io } = capture();
+  const requests = [];
+
+  const code = await main(
+    ['--playlist', 'https://mobile.x.com/POTETO/status/2102050467505430555/video/2?s=20'],
+    io,
+    {
+      preflight: async () => '2026.08.19',
+      expandPlaylist: async () => assert.fail('a post was expanded'),
+      fetchTranscript: async (request) => {
+        requests.push(request);
+        return {
+          file: 'transcripts/a-talk.md',
+          transcript: { url: `${POST_URL}/video/2`, trackKind: 'auto' },
+        };
+      },
+      rebuildCatalog: async () => ({ file: 'transcripts/README.md', count: 1, warnings: [] }),
+    },
+  );
+
+  assert.equal(code, 0);
+  assert.deepEqual(requests, [
+    {
+      url: 'https://x.com/POTETO/status/2102050467505430555/video/2',
+      videoId: null,
+      post: { videoNumber: 2 },
+      lang: 'en',
+    },
+  ]);
+  assert.match(out.join('\n'), /video\/2 {2}\(auto subtitle track\)/);
+});
+
+test('x broadcasts and spaces are refused before yt-dlp is reached', async () => {
+  for (const input of ['https://x.com/i/broadcasts/1pKdRDvrQqQJW', 'https://x.com/i/spaces/1DXGydznBYWKM']) {
+    const { err, io } = capture();
+
+    assert.equal(
+      await main([input], io, {
+        preflight: async () => assert.fail('a refused target reached yt-dlp'),
+      }),
+      1,
+    );
+    assert.match(err.join('\n'), /Broadcasts and Spaces carry no subtitles/);
+  }
+});
+
+test('a profile is a parse error that mentions X', async () => {
+  const { err, io } = capture();
+
+  assert.equal(await main(['https://x.com/poteto'], io), 1);
+  assert.match(err.join('\n'), /or an X post/);
+});
+
+test('a post with no video exits 1 naming the post, having retried nothing', async () => {
+  const { err, io } = capture();
+  const url = 'https://x.com/jack/status/20';
+  let attempts = 0;
+
+  const code = await main([url], io, {
+    preflight: async () => '2026.08.19',
+    fetchTranscript: async () => {
+      attempts += 1;
+      throw recordedFailure({ failure: NO_VIDEO, url });
+    },
+  });
+
+  assert.equal(code, 1);
+  assert.equal(attempts, 1);
+  assert.match(err.join('\n'), /No video could be found in https:\/\/x\.com\/jack\/status\/20/);
+});
+
+test('the usage and the unrecognised-input error both say X posts are accepted', async () => {
+  const { err, io } = capture();
+
+  await main([], io);
+  assert.match(err.join('\n'), /X post/);
 });
