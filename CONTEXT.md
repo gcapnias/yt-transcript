@@ -1,8 +1,20 @@
 # yt-transcript
 
-Turns YouTube videos into Markdown transcripts that read as prose, for use as agent input or reference material. It produces transcripts, never summaries.
+Turns videos on YouTube and X into Markdown transcripts that read as prose, for use as agent input or reference material. It produces transcripts, never summaries.
 
 ## Language
+
+**Site**:
+Where a video lives: YouTube or X. Each site has its own URL shapes and its own subtitle track conventions; everything after the subtitle track is downloaded is the same for both.
+_Avoid_: Source, platform, provider, service
+
+**Post**:
+An X post carrying one or more videos. Fetching a post fetches exactly one of them: the one its URL numbers (`/video/N`, counting only the post's own videos), else its first — its own, or else the one it quotes. A transcript records and is identified by the post, plus the video's number when it is not the first; never by the video's own id, which posts quoting it share.
+_Avoid_: Tweet, status
+
+**Channel**:
+Who published a video: a YouTube channel, or the author of an X post.
+_Avoid_: Uploader, author, creator
 
 **Transcript**:
 A single Markdown file holding one video's spoken content as prose, preceded by frontmatter describing the video.
@@ -29,7 +41,7 @@ A run of consecutive cues merged into prose, broken at the first sentence end af
 _Avoid_: Block, chunk, section
 
 **Subtitle track**:
-The source text for a transcript, either **manual** (authored by a human) or **auto** (produced by YouTube's machinery — speech recognition, or its machine translation of another language's recognition). Manual is preferred; which one was used is always recorded. There are only these two kinds: a translated track is an auto track, and a transcript does not say what language was spoken.
+The source text for a transcript, either **manual** (authored by a human) or **auto** (produced by a site's machinery — speech recognition, or YouTube's machine translation of another language's recognition). Manual is preferred; which one was used is always recorded. There are only these two kinds: a translated track is an auto track, every X track is an auto track, and a transcript does not say what language was spoken.
 _Avoid_: Captions, CC, transcript (the track is the input, the transcript is the output)
 
 **Catalog**:
