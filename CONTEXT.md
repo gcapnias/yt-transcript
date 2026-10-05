@@ -13,7 +13,7 @@ An X post carrying one or more videos. Fetching a post fetches exactly one of th
 _Avoid_: Tweet, status
 
 **Channel**:
-Who published a video: a YouTube channel, or the author of an X post.
+Who published a video: a YouTube channel, or the X account that made the post.
 _Avoid_: Uploader, author, creator
 
 **Transcript**:
