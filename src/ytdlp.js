@@ -3,7 +3,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 
 import { sanitizeChildEnv } from './child-env.js';
-import { classifyFetch, describeFailure } from './fetch-outcome.js';
+import { classifyFetch, classifyPostFetch, describeFailure } from './fetch-outcome.js';
 import { parseTarget, TargetParseError } from './target.js';
 
 /** The binary name looked up on PATH. Overridable so tests need not uninstall it. */
@@ -29,7 +29,8 @@ export class YtDlpMissingError extends Error {
 /**
  * A fetch that produced no usable subtitle track.
  *
- * `failure` is the classification (`no-subtitles` or `rate-limited`) and
+ * `failure` is the classification (`no-subtitles`, `rate-limited`, or one of
+ * the X post kinds in `fetch-outcome.js`) and
  * `retryable` is what the retry ladder reads; a batch reports on `failure`.
  */
 export class FetchError extends Error {
@@ -117,26 +118,48 @@ export function parseMetadata(stdout) {
     channel: parsed.channel ?? '',
     duration: parsed.duration_string ?? '',
     uploadDate: parsed.upload_date ?? '',
+    // Printed for an X post only; empty on YouTube, which never asks for them.
+    description: parsed.description ?? '',
+    uploader: parsed.uploader ?? '',
+    uploaderId: parsed.uploader_id ?? '',
+    displayId: parsed.display_id ?? '',
+    extractorKey: parsed.extractor_key ?? '',
   };
 }
+
+const VIDEO_FIELDS = 'title,channel,duration_string,upload_date';
+/**
+ * What an X post adds: the text, the author (`uploader` is the display name,
+ * `uploader_id` the handle), the post id (`display_id`; `id` is the media id)
+ * and which extractor answered. `channel` is absent on X, so it is not asked
+ * for. `title` is printed but unused: it is `<name> - <text>` cut at 72.
+ */
+const POST_FIELDS =
+  'title,description,uploader,uploader_id,display_id,extractor_key,duration_string,upload_date';
 
 /**
  * Builds the one settled per-video invocation. Every flag is load-bearing; see
  * the spec's Fetching section before changing any of them.
+ *
+ * `post` is the X variant. `--no-playlist` is kept, because it is what makes
+ * yt-dlp honour a `/video/N` suffix, but it does not stop X's extractor from
+ * returning a multi-video or quote post as a playlist and processing every
+ * entry; `--playlist-items 1` selects the post's own first video.
  */
-export function fetchArgs({ url, lang, destDir }) {
+export function fetchArgs({ url, lang, destDir, post = false }) {
   return [
     '--js-runtimes',
     'node',
     '--skip-download',
     '--no-playlist',
+    ...(post ? ['--playlist-items', '1'] : []),
     '--write-sub',
     '--write-auto-sub',
     '--sub-langs',
     lang,
     '--no-simulate',
     '--print',
-    '%(.{title,channel,duration_string,upload_date})j',
+    `%(.{${post ? POST_FIELDS : VIDEO_FIELDS}})j`,
     '-P',
     destDir,
     '-o',
@@ -150,18 +173,27 @@ export function fetchArgs({ url, lang, destDir }) {
  * and emits the metadata on stdout. No pre-flight query, no second round-trip,
  * and no `.info.json` is ever written.
  *
+ * `post: true` is an X post, fetched as its first video (see `fetchArgs`).
+ *
  * @returns {Promise<{ metadata: object, trackPath: string }>}
  */
-export async function fetchSubtitleTrack({ url, lang = 'en', destDir, binary = YT_DLP }) {
-  const { exitCode, stdout } = await run(binary, fetchArgs({ url, lang, destDir }));
+export async function fetchSubtitleTrack({ url, lang = 'en', destDir, post = false, binary = YT_DLP }) {
+  const { exitCode, stdout, stderr } = await run(binary, fetchArgs({ url, lang, destDir, post }));
 
   // One invocation, one verdict. The retry ladder lives a level up, in
   // `fetch.js`, so every retry is a fresh invocation into a fresh directory.
   const trackPath = await findSubtitleTrack(destDir);
-  const failure = fetchFailure({ exitCode, hasTrack: trackPath !== null, url, lang });
+  const metadata = parseMetadata(stdout);
+  const failure = fetchFailure({
+    exitCode,
+    hasTrack: trackPath !== null,
+    url,
+    lang,
+    post: post ? { stderr, extractorKey: metadata?.extractorKey } : undefined,
+  });
   if (failure) throw failure;
 
-  return { metadata: parseMetadata(stdout), trackPath };
+  return { metadata, trackPath };
 }
 
 /**
@@ -169,11 +201,17 @@ export async function fetchSubtitleTrack({ url, lang = 'en', destDir, binary = Y
  * the fetch succeeded. Separated from the spawn so the mapping from an exit
  * code to a retryable failure is testable without a live invocation.
  *
- * @param {{ exitCode: number, hasTrack: boolean, url: string, lang: string }} outcome
+ * `post` is present for an X post, and is what lets stderr and the reported
+ * extractor be read; a YouTube outcome is classified by its exit code alone.
+ *
+ * @param {{ exitCode: number, hasTrack: boolean, url: string, lang: string,
+ *           post?: { stderr?: string, extractorKey?: string } }} outcome
  * @returns {FetchError|null}
  */
-export function fetchFailure({ exitCode, hasTrack, url, lang }) {
-  const outcome = classifyFetch({ exitCode, hasTrack });
+export function fetchFailure({ exitCode, hasTrack, url, lang, post }) {
+  const outcome = post
+    ? classifyPostFetch({ exitCode, hasTrack, ...post })
+    : classifyFetch({ exitCode, hasTrack });
   if (outcome.ok) return null;
 
   return new FetchError(describeFailure({ failure: outcome.failure, url, lang }), {

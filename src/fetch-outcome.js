@@ -13,6 +13,18 @@ export const NO_SUBTITLES = 'no-subtitles';
 /** A refusal that looks like HTTP 429. The one retried failure. */
 export const RATE_LIMITED = 'rate-limited';
 
+// The X post failures. Every one is permanent: a post with no video, or with no
+// such video, or behind a login, is not made fetchable by waiting.
+
+/** The post has no video: text, photos only, or it does not exist. */
+export const NO_VIDEO = 'no-video';
+/** `/video/N` names a video the post does not have. */
+export const NO_SUCH_VIDEO = 'no-such-video';
+/** The post is protected or age-restricted; yt-transcript does not log in. */
+export const LOGIN_REQUIRED = 'login-required';
+/** The fetch led away from X, e.g. a link-only post followed to another site. */
+export const NOT_AN_X_POST = 'not-an-x-post';
+
 /**
  * The settled ladder: one wait per retry, so the invocation count is
  * `RETRY_DELAYS_MS.length + 1` everywhere and never a literal.
@@ -49,6 +61,53 @@ export function classifyFetch({ exitCode, hasTrack }) {
 }
 
 /**
+ * The stderr lines that mean a post failure, matched on the extractor's own
+ * words. Recorded from `yt-dlp` 2026.08.19, except the login pair, which come
+ * from the extractor's source (no protected or NSFW post was reachable).
+ * `No video formats found` is what a link-only post gives when the link it
+ * followed turned out to hold no video.
+ */
+const POST_FAILURES = [
+  [/No video could be found in this tweet|No video formats found/, NO_VIDEO],
+  [/Video #\d+ is unavailable/, NO_SUCH_VIDEO],
+  [/requires authentication|not authorized to view/, LOGIN_REQUIRED],
+];
+
+/** An error from an extractor that is not X's, or from none: the link led away. */
+const OTHER_SITE_ERROR = /^ERROR: (?:\[(?!twitter)[^\]]+\]|Unsupported URL)/m;
+
+/**
+ * Classifies one X post fetch.
+ *
+ * **Unlike `classifyFetch`, this reads stderr**, and only for a post, only
+ * after a non-zero exit. A YouTube video's permanent failures can be told from
+ * a 429 by nothing but their exit code, so none of its text is read. X's
+ * cannot: a post with no video, no such video or a login wall all exit 1, the
+ * same as a 429, and retrying them three times would spend a minute on a
+ * certainty. Anything unrecognised stays what it was: rate-limited, retried.
+ *
+ * `extractorKey` is what `yt-dlp` reports for a fetch that succeeded in
+ * extracting; anything but `Twitter` means a link-only post was followed to
+ * another site, whose video must not be filed under the post's url.
+ *
+ * @param {{ exitCode: number, hasTrack: boolean, stderr?: string, extractorKey?: string }} outcome
+ * @returns {{ ok: true } | { ok: false, failure: string, retryable: boolean }}
+ */
+export function classifyPostFetch({ exitCode, hasTrack, stderr = '', extractorKey = '' }) {
+  if (extractorKey && extractorKey !== 'Twitter') {
+    return { ok: false, failure: NOT_AN_X_POST, retryable: false };
+  }
+  if (exitCode === 0) return classifyFetch({ exitCode, hasTrack });
+
+  for (const [pattern, failure] of POST_FAILURES) {
+    if (pattern.test(stderr)) return { ok: false, failure, retryable: false };
+  }
+  if (OTHER_SITE_ERROR.test(stderr)) return { ok: false, failure: NOT_AN_X_POST, retryable: false };
+
+  return classifyFetch({ exitCode, hasTrack });
+}
+
+/**
  * The message a user sees for a failure.
  *
  * The signature is the guarantee that **the original spoken language is never
@@ -63,6 +122,34 @@ export function describeFailure({ failure, url, lang }) {
     return (
       `No subtitles in "${lang}" are available for ${url}.\n` +
       'Nothing was written. yt-transcript only ever retrieves the language you asked for.'
+    );
+  }
+
+  if (failure === NO_VIDEO) {
+    return (
+      `No video could be found in ${url}.\n` +
+      'The post has only text or photos, or it does not exist. Nothing was written.'
+    );
+  }
+
+  if (failure === NO_SUCH_VIDEO) {
+    return (
+      `There is no such video in the post ${url}.\n` +
+      'Videos are numbered from 1 and count only the post\'s own. Nothing was written.'
+    );
+  }
+
+  if (failure === LOGIN_REQUIRED) {
+    return (
+      `The post ${url} requires logging in to view (it is protected or age-restricted), ` +
+      'which yt-transcript does not do.\nNothing was written.'
+    );
+  }
+
+  if (failure === NOT_AN_X_POST) {
+    return (
+      `${url} does not lead to a video in an X post: the post is a link to another site.\n` +
+      'Nothing was written.'
     );
   }
 

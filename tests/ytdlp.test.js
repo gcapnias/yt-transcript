@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
-import { NO_SUBTITLES, RATE_LIMITED } from '../src/fetch-outcome.js';
+import { NO_SUBTITLES, NO_VIDEO, NOT_AN_X_POST, RATE_LIMITED } from '../src/fetch-outcome.js';
 import {
   expandArgs,
   ExpansionError,
@@ -12,8 +12,10 @@ import {
   FetchError,
   findSubtitleTrack,
   parseExpansion,
+  parseMetadata,
 } from '../src/ytdlp.js';
 import { withTempDir } from '../src/temp-dir.js';
+import { readXPrintLine } from './fixtures.js';
 
 const URL = 'https://www.youtube.com/watch?v=o3CX_Y59_74';
 
@@ -115,4 +117,101 @@ test('expansion failure names the playlist and what yt-dlp said', () => {
   assert.match(error.message, /PL404/);
   assert.match(error.message, /The playlist does not exist\./);
   assert.doesNotMatch(error.message, /at .*\(.*:\d+:\d+\)/, 'message reads like a stack trace');
+});
+
+// X posts: still one invocation, with the playlist refused by selecting entry
+// #1 rather than by `--no-playlist` alone, which X's extractor ignores.
+
+const POST_URL = 'https://x.com/poteto/status/2102050467505430555';
+
+test('the youtube invocation is exactly what it was', () => {
+  assert.deepEqual(fetchArgs({ url: URL, lang: 'en', destDir: '/tmp/run' }), [
+    '--js-runtimes',
+    'node',
+    '--skip-download',
+    '--no-playlist',
+    '--write-sub',
+    '--write-auto-sub',
+    '--sub-langs',
+    'en',
+    '--no-simulate',
+    '--print',
+    '%(.{title,channel,duration_string,upload_date})j',
+    '-P',
+    '/tmp/run',
+    '-o',
+    '%(id)s',
+    URL,
+  ]);
+});
+
+test('a post is fetched as playlist entry 1, still in one invocation', () => {
+  const args = fetchArgs({ url: POST_URL, lang: 'en', destDir: '/tmp/run', post: true });
+
+  assert.ok(args.includes('--no-playlist'), 'dropped --no-playlist, which honours /video/N');
+  // `--no-playlist` alone still processes both entries of a multi-video or
+  // quote post, so the first is asked for by number.
+  assert.equal(args[args.indexOf('--playlist-items') + 1], '1');
+  assert.equal(args.at(-1), POST_URL);
+  // Nothing that costs a second round-trip or leaves a file but the track.
+  assert.ok(!args.includes('--write-info-json'));
+  assert.ok(!args.includes('--dump-json') && !args.includes('-J'));
+
+  const template = args[args.indexOf('--print') + 1];
+  for (const field of [
+    'description',
+    'uploader',
+    'uploader_id',
+    'display_id',
+    'extractor_key',
+    'duration_string',
+    'upload_date',
+  ]) {
+    assert.ok(template.includes(field), `the post invocation does not print ${field}`);
+  }
+});
+
+test('recorded post metadata is read as reported', () => {
+  const metadata = parseMetadata(readXPrintLine('poteto-2102050467505430555'));
+
+  assert.equal(metadata.uploader, 'lauren');
+  assert.equal(metadata.uploaderId, 'poteto');
+  // The post id, not the media id the file is named after.
+  assert.equal(metadata.displayId, '2102050467505430555');
+  assert.equal(metadata.extractorKey, 'Twitter');
+  assert.equal(metadata.duration, '38:01');
+  assert.equal(metadata.uploadDate, '20260921');
+  assert.match(metadata.description, /^here's how i shipped 2,500 PRs.* https:\/\/t\.co\/NgrGz7tmPM$/);
+});
+
+test('a recorded post outcome becomes the failure it means', () => {
+  const outcome = { url: POST_URL, lang: 'en' };
+
+  const noVideo = fetchFailure({
+    ...outcome,
+    exitCode: 1,
+    hasTrack: false,
+    post: { stderr: 'ERROR: [twitter] 20: No video could be found in this tweet\n' },
+  });
+  assert.ok(noVideo instanceof FetchError);
+  assert.equal(noVideo.failure, NO_VIDEO);
+  assert.equal(noVideo.retryable, false, 'a post without a video was retried');
+  assert.equal(noVideo.url, POST_URL);
+
+  const elsewhere = fetchFailure({
+    ...outcome,
+    exitCode: 0,
+    hasTrack: true,
+    post: { stderr: '', extractorKey: 'Youtube' },
+  });
+  assert.equal(elsewhere.failure, NOT_AN_X_POST);
+
+  // The same stderr on a YouTube fetch is still just a non-zero exit.
+  const youtube = fetchFailure({
+    url: URL,
+    lang: 'en',
+    exitCode: 1,
+    hasTrack: false,
+  });
+  assert.equal(youtube.failure, RATE_LIMITED);
 });
