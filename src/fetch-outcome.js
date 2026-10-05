@@ -78,7 +78,7 @@ export function classifyFetch({ exitCode, hasTrack }) {
  */
 const POST_FAILURES = [
   [/No video could be found in this tweet|No video formats found/, NO_VIDEO],
-  [/Video #\d+ is unavailable/, NO_SUCH_VIDEO],
+  [/Video #\d+ is unavailable|Media #\d+ is not a video/, NO_SUCH_VIDEO],
   [/requires authentication|not authorized to view/, LOGIN_REQUIRED],
 ];
 
