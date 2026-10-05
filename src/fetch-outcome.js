@@ -94,10 +94,12 @@ const OTHER_SITE_ERROR = /^ERROR: (?:\[(?!twitter)[^\]]+\]|Unsupported URL)/m;
  * @returns {{ ok: true } | { ok: false, failure: string, retryable: boolean }}
  */
 export function classifyPostFetch({ exitCode, hasTrack, stderr = '', extractorKey = '' }) {
-  if (extractorKey && extractorKey !== 'Twitter') {
-    return { ok: false, failure: NOT_AN_X_POST, retryable: false };
+  if (exitCode === 0) {
+    // A success that did not say it came from X's extractor is not filed as an
+    // X post: with no report there is no handle or post id to identify it by.
+    if (extractorKey !== 'Twitter') return { ok: false, failure: NOT_AN_X_POST, retryable: false };
+    return classifyFetch({ exitCode, hasTrack });
   }
-  if (exitCode === 0) return classifyFetch({ exitCode, hasTrack });
 
   for (const [pattern, failure] of POST_FAILURES) {
     if (pattern.test(stderr)) return { ok: false, failure, retryable: false };
