@@ -167,22 +167,26 @@ test('a t.co short link is a post, fetched as video 1', () => {
   });
 });
 
-test('/video/N and /photo/N both select the Nth video, and the url keeps the choice', () => {
+test('/video/N and /photo/N selectors stay on the fetch url', () => {
   for (const kind of ['video', 'photo']) {
     assert.deepEqual(parseTarget(`https://twitter.com/CTVJLaidlaw/status/160/${kind}/2`), {
       kind: 'post',
-      url: 'https://twitter.com/CTVJLaidlaw/status/160/video/2',
+      url: `https://twitter.com/CTVJLaidlaw/status/160/${kind}/2`,
       videoId: null,
       videoNumber: 2,
     });
   }
 });
 
-test('a post url fetched bare, as video 1 or as photo 1 is the same target', () => {
+test('explicit video 1 and photo 1 selectors stay distinct from a bare post url', () => {
   const bare = parseTarget(`https://x.com/poteto/status/${POST}`);
-  assert.deepEqual(parseTarget(`https://x.com/poteto/status/${POST}/video/1`), bare);
-  assert.deepEqual(parseTarget(`https://x.com/poteto/status/${POST}/photo/1`), bare);
   assert.equal(bare.url, `https://x.com/poteto/status/${POST}`);
+
+  for (const kind of ['video', 'photo']) {
+    const explicit = parseTarget(`https://x.com/poteto/status/${POST}/${kind}/1`);
+    assert.equal(explicit.videoNumber, 1);
+    assert.equal(explicit.url, `https://x.com/poteto/status/${POST}/${kind}/1`);
+  }
 });
 
 test('a query string or fragment never reaches the fetched url', () => {

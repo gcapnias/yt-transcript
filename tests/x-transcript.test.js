@@ -18,13 +18,13 @@ const FETCHED_AT = new Date('2026-10-05T12:00:00.000Z');
 
 const recorded = (name) => parseMetadata(readXPrintLine(name));
 
-function render(metadata, { videoNumber = 1, trackText = readXTrack() } = {}) {
+function render(metadata, { trackText = readXTrack() } = {}) {
   return renderTranscript({
     trackText,
     // What a post target carries: the url fetched, which is never the identity.
     url: 'https://mobile.x.com/POTETO/status/2102050467505430555?s=20',
     videoId: null,
-    site: xPost(videoNumber),
+    site: xPost(),
     metadata,
     fetchedAt: FETCHED_AT,
   });
@@ -78,13 +78,11 @@ test('the title is the post text: links gone, whitespace collapsed, nothing cut'
   assert.equal(render(messy).video.title, 'a b c d e');
 });
 
-test('the same post in any spelling is one url, and a later video is its own', () => {
+test('the fetched entry rank distinguishes later videos', () => {
   const metadata = recorded('poteto-2102050467505430555');
   const bare = render(metadata).url;
 
-  // `/video/1` and `/photo/1` are parsed to video number 1: no suffix.
-  assert.equal(render(metadata, { videoNumber: 1 }).url, bare);
-  assert.equal(render(metadata, { videoNumber: 2 }).url, `${bare}/video/2`);
+  assert.equal(render({ ...metadata, title: `${metadata.title} #2` }).url, `${bare}/video/2`);
 });
 
 test('video 1 is never numbered, in a url or a filename, and a later video always is', () => {
@@ -100,45 +98,46 @@ test('the url uses the handle yt-dlp reports, not the one the input spelled', ()
   assert.equal(first.url, 'https://x.com/JocelynVLaidlaw/status/1600649710662213632');
   assert.equal(frontmatter(first).channel, '"Jocelyn Laidlaw (@JocelynVLaidlaw)"');
 
-  const second = render(recorded('ctv-1600649710662213632-video2'), { videoNumber: 2 });
-  assert.equal(second.url, 'https://x.com/JocelynVLaidlaw/status/1600649710662213632/video/2');
+  const second = render(recorded('ctv-1600649710662213632-video2'));
+  assert.equal(second.url, 'https://x.com/JocelynVLaidlaw/status/1600649710662213632');
   assert.equal(frontmatter(second).duration, '"1:42"');
 });
 
-test('the video number is the one yt-dlp reports, so a t.co link to video 2 is video 2', () => {
-  // A t.co link carries no number of its own, so it is requested as video 1;
-  // `webpage_url` is the expanded url yt-dlp extracted from (as observed for
-  // t.co/NgrGz7tmPM), here hand-set to name the post's second video.
-  const viaShortLink = {
+test('the fetched entry rank determines identity, not the selector in webpage_url', () => {
+  const entry = {
     ...recorded('ctv-1600649710662213632-video2'),
-    webpageUrl: 'https://twitter.com/CTVJLaidlaw/status/1600649710662213632/video/2',
+    title: 'Jocelyn Laidlaw - title #2',
+    webpageUrl: 'https://twitter.com/CTVJLaidlaw/status/1600649710662213632/video/3',
   };
-  const transcript = render(viaShortLink, { videoNumber: 1 });
+  const second = render(entry);
 
-  assert.equal(transcript.url, 'https://x.com/JocelynVLaidlaw/status/1600649710662213632/video/2');
-  assert.equal(transcript.collisionId, '1600649710662213632-2');
+  assert.equal(second.url, 'https://x.com/JocelynVLaidlaw/status/1600649710662213632/video/2');
+  assert.equal(second.collisionId, '1600649710662213632-2');
 
-  // /photo/N in the report is the same selector, and video 1 is never numbered.
-  const photo = { ...viaShortLink, webpageUrl: viaShortLink.webpageUrl.replace('/video/2', '/photo/2') };
-  assert.equal(render(photo).url, transcript.url);
-  const first = { ...viaShortLink, webpageUrl: 'https://x.com/CTVJLaidlaw/status/1600649710662213632/video/1' };
-  assert.equal(render(first, { videoNumber: 2 }).url, 'https://x.com/JocelynVLaidlaw/status/1600649710662213632');
+  const first = {
+    ...entry,
+    title: 'Jocelyn Laidlaw - title #1',
+    webpageUrl: 'https://x.com/CTVJLaidlaw/status/1600649710662213632/video/2',
+  };
+  assert.equal(render(first).url, 'https://x.com/JocelynVLaidlaw/status/1600649710662213632');
 });
 
-test('a report that names no video number leaves the requested one standing', () => {
+test('an entry with no rank suffix is the first video, regardless of the requested number', () => {
   const bare = {
     ...recorded('ctv-1600649710662213632-video2'),
+    title: 'Jocelyn Laidlaw - a single video',
     webpageUrl: 'https://x.com/poteto/status/1600649710662213632',
   };
-  assert.match(render(bare, { videoNumber: 2 }).url, /\/video\/2$/);
-  assert.match(render({ ...bare, webpageUrl: '' }, { videoNumber: 2 }).url, /\/video\/2$/);
+  assert.equal(render(bare).url, 'https://x.com/JocelynVLaidlaw/status/1600649710662213632');
+  assert.equal(render({ ...bare, webpageUrl: '' }).url, 'https://x.com/JocelynVLaidlaw/status/1600649710662213632');
 });
 
 test('the post id identifies the transcript, never the media id', () => {
   const transcript = render(recorded('poteto-2102050467505430555'));
 
   assert.equal(transcript.collisionId, '2102050467505430555');
-  assert.equal(render(recorded('poteto-2102050467505430555'), { videoNumber: 3 }).collisionId, '2102050467505430555-3');
+  const third = { ...recorded('poteto-2102050467505430555'), title: 'Post title #3' };
+  assert.equal(render(third).collisionId, '2102050467505430555-3');
 });
 
 test('every X track is recorded as auto, whatever the track itself says', () => {
@@ -183,7 +182,7 @@ test('the slug comes from the title, and falls back to the lowercased handle and
   assert.equal(render(weidel).slug, 'alice_weidel-1877462752526053592');
 
   // A later video of the same post is told apart in the slug too.
-  assert.equal(render(weidel, { videoNumber: 2 }).slug, 'alice_weidel-1877462752526053592-2');
+  assert.equal(render({ ...weidel, title: 'Post title #2' }).slug, 'alice_weidel-1877462752526053592-2');
 });
 
 test('a post with no text is titled by its handle and id, and filed under them', () => {

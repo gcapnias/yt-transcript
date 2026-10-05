@@ -9,7 +9,7 @@ Where a video lives: YouTube or X. Each site has its own URL shapes and its own 
 _Avoid_: Source, platform, provider, service
 
 **Post**:
-An X post carrying one or more videos. Fetching a post fetches exactly one of them: the one its URL numbers (`/video/N`, counting only the post's own videos), else its first — its own, or else the one it quotes. A transcript records and is identified by the post, plus the video's number when it is not the first; never by the video's own id, which posts quoting it share.
+An X post carrying one or more videos. A bare post fetches its first extracted video; `/video/N` and `/photo/N` select an item in the post's media array, and a selected photo is not a video. A transcript records and is identified by the post, plus the selected video's rank among extracted videos when it is not the first; never by the video's own id, which posts quoting it share.
 _Avoid_: Tweet, status
 
 **Channel**:

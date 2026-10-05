@@ -10,8 +10,6 @@
  * carries the url to *fetch* and nothing a transcript is identified by.
  */
 
-import { videoSuffix } from './x-post.js';
-
 const VIDEO_ID = /^[A-Za-z0-9_-]{11}$/;
 /** A shape guard, not a playlist-id format: rejects empty and junk `list=` values. */
 const LIST_ID_SHAPE = /^[A-Za-z0-9_-]+$/;
@@ -28,7 +26,7 @@ const X_HOST = /^(?:(?:www|m|mobile)\.)?(?:x|twitter)\.com$/;
  * `i` and `i/web` name nobody, and the handle a transcript records comes from
  * `yt-dlp` anyway (ADR-0004).
  */
-const X_STATUS = /^\/(i\/web|[A-Za-z0-9_]+)\/status\/(\d+)(?:\/(?:video|photo)\/([1-9]\d*))?\/?$/;
+const X_STATUS = /^\/(i\/web|[A-Za-z0-9_]+)\/status\/(\d+)(?:\/(video|photo)\/([1-9]\d*))?\/?$/;
 /** Neither carries a subtitle track, so there is nothing for this tool to fetch. */
 const X_NO_SUBTITLES = /^\/i\/(?:broadcasts|events|spaces)\//;
 const T_CO_CODE = /^\/[A-Za-z0-9]+\/?$/;
@@ -68,11 +66,11 @@ function video(videoId) {
 
 /**
  * A post is fetched as typed, minus its query and fragment: `/i/status` and
- * `t.co` inputs carry no handle to rebuild a url from. The video number is the
- * one thing kept explicitly, so `/video/1` and the bare url are one target.
+ * `t.co` inputs carry no handle to rebuild a url from. An explicit media
+ * selector stays on the fetch url, including `/video/1`.
  */
-function post(url, path, videoNumber = 1) {
-  const suffix = videoSuffix(videoNumber, '/video/');
+function post(url, path, videoNumber = 1, selector = '') {
+  const suffix = selector ? `/${selector}/${videoNumber}` : '';
   return { kind: 'post', url: `https://${url.hostname}${path}${suffix}`, videoId: null, videoNumber };
 }
 
@@ -91,8 +89,8 @@ function xTarget(url, input) {
 
   const match = X_STATUS.exec(url.pathname);
   if (!match) throw new TargetParseError(input);
-  const [, prefix, postId, videoNumber] = match;
-  return post(url, `/${prefix}/status/${postId}`, videoNumber ? Number(videoNumber) : 1);
+  const [, prefix, postId, selector, videoNumber] = match;
+  return post(url, `/${prefix}/status/${postId}`, videoNumber ? Number(videoNumber) : 1, selector);
 }
 
 function playlist(listId, input) {

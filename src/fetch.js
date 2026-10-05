@@ -44,7 +44,7 @@ export async function fetchTranscript({ url, videoId, post, lang = 'en' }, deps 
   // vocabulary, is the whole operation this function performs.
   const { fetchTrack = fetchSubtitleTrack, write = writeTranscript, dir, sleep, delays, onRetry } =
     deps;
-  const site = post ? xPost(post.videoNumber) : YOUTUBE;
+  const site = post ? xPost() : YOUTUBE;
 
   const transcript = await withRateLimitRetries(
     () =>

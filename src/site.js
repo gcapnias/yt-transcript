@@ -50,25 +50,24 @@ export const YOUTUBE = {
 /**
  * What an X post prints: the text, the channel (`uploader` is the display
  * name, `uploader_id` the handle), the post id (`display_id`; `id` is the media
- * id), which extractor answered, and the url it extracted from (`webpage_url`,
- * which names the video number). `channel` is absent on X, so it is not asked
- * for. `title` is printed but unused: it is `<name> - <text>` cut at 72.
+ * id), which extractor answered, and the url it extracted from (`webpage_url`).
+ * `title` carries the fetched video's rank when the post has multiple videos.
+ * `channel` is absent on X, so it is not asked for.
  */
 const POST_FIELDS =
   'title,description,uploader,uploader_id,display_id,extractor_key,webpage_url,duration_string,upload_date';
 
 /**
- * An X post, fetched as its video number `videoNumber`.
+ * An X post, fetched using its requested media selector.
  *
  * `--no-playlist` (always passed) is what makes `yt-dlp` honour a `/video/N`
  * suffix, but it does not stop X's extractor returning a multi-video or quote
  * post as a playlist and processing every entry; `--playlist-items 1` selects
- * the post's own first video, or with a suffix the one it names.
+ * the post's own first video, or the selected media entry.
  *
- * @param {number} videoNumber
  * @returns {Site}
  */
-export function xPost(videoNumber) {
+export function xPost() {
   return {
     name: 'x',
     printFields: POST_FIELDS,
@@ -84,6 +83,6 @@ export function xPost(videoNumber) {
     // (ADR-0004), and every track is auto, whatever it looks like (ADR-0003).
     // The *cleaning* still follows what the track looks like: the recorded kind
     // is a claim about provenance, not a cleaning rule.
-    identify: ({ metadata }) => ({ ...postIdentity(metadata ?? {}, videoNumber), trackKind: 'auto' }),
+    identify: ({ metadata }) => ({ ...postIdentity(metadata ?? {}), trackKind: 'auto' }),
   };
 }

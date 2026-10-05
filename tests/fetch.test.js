@@ -221,7 +221,14 @@ test('two different posts sharing a title are told apart by post id', async () =
           dir,
           fetchTrack: async (request) => {
             const fetched = await recorded.fetchTrack(request);
-            return { ...fetched, metadata: { ...fetched.metadata, displayId } };
+            return {
+              ...fetched,
+              metadata: {
+                ...fetched.metadata,
+                displayId,
+                title: `${fetched.metadata.title} #${videoNumber}`,
+              },
+            };
           },
         },
       );
