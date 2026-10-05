@@ -1,7 +1,7 @@
 # yt-transcript
 
-Turns YouTube videos into Markdown transcripts that read as prose, for use as agent
-input or reference material. It produces transcripts, never summaries.
+Turns videos on YouTube and X into Markdown transcripts that read as prose, for use as
+agent input or reference material. It produces transcripts, never summaries.
 
 Each fetch downloads a subtitle track, cleans it into paragraphs, and writes one
 Markdown file under `transcripts/` with frontmatter describing the video. A catalog
@@ -28,6 +28,13 @@ Fetch a playlist or a channel — the URL expands into a batch, one fetch per vi
 npx . "https://www.youtube.com/watch?v=o3CX_Y59_74&list=PLxxxxxxxx" --playlist
 ```
 
+Fetch the video in an X post, by its URL:
+
+```bash
+npx . https://x.com/poteto/status/2102050467505430555
+npx . https://x.com/poteto/status/2102050467505430555/video/2
+```
+
 Rebuild the catalog from what is on disk, fetching nothing:
 
 ```bash
@@ -35,7 +42,34 @@ npx . catalog
 ```
 
 A target may be a video URL, a bare video id, a `youtu.be` or `/shorts` link, a
-playlist URL, a channel URL, or a bare `@handle`.
+playlist URL, a channel URL, or a bare `@handle`; or an X post URL.
+
+### X posts
+
+A post is always one fetch, never a batch. Accepted: status URLs on `x.com` and
+`twitter.com` (also `www.`, `mobile.` and `m.`) in the forms `/<handle>/status/<id>`,
+`/i/status/<id>` and `/i/web/status/<id>`, and `t.co` short links. A query string or
+fragment is ignored.
+
+- **One video per fetch.** A post with several videos, or one that quotes another
+  post's video, fetches its own first video. A trailing `/video/N` (or `/photo/N`)
+  fetches the post's own Nth video instead; `N` counts only the post's own videos,
+  so a quoted video is reachable only through the quoted post's URL. There is no
+  fetch-every-video mode.
+- **One transcript per video.** The transcript's `url` is built from the handle and
+  post id `yt-dlp` reports, plus `/video/N` from the second video on, so every
+  spelling of a post (`twitter.com`, `/i/status`, `t.co`, `/video/1`) overwrites the
+  same file. `title` is the post text with links removed, `channel` is
+  `Display Name (@handle)`, and `subtitles` is always `auto`: X's tracks are speech
+  recognition. When the post text is too short or not Latin to make a slug, the file
+  is named `<handle>-<post id>.md`, lowercased.
+- **Refused or failed with a message, never retried:** X Broadcasts and Spaces
+  (`/i/broadcasts/…`, `/i/events/…`, `/i/spaces/…`), which carry no subtitles; a post
+  with no video; a `/video/N` the post does not have; a video with no subtitle track
+  (common on short clips); a post that requires logging in, which this tool does not
+  do; and a link-only post that leads to another site. Profiles, threads, likes,
+  lists, search and bare post ids are not supported.
+- X's captions have little sentence punctuation, so paragraphs come out uneven.
 
 ### Without cloning
 

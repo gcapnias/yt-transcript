@@ -1,0 +1,121 @@
+WEBVTT
+
+00:00:01.360 --> 00:00:02.741
+<X-word-ms ms=240,100,201,260 index=1 character_ranges=0-2,3-5,6-12,13-19>Hi, my name's Lauren</X-word-ms>
+
+00:00:03.181 --> 00:00:05.141
+<X-word-ms ms=80,139,100,60,140,359,99,19 index=2 character_ranges=0-2,3-8,9-13,14-16,17-19,20-26,27-29,30-31>You might know me as Potato on X</X-word-ms>
+
+00:00:05.841 --> 00:00:08.682
+<X-word-ms ms=240,20,200,160,480,160,440,300 index=3 character_ranges=0-2,3-4,5-9,10-12,13-20,21-23,24-30,31-33>and I work on Grokbot at SpaceX AI</X-word-ms>
+
+00:00:09.862 --> 00:00:12.463
+<X-word-ms ms=80,279,320,19,119,359,179,319 index=4 character_ranges=0-1,2-6,7-13,14-15,16-19,20-29,30-36,37-42>So last month, I did something pretty crazy</X-word-ms>
+
+00:00:13.903 --> 00:00:17.324
+<X-word-ms ms=19,300,839,119,580,121,480 index=5 character_ranges=0-0,1-8,9-14,15-19,20-28,29-31,32-42>I shipped 2,000 pull requests to production</X-word-ms>
+
+00:00:19.184 --> 00:00:20.304
+<X-word-ms ms=19,160,80,160,100,160,60,79 index=6 character_ranges=0-0,1-4,5-7,8-11,12-15,16-20,21-23,24-26>A lot of how I'm able to do</X-word-ms>
+
+00:00:20.364 --> 00:00:22.025
+<X-word-ms ms=219,120,301,439 index=7 character_ranges=0-3,4-6,7-14,15-20>this is through trust</X-word-ms>
+
+00:00:23.265 --> 00:00:24.265
+<X-word-ms ms=199,560 index=8 character_ranges=0-2,3-4>and I</X-word-ms>
+
+00:00:24.065 --> 00:00:25.986
+<X-word-ms ms=219,19,160,239,379,59,300,100 index=9 character_ranges=0-4,5-6,7-10,11-16,17-22,23-25,26-31,32-34>think a lot about trust in terms of</X-word-ms>
+
+00:00:26.686 --> 00:00:28.206
+<X-word-ms ms=199,19,120,280,120,419 index=10 character_ranges=0-2,3-4,5-8,9-14,15-17,18-24>how I can trust my agents</X-word-ms>
+
+00:00:28.866 --> 00:00:29.866
+<X-word-ms ms=999 index=11 character_ranges=0-1>to</X-word-ms>
+
+00:00:29.306 --> 00:00:32.027
+<X-word-ms ms=480,539,220,179,140,100,160,240 index=12 character_ranges=0-6,7-19,20-24,25-29,30-34,35-38,39-42,43-48>produce high-quality work even when I'm not there</X-word-ms>
+
+00:00:33.287 --> 00:00:35.848
+<X-word-ms ms=179,200,460,100,479,121,160,280 index=13 character_ranges=0-2,3-5,6-14,15-18,19-25,26-29,30-34,35-39>And my argument and thesis for this talk</X-word-ms>
+
+00:00:35.908 --> 00:00:37.048
+<X-word-ms ms=280,79,179,100,160 index=14 character_ranges=0-4,5-7,8-12,13-15,16-19>today is that if you</X-word-ms>
+
+00:00:37.788 --> 00:00:41.729
+<X-word-ms ms=160,119,339,600,99,80,380,179 index=15 character_ranges=0-2,3-5,6-10,11-22,23-26,27-31,32-38,39-45>set up your environment for your agents really</X-word-ms>
+
+00:00:41.769 --> 00:00:42.769
+<X-word-ms ms=179,739 index=16 character_ranges=0-5,6-10>really well</X-word-ms>
+
+00:00:42.909 --> 00:00:44.349
+<X-word-ms ms=79,119,119,79,119,280,119,219 index=17 character_ranges=0-2,3-6,7-10,11-13,14-18,19-28,29-33,34-39>you can end up with something that looks</X-word-ms>
+
+00:00:44.469 --> 00:00:48.350
+<X-word-ms ms=260,219,19,500,79,179,359,399,399 index=18 character_ranges=0-3,4-8,9-10,11-19,20-22,23-27,28-32,33-41,42-49>more like a personal or even team software factory</X-word-ms>
+
+00:00:49.511 --> 00:00:50.511
+<X-word-ms ms=199,159,580 index=19 character_ranges=0-4,5-11,12-21>where you're producing</X-word-ms>
+
+00:00:51.071 --> 00:00:52.331
+<X-word-ms ms=179,560,340 index=20 character_ranges=0-3,4-16,17-21>very high-quality code</X-word-ms>
+
+00:00:52.851 --> 00:00:55.652
+<X-word-ms ms=160,340,280,380,180,380 index=21 character_ranges=0-1,2-6,7-14,15-20,21-25,26-32>at much greater rates than before</X-word-ms>
+
+00:00:57.192 --> 00:00:58.192
+<X-word-ms ms=999 index=22 character_ranges=0-2>but</X-word-ms>
+
+00:00:57.712 --> 00:00:59.393
+<X-word-ms ms=99,140,20,239,79,79,239,341 index=23 character_ranges=0-2,3-6,7-8,9-12,13-15,16-19,20-24,25-33>I'm not a fan of the term software</X-word-ms>
+
+00:00:59.413 --> 00:01:00.413
+<X-word-ms ms=1000 index=24 character_ranges=0-6>factory</X-word-ms>
+
+00:01:00.573 --> 00:01:03.193
+<X-word-ms ms=20,239,120,400,80,60,359,299,239 index=25 character_ranges=0-0,1-5,6-9,10-17,18-20,21-24,25-33,34-41,42-48>I like the analogy of the Michelin kitchen better</X-word-ms>
+
+00:01:03.913 --> 00:01:08.874
+<X-word-ms ms=320,79,140,99,780,140,259,219,659 index=26 character_ranges=0-5,6-9,10-15,16-18,19-33,34-39,40-43,44-50,51-60>where, you know, as technologists, we're not really producing</X-word-ms>
+
+00:01:08.994 --> 00:01:11.955
+<X-word-ms ms=120,120,280,439,20,420,140,99,380,260 index=27 character_ranges=0-4,5-8,9-13,14-23,24-25,26-33,34-36,37-39,40-48,49-53>we're not mass producing a product on an assembly line</X-word-ms>
+
+00:01:12.795 --> 00:01:14.895
+<X-word-ms ms=120,60,140,99,40,60,200,219,560 index=28 character_ranges=0-2,3-6,7-11,12-16,17-19,20-22,23-28,29-33,34-42>but the work that we do looks very creative</X-word-ms>
+
+00:01:15.096 --> 00:01:18.336
+<X-word-ms ms=159,280,60,140,99,79,159,59,260,19,439 index=29 character_ranges=0-3,4-9,10-13,14-19,20-24,25-28,29-32,33-35,36-44,45-46,47-54>It's very, you know, it's the act of building a product</X-word-ms>
+
+00:01:19.136 --> 00:01:21.237
+<X-word-ms ms=359,180,201,79,180,359 index=30 character_ranges=0-2,3-7,8-11,12-14,15-19,20-25>and it's art in some sense</X-word-ms>
+
+00:01:22.017 --> 00:01:24.837
+<X-word-ms ms=120,60,120,179,200,159,460 index=31 character_ranges=0-2,3-6,7-12,13-17,18-24,25-29,30-36>So, you know, even though with agents</X-word-ms>
+
+00:01:24.897 --> 00:01:25.897
+<X-word-ms ms=140,799 index=32 character_ranges=0-4,5-8>we're not</X-word-ms>
+
+00:01:26.078 --> 00:01:30.238
+<X-word-ms ms=420,79,439,620,120,60,159,60,439,480 index=33 character_ranges=0-6,7-10,11-21,22-32,33-37,38-40,41-45,46-49,50-57,58-65>cooking the individual components that go into the product anymore</X-word-ms>
+
+00:01:32.539 --> 00:01:34.899
+<X-word-ms ms=179,239,620,120,79,280,420 index=34 character_ranges=0-4,5-10,11-22,23-26,27-30,31-36,37-44>we're still responsible for the final outcome</X-word-ms>
+
+00:01:35.699 --> 00:01:37.980
+<X-word-ms ms=260,420,300,120,319,240 index=35 character_ranges=0-2,3-11,12-17,18-21,22-29,30-35>and thinking about our kitchen setup</X-word-ms>
+
+00:01:39.160 --> 00:01:42.382
+<X-word-ms ms=200,320,359,59,119,60,140,99,200,281,359 index=36 character_ranges=0-5,6-13,14-23,24-26,27-30,31-34,35-38,39-41,42-46,47-51,52-57>Right, because depending on how you set up your line cooks</X-word-ms>
+
+00:01:42.482 --> 00:01:45.623
+<X-word-ms ms=99,260,420,60,79,60,159,40,500,120,359 index=37 character_ranges=0-3,4-8,9-15,16-19,20-25,26-29,30-34,35-37,38-47,48-52,53-57>your sous chefs, you know, the kind of equipment they have</X-word-ms>
+
+00:01:45.683 --> 00:01:47.124
+<X-word-ms ms=79,181,59,399,120,339 index=38 character_ranges=0-2,3-7,8-10,11-19,20-24,25-29>the kind of training they have</X-word-ms>
+
+00:01:47.844 --> 00:01:50.346
+<X-word-ms ms=60,100,940,140,79,361 index=39 character_ranges=0-2,3-8,9-20,21-24,25-28,29-34>you know, dishwashers and the ratio</X-word-ms>
+
+00:01:50.566 --> 00:01:52.607
+<X-word-ms ms=19,219,99,219,280,59,721 index=40 character_ranges=0-0,1-7,8-10,11-15,16-21,22-24,25-36>I guess, of line cooks to dishwashers</X-word-ms>

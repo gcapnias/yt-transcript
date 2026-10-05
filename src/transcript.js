@@ -1,7 +1,7 @@
 /**
  * The transcript rendering seam:
  *
- *   (raw subtitle track text, video metadata) -> { filename, contents }
+ *   (raw subtitle track text, video metadata[, site]) -> { filename, contents }
  *
  * One call, one diffable string. Everything the cleaning pipeline, the slug
  * and the frontmatter decide is visible in that string, which is why the tests
@@ -14,28 +14,50 @@
 
 import { cleanTrack } from './clean.js';
 import { formatUploadDate, renderFrontmatter } from './frontmatter.js';
-import { transcriptSlug } from './slug.js';
+import { YOUTUBE } from './site.js';
 
 /**
  * @param {object} input
  * @param {string} input.trackText the subtitle track exactly as downloaded
- * @param {string} input.url the canonical `https://www.youtube.com/watch?v=<id>` form
- * @param {string} input.videoId
- * @param {{ title: string, channel: string, duration: string, uploadDate: string }} input.metadata
+ * @param {string} input.url for a YouTube video, the canonical
+ *   `https://www.youtube.com/watch?v=<id>` form
+ * @param {string} input.videoId for a YouTube video, its id
+ * @param {import('./site.js').Site} [input.site] YouTube unless given; an X post
+ *   ignores `url` and `videoId`, and rebuilds both from the metadata
+ * @param {{ title: string, channel: string, duration: string, uploadDate: string,
+ *           description?: string, uploader?: string, uploaderId?: string,
+ *           displayId?: string }} input.metadata
  * @param {Date} [input.fetchedAt]
+ *
+ * `collisionId` in the result is what the filename collision rule suffixes: the
+ * YouTube video id, or for an X post the post id (plus `-<N>` for video N ≥ 2).
+ * `url` is the frontmatter `url`, for an X post the one built from metadata.
+ *
  * @returns {{ slug: string, filename: string, contents: string,
- *             url: string, videoId: string, trackKind: 'auto'|'manual',
+ *             url: string, collisionId: string, trackKind: 'auto'|'manual',
  *             video: { title: string, channel: string, duration: string,
  *                      uploaded: string } }}
  */
-export function renderTranscript({ trackText, url, videoId, metadata, fetchedAt = new Date() }) {
-  const { trackKind, paragraphs } = cleanTrack(trackText);
-  const slug = transcriptSlug(metadata?.title ?? '', videoId);
+export function renderTranscript({
+  trackText,
+  url: fetchedUrl,
+  videoId: fetchedVideoId,
+  site = YOUTUBE,
+  metadata,
+  fetchedAt = new Date(),
+}) {
+  const { trackKind: detectedKind, paragraphs } = cleanTrack(trackText);
+  const { url, collisionId, trackKind, title, channel, slug } = site.identify({
+    metadata,
+    url: fetchedUrl,
+    videoId: fetchedVideoId,
+    trackKind: detectedKind,
+  });
 
   const frontmatter = renderFrontmatter({
-    title: metadata?.title ?? '',
+    title,
     url,
-    channel: metadata?.channel ?? '',
+    channel,
     duration: metadata?.duration ?? '',
     uploadDate: metadata?.uploadDate ?? '',
     fetchedAt,
@@ -53,14 +75,14 @@ export function renderTranscript({ trackText, url, videoId, metadata, fetchedAt 
     filename: `${slug}.md`,
     contents: `${frontmatter}\n\n${body}\n`,
     url,
-    videoId,
+    collisionId,
     trackKind,
     // What the run tells the human it just fetched. Carried out here rather
     // than re-read from the file or re-formatted by the CLI, so the terminal
     // and the frontmatter can only ever say the same thing.
     video: {
-      title: metadata?.title ?? '',
-      channel: metadata?.channel ?? '',
+      title,
+      channel,
       duration: metadata?.duration ?? '',
       uploaded: formatUploadDate(metadata?.uploadDate ?? ''),
     },

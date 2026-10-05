@@ -41,9 +41,9 @@ export function readTranscriptUrl(text) {
 
 /**
  * Writes a transcript, resolving a true title collision by suffixing the
- * second file with its video id.
+ * second file with its collision id: the video id, or an X post's post id.
  *
- * @param {{ slug: string, filename: string, contents: string, url: string, videoId: string }} transcript
+ * @param {{ slug: string, filename: string, contents: string, url: string, collisionId: string }} transcript
  * @param {{ dir?: string }} [options]
  * @returns {Promise<string>} the path written
  */
@@ -68,5 +68,5 @@ async function resolveFilename(transcript, dir) {
   const owner = readTranscriptUrl(existing);
   if (owner === null || owner === transcript.url) return transcript.filename;
 
-  return `${transcript.slug}-${transcript.videoId}.md`;
+  return `${transcript.slug}-${transcript.collisionId}.md`;
 }
