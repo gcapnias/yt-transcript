@@ -27,8 +27,6 @@ a never-succeeding one.
   no migration that can recover the truth.
 - `subtitles: auto` on a transcript of a non-English video reads as a bug until you know this was
   deliberate. That is the whole reason this record exists.
-- Largely moot in practice: translated tracks reliably return HTTP 429, so most attempts to fetch
-  one fail as an ordinary rate-limited fetch rather than producing a translated transcript.
-- Consequently the `<c>`-tag rule that classifies `manual` vs `auto` is unverified against
-  auto-*translated* tracks — they could not be downloaded at all. The same 429 wall means every
+- The `<c>`-tag rule that classifies `manual` vs `auto` is unverified against auto-*translated*
+  tracks, because the 429 wall stopped any from being downloaded. The same wall means every
   reachable input falls into one of the two verified classes.

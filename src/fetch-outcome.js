@@ -98,8 +98,9 @@ const OTHER_SITE_ERROR = /^ERROR: (?:\[(?!twitter)[^\]]+\]|Unsupported URL)/m;
  * `extractorKey` is what `yt-dlp` reports for a fetch that succeeded in
  * extracting; anything but `Twitter` means a link-only post was followed to
  * another site, whose video must not be filed under the post's url. A track
- * from X that came without its handle or post id is refused too: the url a
- * transcript is identified by is built from both (ADR-0004).
+ * from X that came without its handle or post id is refused too: the post id
+ * identifies the transcript (ADR-0004), and the handle names its channel
+ * (ADR-0005).
  *
  * @param {{ exitCode: number, hasTrack: boolean, stderr?: string, extractorKey?: string,
  *           uploaderId?: string, displayId?: string }} outcome

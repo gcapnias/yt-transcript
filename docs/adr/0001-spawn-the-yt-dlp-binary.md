@@ -23,10 +23,10 @@ for it on PATH and failing with an actionable message when it is absent.
   clear install message, not as a stack trace at first use.
 - Every per-video fetch passes **`--js-runtimes node`**. It costs nothing today, silences
   yt-dlp's deprecation warning, and keeps the pipeline working if subtitles ever do begin to
-  require a JS runtime. Node >= 22 is yt-dlp's floor for this flag, which is why the Node floor
-  exists at all — but the binding constraint is higher: `bin/yt-transcript.js` guards its entry
-  point with `import.meta.main`, which arrived in Node 24.2 and was backported to Node 22.18, so
-  `engines` demands `>=22.18.0 <23 || >=24.2.0`. See [#2](https://github.com/gcapnias/yt-transcript/issues/2).
+  require a JS runtime. Node 22 is yt-dlp's floor for this flag, which is why the tool has a Node
+  floor at all. The floor actually declared is higher: the entry guard in `bin/yt-transcript.js`
+  relies on `import.meta.main`, which only some Node versions have. `engines` in `package.json`
+  is the source of truth for the supported range; see [#2](https://github.com/gcapnias/yt-transcript/issues/2).
   Expanding a playlist or channel does not pass it: the rationale above is subtitle
   extraction, and a flat listing runs no player JavaScript.
 - The `yt-dlp` spawn is the tool's only impure seam; everything above it is text in, text out.
