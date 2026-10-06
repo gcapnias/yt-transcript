@@ -31,8 +31,14 @@ export const MANUAL_IDS = ['8nHBGFKLHZQ', 'DxL2HoqLbyA', 'arj7oStGLkU', 'iG9CE55
 
 /**
  * X posts, recorded from `yt-dlp` 2026.08.19: `x/<name>.json` is the line its
- * `--print` emitted for a post, and `x/<media id>.en.vtt` is a track trimmed to
+ * `--print` emitted for a post, `x/<name>-listing.jsonl` what the list-only
+ * invocation printed for one, and `x/<media id>.en.vtt` is a track trimmed to
  * its first cues (the X cue markup is the evidence, not the length).
+ *
+ * The CTV post (two videos, no photos) is recorded fetched four ways: `-post`
+ * bare, `-video1` and `-video2` through `/video/N`, and `-tco` through the
+ * `t.co` link in its text, which resolves to `/video/1` and is then redirected
+ * by X to the bare post.
  */
 export const X_TRACK_ID = '2101938030122868736';
 
@@ -45,6 +51,16 @@ export const X_TRACK_ID = '2101938030122868736';
 export function readXPrintLine(name) {
   const recorded = fs.readFileSync(path.join(FIXTURES_DIR, 'x', `${name}.json`), 'utf8');
   return `${JSON.stringify(JSON.parse(recorded))}\n`;
+}
+
+/**
+ * A recorded listing of a post's videos: the lines the list-only invocation
+ * printed, one JSON object per video, stored exactly as emitted.
+ *
+ * @param {string} name a recorded post, without the `-listing.jsonl` suffix
+ */
+export function readXListing(name) {
+  return fs.readFileSync(path.join(FIXTURES_DIR, 'x', `${name}-listing.jsonl`), 'utf8');
 }
 
 /** The trimmed X track exactly as downloaded. */

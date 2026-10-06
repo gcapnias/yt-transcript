@@ -6,7 +6,8 @@
  * (ADR-0004): `/i/status` and `t.co` inputs carry no handle, handles are
  * case-insensitive and get renamed, and `id` is the media id, shared with every
  * post that quotes the video. The handle is `uploader_id`, the post id is
- * `display_id`, and yt-dlp's title suffix is the selected video's rank.
+ * `display_id`, and the video's rank is settled by the fetch, which may have
+ * to list the post to find it (`reportedRank`, `rankInListing`).
  */
 
 import { transcriptSlug } from './slug.js';
@@ -16,8 +17,9 @@ const LINK = /https?:\/\/\S+/g;
 
 /**
  * The post text as a title: links out, every run of whitespace (newlines and
- * U+3000 included) one space, nothing truncated. yt-dlp's own `title` supplies
- * only the fetched video's rank; it is `<display name> - <text>` truncated.
+ * U+3000 included) one space, nothing truncated. yt-dlp's own `title` is
+ * `<display name> - <text>` truncated, with a rank suffix that is not always
+ * right (`reportedRank`).
  */
 function postText(description) {
   return String(description ?? '')
@@ -39,24 +41,49 @@ export function videoSuffix(videoNumber, separator) {
 }
 
 /**
- * Which video entry was fetched, as `yt-dlp` reports it. Its title suffix is
- * the rank among the post's videos (photos excluded); no suffix means the
- * entry is the only video.
+ * Which video entry was fetched, when the fetch alone can tell: its rank from
+ * 1 among the post's videos (photos excluded), or `null` when only a listing
+ * of the post can tell.
+ *
+ * `yt-dlp`'s ` #N` title suffix is trusted for one thing only. A whole-post
+ * fetch reports the rank as `playlist_index`, and the suffix agrees with it. A
+ * fetch through a `/video/N` selector reports no index, and on a multi-video
+ * post its suffix is `#1` for every video, the second included: a bug in
+ * yt-dlp's Twitter extractor (ADR-0004). What that path still gets right is
+ * leaving the suffix off when the post has only one video.
+ *
+ * @param {{ title?: string, playlistIndex?: number|null }} metadata
+ * @returns {number|null}
  */
-function reportedVideoNumber(title) {
-  const match = / #([1-9]\d*)$/.exec(title ?? '');
-  return match ? Number(match[1]) : 1;
+export function reportedRank({ title, playlistIndex }) {
+  if (playlistIndex) return playlistIndex;
+  return / #[1-9]\d*$/.test(title ?? '') ? null : 1;
 }
 
 /**
- * @param {{ description: string, uploader: string, uploaderId: string, displayId: string,
- *           title?: string }} metadata
+ * The fetched video's rank in a listing of its post, found by media id, or
+ * `null` when the listing lacks it. Never a guessed first: that guess is what
+ * files a later video over the first one's transcript.
+ *
+ * @param {string} mediaId
+ * @param {{ mediaId: string, playlistIndex: number }[]} listing
+ * @returns {number|null}
+ */
+export function rankInListing(mediaId, listing) {
+  if (!mediaId) return null;
+  return listing.find((entry) => entry.mediaId === mediaId)?.playlistIndex ?? null;
+}
+
+/**
+ * @param {{ description: string, uploader: string, uploaderId: string,
+ *           displayId: string }} metadata
+ * @param {number} videoNumber the fetched video's rank among the post's videos,
+ *   settled by the fetch (`reportedRank`, else `rankInListing`)
  * @returns {{ title: string, url: string, channel: string, collisionId: string,
  *             slug: string }}
  */
-export function postIdentity(metadata) {
+export function postIdentity(metadata, videoNumber) {
   const { uploader, uploaderId, displayId } = metadata;
-  const videoNumber = reportedVideoNumber(metadata.title);
   const text = postText(metadata.description);
   // Lowercased, unlike YouTube's mixed-case video id: deliberately, and only
   // the case changes, so a handle's underscores are kept.

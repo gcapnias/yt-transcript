@@ -18,11 +18,13 @@ import {
   FetchError,
   findSubtitleTrack,
   parseExpansion,
+  listArgs,
+  parseListing,
   parseMetadata,
 } from '../src/ytdlp.js';
 import { xPost } from '../src/site.js';
 import { withTempDir } from '../src/temp-dir.js';
-import { readXPrintLine } from './fixtures.js';
+import { readXListing, readXPrintLine } from './fixtures.js';
 
 const URL = 'https://www.youtube.com/watch?v=o3CX_Y59_74';
 
@@ -126,8 +128,9 @@ test('expansion failure names the playlist and what yt-dlp said', () => {
   assert.doesNotMatch(error.message, /at .*\(.*:\d+:\d+\)/, 'message reads like a stack trace');
 });
 
-// X posts: still one invocation, with the playlist refused by selecting entry
-// #1 rather than by `--no-playlist` alone, which X's extractor ignores.
+// X posts: the fetch selects entry #1 rather than relying on `--no-playlist`
+// alone, which X's extractor ignores. A second, list-only invocation exists for
+// the one case the fetch cannot rank by itself (gcapnias/yt-transcript#7).
 
 const POST_URL = 'https://x.com/poteto/status/2102050467505430555';
 
@@ -152,31 +155,63 @@ test('the youtube invocation is exactly what it was', () => {
   ]);
 });
 
-test('a post is fetched as playlist entry 1, still in one invocation', () => {
-  const args = fetchArgs({ url: POST_URL, lang: 'en', destDir: '/tmp/run', site: xPost(1) });
+test('a post is fetched as playlist entry 1, printing what ranks the video fetched', () => {
+  const args = fetchArgs({ url: POST_URL, lang: 'en', destDir: '/tmp/run', site: xPost() });
 
   assert.ok(args.includes('--no-playlist'), 'dropped --no-playlist, which honours /video/N');
   // `--no-playlist` alone still processes both entries of a multi-video or
   // quote post, so the first is asked for by number.
   assert.equal(args[args.indexOf('--playlist-items') + 1], '1');
   assert.equal(args.at(-1), POST_URL);
-  // Nothing that costs a second round-trip or leaves a file but the track.
+  // The fetch itself leaves no file but the track.
   assert.ok(!args.includes('--write-info-json'));
   assert.ok(!args.includes('--dump-json') && !args.includes('-J'));
 
   const template = args[args.indexOf('--print') + 1];
   for (const field of [
+    'id',
+    'title',
     'description',
     'uploader',
     'uploader_id',
     'display_id',
+    'playlist_index',
     'extractor_key',
     'webpage_url',
     'duration_string',
     'upload_date',
   ]) {
-    assert.ok(template.includes(field), `the post invocation does not print ${field}`);
+    assert.ok(template.split(/[{,}]/).includes(field), `the post invocation does not print ${field}`);
   }
+});
+
+test("a post's videos are listed whole, by media id and rank, and nothing is written", () => {
+  const args = listArgs({ postId: '1600649710662213632' });
+
+  assert.equal(args.at(-1), 'https://x.com/i/status/1600649710662213632');
+  // The whole post, every video: the listing takes the playlist path on purpose.
+  assert.ok(args.includes('--yes-playlist'));
+  assert.ok(!args.includes('--no-playlist') && !args.includes('--playlist-items'));
+  assert.ok(args.includes('--simulate'), 'the listing could download');
+  for (const flag of ['--write-sub', '--write-auto-sub', '--sub-langs', '-P', '-o', '--no-simulate']) {
+    assert.ok(!args.includes(flag), `the listing passes ${flag}`);
+  }
+  assert.equal(args[args.indexOf('--print') + 1], '%(.{id,playlist_index})j');
+});
+
+test('a recorded listing is read as media id to rank', () => {
+  assert.deepEqual(parseListing(readXListing('ctv-1600649710662213632')), [
+    { mediaId: '1600649511827038209', playlistIndex: 1 },
+    { mediaId: '1600649511827013632', playlistIndex: 2 },
+  ]);
+  // A post of one video is not a playlist, so its one entry has no index.
+  assert.deepEqual(parseListing('noise\r\n{"id": "7"}\r\n'), [{ mediaId: '7', playlistIndex: 1 }]);
+  assert.deepEqual(parseListing(''), []);
+  // Only a lone entry is video 1 by default: among several, an unindexed entry
+  // has no rank, so it is left out rather than guessed as the first.
+  assert.deepEqual(parseListing('{"id": "7"}\n{"id": "8", "playlist_index": 2}\n'), [
+    { mediaId: '8', playlistIndex: 2 },
+  ]);
 });
 
 test('recorded post metadata is read as reported', () => {
@@ -190,6 +225,16 @@ test('recorded post metadata is read as reported', () => {
   assert.equal(metadata.duration, '38:01');
   assert.equal(metadata.uploadDate, '20260921');
   assert.match(metadata.description, /^here's how i shipped 2,500 PRs.* https:\/\/t\.co\/NgrGz7tmPM$/);
+});
+
+test('the media id and playlist index are read when reported, and absent otherwise', () => {
+  const post = parseMetadata(readXPrintLine('ctv-1600649710662213632-post'));
+  assert.equal(post.mediaId, '1600649511827038209');
+  assert.equal(post.playlistIndex, 1);
+
+  const selected = parseMetadata(readXPrintLine('ctv-1600649710662213632-video2'));
+  assert.equal(selected.mediaId, '1600649511827013632');
+  assert.equal(selected.playlistIndex, null);
 });
 
 test('the url yt-dlp extracted from is read, for the video number it names', () => {
@@ -206,7 +251,7 @@ test('a recorded post outcome becomes the failure it means', () => {
     ...outcome,
     exitCode: 1,
     hasTrack: false,
-    site: xPost(1),
+    site: xPost(),
     stderr: 'ERROR: [twitter] 20: No video could be found in this tweet\n',
   });
   assert.ok(noVideo instanceof FetchError);
@@ -218,7 +263,7 @@ test('a recorded post outcome becomes the failure it means', () => {
     ...outcome,
     exitCode: 0,
     hasTrack: true,
-    site: xPost(1),
+    site: xPost(),
     metadata: { extractorKey: 'Youtube' },
   });
   assert.equal(elsewhere.failure, NOT_AN_X_POST);
@@ -228,7 +273,7 @@ test('a recorded post outcome becomes the failure it means', () => {
     ...outcome,
     exitCode: 0,
     hasTrack: true,
-    site: xPost(1),
+    site: xPost(),
     metadata: { extractorKey: 'Twitter', uploaderId: '', displayId: '2102050467505430555' },
   });
   assert.equal(anonymous.failure, NO_POST_IDENTITY);

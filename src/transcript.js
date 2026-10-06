@@ -27,6 +27,8 @@ import { YOUTUBE } from './site.js';
  * @param {{ title: string, channel: string, duration: string, uploadDate: string,
  *           description?: string, uploader?: string, uploaderId?: string,
  *           displayId?: string }} input.metadata
+ * @param {number} [input.videoNumber] for an X post, which of its videos the
+ *   track is, from 1; settled by the fetch, and required for a post
  * @param {Date} [input.fetchedAt]
  *
  * `collisionId` in the result is what the filename collision rule suffixes: the
@@ -44,6 +46,7 @@ export function renderTranscript({
   videoId: fetchedVideoId,
   site = YOUTUBE,
   metadata,
+  videoNumber,
   fetchedAt = new Date(),
 }) {
   const { trackKind: detectedKind, paragraphs } = cleanTrack(trackText);
@@ -52,6 +55,7 @@ export function renderTranscript({
     url: fetchedUrl,
     videoId: fetchedVideoId,
     trackKind: detectedKind,
+    videoNumber,
   });
 
   const frontmatter = renderFrontmatter({

@@ -4,7 +4,7 @@ import path from 'node:path';
 
 import { sanitizeChildEnv } from './child-env.js';
 import { describeFailure } from './fetch-outcome.js';
-import { YOUTUBE } from './site.js';
+import { xPost, YOUTUBE } from './site.js';
 import { parseTarget, TargetParseError } from './target.js';
 
 /** The binary name looked up on PATH. Overridable so tests need not uninstall it. */
@@ -98,12 +98,14 @@ export async function preflight({ binary = YT_DLP } = {}) {
  * `yt-dlp` reported them; reformatting is the transcript's business.
  *
  * @param {string} stdout
- * The last six fields are printed for an X post only, and are empty strings
- * for a YouTube video.
+ * The last eight fields are printed for an X post only, and are empty strings
+ * (`playlistIndex` `null`) for a YouTube video. `playlistIndex` is `null` on
+ * an X post too unless the whole post was fetched.
  *
  * @returns {{ title: string, channel: string, duration: string, uploadDate: string,
  *             description: string, uploader: string, uploaderId: string,
- *             displayId: string, extractorKey: string, webpageUrl: string }|null}
+ *             displayId: string, extractorKey: string, webpageUrl: string,
+ *             mediaId: string, playlistIndex: number|null }|null}
  */
 export function parseMetadata(stdout) {
   const line = stdout
@@ -131,6 +133,10 @@ export function parseMetadata(stdout) {
     displayId: parsed.display_id ?? '',
     extractorKey: parsed.extractor_key ?? '',
     webpageUrl: parsed.webpage_url ?? '',
+    // The media id, which tells a post's videos apart (`id`; `display_id` is
+    // the post's), and the rank a whole-post fetch reports with it.
+    mediaId: parsed.id ?? '',
+    playlistIndex: parsed.playlist_index ?? null,
   };
 }
 
@@ -164,8 +170,9 @@ export function fetchArgs({ url, lang, destDir, site = YOUTUBE }) {
 
 /**
  * One blind invocation per video: downloads the subtitle track into `destDir`
- * and emits the metadata on stdout. No pre-flight query, no second round-trip,
- * and no `.info.json` is ever written.
+ * and emits the metadata on stdout. No pre-flight query and no `.info.json`
+ * is ever written. The one second round-trip is an X post's, when the fetch
+ * cannot say which of the post's videos it was (`listPostVideos`).
  *
  * @returns {Promise<{ metadata: object, trackPath: string }>}
  */
@@ -213,6 +220,71 @@ export function fetchFailure({ exitCode, hasTrack, url, lang, site = YOUTUBE, st
     failure: outcome.failure,
     retryable: outcome.retryable,
   });
+}
+
+/**
+ * Builds the invocation that lists an X post's videos: each one's media id and
+ * rank, and nothing downloaded or written.
+ *
+ * The whole post is asked for on purpose (`--yes-playlist`, no selector, no
+ * `--playlist-items`): that is the path on which `yt-dlp` ranks the videos
+ * right. The post is named by the id the fetch reported, not by the input, so
+ * a `t.co` link or a handle form lists the same post.
+ */
+export function listArgs({ postId }) {
+  return [
+    '--simulate',
+    '--yes-playlist',
+    '--print',
+    '%(.{id,playlist_index})j',
+    `https://x.com/i/status/${postId}`,
+  ];
+}
+
+/**
+ * Reads the listing's stdout: one JSON line per video. A post of one video is
+ * not a playlist, so its one line carries no index, and is video 1. Among
+ * several, an entry with no index has no rank and is left out: guessing it as
+ * the first is the overwrite this listing exists to prevent.
+ *
+ * @param {string} stdout
+ * @returns {{ mediaId: string, playlistIndex: number }[]}
+ */
+export function parseListing(stdout) {
+  const entries = [];
+  for (const line of String(stdout ?? '').split(/\r?\n/)) {
+    const candidate = line.trim();
+    if (!candidate.startsWith('{')) continue;
+
+    let parsed;
+    try {
+      parsed = JSON.parse(candidate);
+    } catch {
+      continue;
+    }
+    if (parsed.id) entries.push({ mediaId: String(parsed.id), playlistIndex: parsed.playlist_index ?? null });
+  }
+  if (entries.length === 1) return [{ ...entries[0], playlistIndex: entries[0].playlistIndex ?? 1 }];
+  return entries.filter((entry) => entry.playlistIndex);
+}
+
+/**
+ * Lists an X post's videos, for the fetch that cannot rank its own.
+ *
+ * A failure is classified as the post's fetch would be, so a 429 here climbs
+ * the same ladder: the fetch and the listing are one attempt (`fetch.js`).
+ *
+ * @param {{ postId: string, url: string, lang?: string, binary?: string }} request
+ *   `url` and `lang` only name the post in a failure's message
+ * @returns {Promise<{ mediaId: string, playlistIndex: number }[]>}
+ * @throws {FetchError}
+ */
+export async function listPostVideos({ postId, url, lang = 'en', binary = YT_DLP }) {
+  const { exitCode, stdout, stderr } = await run(binary, listArgs({ postId }));
+  if (exitCode !== 0) {
+    throw fetchFailure({ exitCode, hasTrack: false, url, lang, site: xPost(), stderr, metadata: null });
+  }
+  return parseListing(stdout);
 }
 
 /**

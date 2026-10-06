@@ -31,6 +31,12 @@ export const LOGIN_REQUIRED = 'login-required';
 export const NOT_AN_X_POST = 'not-an-x-post';
 /** X answered, but without the handle or post id a transcript is filed under. */
 export const NO_POST_IDENTITY = 'no-post-identity';
+/**
+ * The video fetched is not among the post's listed videos, so which of them it
+ * is cannot be told. Never guessed as the first: that guess is what files a
+ * later video over the first one's transcript.
+ */
+export const UNLISTED_VIDEO = 'unlisted-video';
 
 /**
  * The settled ladder: one wait per retry, so the invocation count is
@@ -184,6 +190,14 @@ export function describeFailure({ failure, url, lang }) {
     return (
       `yt-dlp did not report the handle and post id of ${url}, so there is no url to ` +
       'identify its transcript by.\nNothing was written.'
+    );
+  }
+
+  if (failure === UNLISTED_VIDEO) {
+    return (
+      `yt-dlp fetched a video from ${url} that it did not list among the post's videos, ` +
+      "so there is no telling which of them it is.\nNothing was written, and no other video's " +
+      'transcript was overwritten.'
     );
   }
 

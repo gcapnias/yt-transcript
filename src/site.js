@@ -22,7 +22,8 @@ import { postIdentity } from './x-post.js';
  * @property {(outcome: { exitCode: number, hasTrack: boolean, stderr?: string,
  *             metadata?: object|null }) => object} classify
  * @property {(fetched: { metadata: object|null, url: string, videoId: string|null,
- *             trackKind: 'auto'|'manual' }) => { url: string, collisionId: string,
+ *             trackKind: 'auto'|'manual', videoNumber?: number })
+ *             => { url: string, collisionId: string,
  *             title: string, channel: string, trackKind: 'auto'|'manual',
  *             slug: string }} identify
  */
@@ -49,13 +50,16 @@ export const YOUTUBE = {
 
 /**
  * What an X post prints: the text, the channel (`uploader` is the display
- * name, `uploader_id` the handle), the post id (`display_id`; `id` is the media
- * id), which extractor answered, and the url it extracted from (`webpage_url`).
- * `title` carries the fetched video's rank when the post has multiple videos.
+ * name, `uploader_id` the handle), the post id (`display_id`), which extractor
+ * answered, and the url it extracted from (`webpage_url`). `id` is the media
+ * id, the one field that tells a post's videos apart; `playlist_index` ranks
+ * the video, and is reported only when the whole post was fetched. `title`'s
+ * rank suffix says whether the post has more than one video (`reportedRank`).
  * `channel` is absent on X, so it is not asked for.
  */
 const POST_FIELDS =
-  'title,description,uploader,uploader_id,display_id,extractor_key,webpage_url,duration_string,upload_date';
+  'id,title,description,uploader,uploader_id,display_id,playlist_index,extractor_key,webpage_url,' +
+  'duration_string,upload_date';
 
 /**
  * An X post, fetched using its requested media selector.
@@ -82,7 +86,13 @@ export function xPost() {
     // The identity comes from what yt-dlp reported, never from the url fetched
     // (ADR-0004), and every track is auto, whatever it looks like (ADR-0003).
     // The *cleaning* still follows what the track looks like: the recorded kind
-    // is a claim about provenance, not a cleaning rule.
-    identify: ({ metadata }) => ({ ...postIdentity(metadata ?? {}), trackKind: 'auto' }),
+    // is a claim about provenance, not a cleaning rule. Which of the post's
+    // videos it is was settled by the fetch, which may have listed the post.
+    identify({ metadata, videoNumber }) {
+      if (!Number.isInteger(videoNumber) || videoNumber < 1) {
+        throw new TypeError(`An X post is identified with its video's rank, not ${videoNumber}`);
+      }
+      return { ...postIdentity(metadata ?? {}, videoNumber), trackKind: 'auto' };
+    },
   };
 }

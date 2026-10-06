@@ -23,11 +23,19 @@ import {
   NO_SUCH_VIDEO,
   NO_VIDEO,
   NOT_AN_X_POST,
+  UNLISTED_VIDEO,
 } from '../src/fetch-outcome.js';
 import { FetchError } from '../src/ytdlp.js';
 
 /** The X post failures, none of which is a rate limit and so none retryable. */
-const POST_FAILURES = [NO_VIDEO, NO_SUCH_VIDEO, LOGIN_REQUIRED, NOT_AN_X_POST, NO_POST_IDENTITY];
+const POST_FAILURES = [
+  NO_VIDEO,
+  NO_SUCH_VIDEO,
+  LOGIN_REQUIRED,
+  NOT_AN_X_POST,
+  NO_POST_IDENTITY,
+  UNLISTED_VIDEO,
+];
 
 /**
  * @param {{ failure: string, url: string, lang?: string, message?: string }} outcome
