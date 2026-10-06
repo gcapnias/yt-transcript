@@ -10,7 +10,10 @@ const USAGE = `Usage: yt-transcript <url|id> [--lang <code>] [--playlist] [--for
        yt-transcript catalog
 
   <url|id>      a YouTube video URL, a bare video id, a youtu.be or /shorts
-                link, a playlist URL, a channel URL, or a bare @handle
+                link, a playlist URL, a channel URL, or a bare @handle; or
+                an X post URL (x.com or twitter.com /<handle>/status/<id>,
+                /i/status/<id>, or a t.co link), which fetches one video:
+                its first, or the Nth for a trailing /video/N
   --lang <code> subtitle language, matched exactly (default: en)
   --playlist    read a watch?v=...&list=... URL as the playlist, not the video
   --force       in a batch, ignore the skip set and re-fetch everything. A
@@ -136,7 +139,7 @@ export async function main(argv, io = {}, deps = {}) {
 
   // A playlist or channel is many fetches, and nothing else about a fetch
   // changes: the same per-video invocation runs inside the loop.
-  if (target.kind !== 'video') {
+  if (target.kind === 'playlist' || target.kind === 'channel') {
     return batch({
       target,
       options,
@@ -149,8 +152,17 @@ export async function main(argv, io = {}, deps = {}) {
     // The temporary directory, the retry ladder and the write all live inside
     // fetchTranscript: the subtitle track is gone by the time this returns, on
     // this path and on the throwing one alike.
+    //
+    // An X post has no video id and its identity is only known after the fetch
+    // (ADR-0004); it is fetched by the url it was typed as, and the video
+    // number it chose.
     const { transcript, file } = await fetchOne(
-      { url: target.url, videoId: target.videoId, lang: options.lang },
+      {
+        url: target.url,
+        videoId: target.videoId,
+        ...(target.kind === 'post' && { post: { videoNumber: target.videoNumber } }),
+        lang: options.lang,
+      },
       { onRetry: (retry) => err(describeRetry({ url: target.url, ...retry })) },
     );
 

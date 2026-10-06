@@ -4,12 +4,13 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 
 import { fetchTranscript } from '../src/fetch.js';
-import { NO_SUBTITLES, RATE_LIMITED, RETRY_DELAYS_MS } from '../src/fetch-outcome.js';
+import { NO_SUBTITLES, NO_VIDEO, RATE_LIMITED, RETRY_DELAYS_MS } from '../src/fetch-outcome.js';
 // Production's own: there is no second temporary-directory rule to keep in
 // step with it. Renamed at the import because what it holds here is the
 // throwaway transcripts directory, so no test writes into the repository's.
 import { withTempDir as withTranscriptsDir } from '../src/temp-dir.js';
-import { FetchError } from '../src/ytdlp.js';
+import { FetchError, parseMetadata } from '../src/ytdlp.js';
+import { readXPrintLine, readXTrack, X_TRACK_ID } from './fixtures.js';
 import { recordedFailure } from './recorded-outcomes.js';
 
 const URL = 'https://www.youtube.com/watch?v=o3CX_Y59_74';
@@ -165,5 +166,106 @@ test('the language defaults to en and reaches the download unchanged', async () 
       recorded.calls.map((call) => call.lang),
       ['en', 'el'],
     );
+  });
+});
+
+// X posts: the same fetch, with the identity taken from what yt-dlp reported.
+
+/** Replays a recorded post: the track, and the metadata yt-dlp printed for it. */
+function recordedPostFetch(name) {
+  const calls = [];
+  return {
+    calls,
+    async fetchTrack({ url, lang, destDir, site }) {
+      calls.push({ url, lang, site: site.name });
+      const trackPath = path.join(destDir, `${X_TRACK_ID}.en.vtt`);
+      await fs.writeFile(trackPath, readXTrack(), 'utf8');
+      return { metadata: parseMetadata(readXPrintLine(name)), trackPath };
+    },
+  };
+}
+
+test('a post is fetched as a post, with a canonical handle-free url', async () => {
+  await withTranscriptsDir(async (dir) => {
+    const recorded = recordedPostFetch('poteto-2102050467505430555');
+    const spellings = ['https://t.co/NgrGz7tmPM', 'https://x.com/i/status/2102050467505430555'];
+
+    for (const url of spellings) {
+      await fetchTranscript(
+        { url, videoId: null, post: { videoNumber: 1 }, lang: 'en' },
+        { fetchTrack: recorded.fetchTrack, dir },
+      );
+    }
+
+    assert.deepEqual(
+      recorded.calls.map((call) => [call.url, call.site]),
+      spellings.map((url) => [url, 'x']),
+    );
+    // Two spellings, one post: the second overwrote the first.
+    const files = await fs.readdir(dir);
+    assert.equal(files.length, 1);
+    assert.match(
+      await fs.readFile(path.join(dir, files[0]), 'utf8'),
+      /^---\ntitle: "here's how i shipped.*\nurl: https:\/\/x\.com\/i\/status\/2102050467505430555\n/,
+    );
+  });
+});
+
+test('two different posts sharing a title are told apart by post id', async () => {
+  await withTranscriptsDir(async (dir) => {
+    const recorded = recordedPostFetch('poteto-2102050467505430555');
+    const fetchPost = (displayId, videoNumber) =>
+      fetchTranscript(
+        { url: 'https://x.com/i/status/1', videoId: null, post: { videoNumber }, lang: 'en' },
+        {
+          dir,
+          fetchTrack: async (request) => {
+            const fetched = await recorded.fetchTrack(request);
+            return {
+              ...fetched,
+              metadata: {
+                ...fetched.metadata,
+                displayId,
+                title: `${fetched.metadata.title} #${videoNumber}`,
+              },
+            };
+          },
+        },
+      );
+
+    await fetchPost('2102050467505430555', 1);
+    await fetchPost('2102050467505430999', 1);
+    await fetchPost('2102050467505430555', 2);
+
+    const files = await fs.readdir(dir);
+    assert.equal(files.length, 3);
+    assert.ok(files.some((file) => file.endsWith('-2102050467505430999.md')));
+    assert.ok(files.some((file) => file.endsWith('-2102050467505430555-2.md')));
+  });
+});
+
+test('a post with no video fails at once: no retry, nothing written', async () => {
+  await withTranscriptsDir(async (dir) => {
+    const url = 'https://x.com/jack/status/20';
+    let attempts = 0;
+
+    await assert.rejects(
+      () =>
+        fetchTranscript(
+          { url, videoId: null, post: { videoNumber: 1 }, lang: 'en' },
+          {
+            dir,
+            sleep: async () => assert.fail('retried a post with no video'),
+            fetchTrack: async () => {
+              attempts += 1;
+              throw recordedFailure({ failure: NO_VIDEO, url });
+            },
+          },
+        ),
+      (error) => error.failure === NO_VIDEO && error.retryable === false && error.message.includes(url),
+    );
+
+    assert.equal(attempts, 1);
+    assert.deepEqual(await fs.readdir(dir), []);
   });
 });

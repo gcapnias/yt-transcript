@@ -123,3 +123,116 @@ test('input naming nothing fetchable raises TargetParseError', () => {
     );
   }
 });
+
+// X posts. The canonical url is not knowable here: it is settled after the
+// fetch, from what yt-dlp reports (ADR-0004). So the target carries the url to
+// *fetch* and the number of the video wanted, and nothing else.
+
+const POST = '2102050467505430555';
+
+test('every x post input form is a post, fetched as video 1', () => {
+  const forms = [
+    `https://x.com/poteto/status/${POST}`,
+    `https://twitter.com/poteto/status/${POST}`,
+    `https://www.x.com/poteto/status/${POST}`,
+    `https://mobile.x.com/POTETO/status/${POST}?s=20`,
+    `https://m.twitter.com/poteto/status/${POST}#top`,
+    `x.com/poteto/status/${POST}`,
+    `https://x.com/poteto/status/${POST}/video/1`,
+    `https://x.com/poteto/status/${POST}/photo/1`,
+  ];
+
+  for (const form of forms) {
+    const target = parseTarget(form);
+    assert.equal(target.kind, 'post', `not a post: ${form}`);
+    assert.equal(target.videoNumber, 1, `not video 1: ${form}`);
+    assert.equal(target.videoId, null, `a post has no video id: ${form}`);
+  }
+});
+
+test('a post url without a handle is still a post, fetched as typed', () => {
+  for (const form of [`https://x.com/i/status/${POST}`, `https://x.com/i/web/status/${POST}`]) {
+    const target = parseTarget(form);
+    assert.equal(target.kind, 'post');
+    assert.equal(target.url, form);
+  }
+});
+
+test('a t.co short link is a post, fetched as video 1', () => {
+  assert.deepEqual(parseTarget('https://t.co/NgrGz7tmPM'), {
+    kind: 'post',
+    url: 'https://t.co/NgrGz7tmPM',
+    videoId: null,
+    videoNumber: 1,
+  });
+});
+
+test('/video/N and /photo/N selectors stay on the fetch url', () => {
+  for (const kind of ['video', 'photo']) {
+    assert.deepEqual(parseTarget(`https://twitter.com/CTVJLaidlaw/status/160/${kind}/2`), {
+      kind: 'post',
+      url: `https://twitter.com/CTVJLaidlaw/status/160/${kind}/2`,
+      videoId: null,
+      videoNumber: 2,
+    });
+  }
+});
+
+test('explicit video 1 and photo 1 selectors stay distinct from a bare post url', () => {
+  const bare = parseTarget(`https://x.com/poteto/status/${POST}`);
+  assert.equal(bare.url, `https://x.com/poteto/status/${POST}`);
+
+  for (const kind of ['video', 'photo']) {
+    const explicit = parseTarget(`https://x.com/poteto/status/${POST}/${kind}/1`);
+    assert.equal(explicit.videoNumber, 1);
+    assert.equal(explicit.url, `https://x.com/poteto/status/${POST}/${kind}/1`);
+  }
+});
+
+test('a query string or fragment never reaches the fetched url', () => {
+  assert.equal(
+    parseTarget(`https://mobile.x.com/POTETO/status/${POST}?s=20#top`).url,
+    `https://x.com/POTETO/status/${POST}`,
+  );
+});
+
+test('parsing the fetched url of a post again yields the same target', () => {
+  for (const input of [`mobile.x.com/POTETO/status/${POST}?s=20`, `x.com/a/status/${POST}/photo/3`]) {
+    const once = parseTarget(input);
+    assert.deepEqual(parseTarget(once.url), once, `not idempotent: ${input}`);
+  }
+});
+
+test('x broadcasts and spaces are refused with their own reason', () => {
+  for (const form of [
+    'https://x.com/i/broadcasts/1pKdRDvrQqQJW',
+    'https://x.com/i/events/1234567890',
+    'https://x.com/i/spaces/1DXGydznBYWKM',
+  ]) {
+    assert.throws(
+      () => parseTarget(form),
+      (error) => error instanceof TargetParseError && /no subtitles/.test(error.message),
+      `not refused for its own reason: ${form}`,
+    );
+  }
+});
+
+test('x urls with no extractor stay unsupported, and the error mentions X', () => {
+  const rejected = [
+    'https://x.com/poteto',
+    'https://x.com/poteto/likes',
+    'https://x.com/search?q=yt-dlp',
+    'https://x.com/i/lists/123',
+    'https://x.com/poteto/status/abc',
+    'https://x.com/poteto/status/160/video/0',
+    POST,
+  ];
+
+  for (const input of rejected) {
+    assert.throws(
+      () => parseTarget(input),
+      (error) => error instanceof TargetParseError && /X post/.test(error.message),
+      `should have been rejected as unsupported: ${input}`,
+    );
+  }
+});

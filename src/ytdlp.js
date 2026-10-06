@@ -3,7 +3,8 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 
 import { sanitizeChildEnv } from './child-env.js';
-import { classifyFetch, describeFailure } from './fetch-outcome.js';
+import { describeFailure } from './fetch-outcome.js';
+import { YOUTUBE } from './site.js';
 import { parseTarget, TargetParseError } from './target.js';
 
 /** The binary name looked up on PATH. Overridable so tests need not uninstall it. */
@@ -29,7 +30,8 @@ export class YtDlpMissingError extends Error {
 /**
  * A fetch that produced no usable subtitle track.
  *
- * `failure` is the classification (`no-subtitles` or `rate-limited`) and
+ * `failure` is the classification (`no-subtitles`, `rate-limited`, or one of
+ * the X post kinds in `fetch-outcome.js`) and
  * `retryable` is what the retry ladder reads; a batch reports on `failure`.
  */
 export class FetchError extends Error {
@@ -96,7 +98,12 @@ export async function preflight({ binary = YT_DLP } = {}) {
  * `yt-dlp` reported them; reformatting is the transcript's business.
  *
  * @param {string} stdout
- * @returns {{ title: string, channel: string, duration: string, uploadDate: string }|null}
+ * The last six fields are printed for an X post only, and are empty strings
+ * for a YouTube video.
+ *
+ * @returns {{ title: string, channel: string, duration: string, uploadDate: string,
+ *             description: string, uploader: string, uploaderId: string,
+ *             displayId: string, extractorKey: string, webpageUrl: string }|null}
  */
 export function parseMetadata(stdout) {
   const line = stdout
@@ -117,26 +124,36 @@ export function parseMetadata(stdout) {
     channel: parsed.channel ?? '',
     duration: parsed.duration_string ?? '',
     uploadDate: parsed.upload_date ?? '',
+    // Printed for an X post only; empty on YouTube, which never asks for them.
+    description: parsed.description ?? '',
+    uploader: parsed.uploader ?? '',
+    uploaderId: parsed.uploader_id ?? '',
+    displayId: parsed.display_id ?? '',
+    extractorKey: parsed.extractor_key ?? '',
+    webpageUrl: parsed.webpage_url ?? '',
   };
 }
 
 /**
  * Builds the one settled per-video invocation. Every flag is load-bearing; see
  * the spec's Fetching section before changing any of them.
+ *
+ * The `site` adds its own flags and names what is printed (see `site.js`).
  */
-export function fetchArgs({ url, lang, destDir }) {
+export function fetchArgs({ url, lang, destDir, site = YOUTUBE }) {
   return [
     '--js-runtimes',
     'node',
     '--skip-download',
     '--no-playlist',
+    ...site.extraArgs,
     '--write-sub',
     '--write-auto-sub',
     '--sub-langs',
     lang,
     '--no-simulate',
     '--print',
-    '%(.{title,channel,duration_string,upload_date})j',
+    `%(.{${site.printFields}})j`,
     '-P',
     destDir,
     '-o',
@@ -152,16 +169,25 @@ export function fetchArgs({ url, lang, destDir }) {
  *
  * @returns {Promise<{ metadata: object, trackPath: string }>}
  */
-export async function fetchSubtitleTrack({ url, lang = 'en', destDir, binary = YT_DLP }) {
-  const { exitCode, stdout } = await run(binary, fetchArgs({ url, lang, destDir }));
+export async function fetchSubtitleTrack({ url, lang = 'en', destDir, site = YOUTUBE, binary = YT_DLP }) {
+  const { exitCode, stdout, stderr } = await run(binary, fetchArgs({ url, lang, destDir, site }));
 
   // One invocation, one verdict. The retry ladder lives a level up, in
   // `fetch.js`, so every retry is a fresh invocation into a fresh directory.
   const trackPath = await findSubtitleTrack(destDir);
-  const failure = fetchFailure({ exitCode, hasTrack: trackPath !== null, url, lang });
+  const metadata = parseMetadata(stdout);
+  const failure = fetchFailure({
+    exitCode,
+    hasTrack: trackPath !== null,
+    url,
+    lang,
+    site,
+    stderr,
+    metadata,
+  });
   if (failure) throw failure;
 
-  return { metadata: parseMetadata(stdout), trackPath };
+  return { metadata, trackPath };
 }
 
 /**
@@ -169,11 +195,16 @@ export async function fetchSubtitleTrack({ url, lang = 'en', destDir, binary = Y
  * the fetch succeeded. Separated from the spawn so the mapping from an exit
  * code to a retryable failure is testable without a live invocation.
  *
- * @param {{ exitCode: number, hasTrack: boolean, url: string, lang: string }} outcome
+ * The whole outcome is handed to the `site`, which decides what of it to read:
+ * an X post reads stderr and the reported extractor, a YouTube video neither.
+ *
+ * @param {{ exitCode: number, hasTrack: boolean, url: string, lang: string,
+ *           site?: import('./site.js').Site, stderr?: string,
+ *           metadata?: object|null }} outcome
  * @returns {FetchError|null}
  */
-export function fetchFailure({ exitCode, hasTrack, url, lang }) {
-  const outcome = classifyFetch({ exitCode, hasTrack });
+export function fetchFailure({ exitCode, hasTrack, url, lang, site = YOUTUBE, stderr, metadata }) {
+  const outcome = site.classify({ exitCode, hasTrack, stderr, metadata });
   if (outcome.ok) return null;
 
   return new FetchError(describeFailure({ failure: outcome.failure, url, lang }), {
