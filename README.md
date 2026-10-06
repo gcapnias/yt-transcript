@@ -53,19 +53,22 @@ fragment is ignored.
 
 - **One video per fetch.** A post with several videos, or one that quotes another
   post's video, fetches its own first video. A trailing `/video/N` (or `/photo/N`)
-  fetches the post's own Nth video instead; `N` counts only the post's own videos,
-  so a quoted video is reachable only through the quoted post's URL. There is no
-  fetch-every-video mode.
-- **One transcript per video.** The transcript's `url` is built from the handle and
-  post id `yt-dlp` reports, plus `/video/N` from the second video on, so every
+  fetches the post's own Nth media item instead. `N` counts the post's own photos as
+  well as its videos, so selecting a photo fails, and a quoted video is reachable only
+  through the quoted post's URL. There is no fetch-every-video mode.
+- **One transcript per video.** The transcript's `url` is
+  `https://x.com/i/status/<post id>`, built from the post id `yt-dlp` reports, plus
+  `/video/N` from the post's second video on, where `N` counts videos only. So every
   spelling of a post (`twitter.com`, `/i/status`, `t.co`, `/video/1`) overwrites the
-  same file. `title` is the post text with links removed, `channel` is
+  same file. A transcript written by v0.2.0 has the handle in its `url`, so fetching
+  that post again writes a second file. `title` is the post text with links removed, `channel` is
   `Display Name (@handle)`, and `subtitles` is always `auto`: X's tracks are speech
   recognition. When the post text is too short or not Latin to make a slug, the file
   is named `<handle>-<post id>.md`, lowercased.
 - **Refused or failed with a message, never retried:** X Broadcasts and Spaces
   (`/i/broadcasts/…`, `/i/events/…`, `/i/spaces/…`), which carry no subtitles; a post
-  with no video; a `/video/N` the post does not have; a video with no subtitle track
+  with no video; a `/video/N` the post does not have, or a `/photo/N` that selects a
+  photo; a video with no subtitle track
   (common on short clips); a post that requires logging in, which this tool does not
   do; and a link-only post that leads to another site. Profiles, threads, likes,
   lists, search and bare post ids are not supported.
