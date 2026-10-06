@@ -64,7 +64,7 @@ export function postIdentity(metadata) {
 
   return {
     title: text || `@${uploaderId} post ${displayId}`,
-    url: `https://x.com/${uploaderId}/status/${displayId}${videoSuffix(videoNumber, '/video/')}`,
+    url: `https://x.com/i/status/${displayId}${videoSuffix(videoNumber, '/video/')}`,
     channel: uploader ? `${uploader} (@${uploaderId})` : `@${uploaderId}`,
     // What the filename collision rule suffixes, where YouTube uses the video
     // id: the post, never the video's own id (CONTEXT.md, Post).

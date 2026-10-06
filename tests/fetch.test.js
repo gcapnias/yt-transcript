@@ -185,7 +185,7 @@ function recordedPostFetch(name) {
   };
 }
 
-test('a post is fetched as a post, and filed under the url yt-dlp reported', async () => {
+test('a post is fetched as a post, with a canonical handle-free url', async () => {
   await withTranscriptsDir(async (dir) => {
     const recorded = recordedPostFetch('poteto-2102050467505430555');
     const spellings = ['https://t.co/NgrGz7tmPM', 'https://x.com/i/status/2102050467505430555'];
@@ -206,7 +206,7 @@ test('a post is fetched as a post, and filed under the url yt-dlp reported', asy
     assert.equal(files.length, 1);
     assert.match(
       await fs.readFile(path.join(dir, files[0]), 'utf8'),
-      /^---\ntitle: "here's how i shipped.*\nurl: https:\/\/x\.com\/poteto\/status\/2102050467505430555\n/,
+      /^---\ntitle: "here's how i shipped.*\nurl: https:\/\/x\.com\/i\/status\/2102050467505430555\n/,
     );
   });
 });

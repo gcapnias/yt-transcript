@@ -54,7 +54,7 @@ test('a post transcript has the seven keys, built from what yt-dlp reported', ()
     'fetched',
     'subtitles',
   ]);
-  assert.equal(fields.url, 'https://x.com/poteto/status/2102050467505430555');
+  assert.equal(fields.url, 'https://x.com/i/status/2102050467505430555');
   assert.equal(fields.channel, '"lauren (@poteto)"');
   assert.equal(fields.duration, '"38:01"');
   assert.equal(fields.upload_date, '2026-09-21');
@@ -92,14 +92,14 @@ test('video 1 is never numbered, in a url or a filename, and a later video alway
   assert.equal(videoSuffix(12, '-'), '-12');
 });
 
-test('the url uses the handle yt-dlp reports, not the one the input spelled', () => {
+test('the url is handle-free and the channel uses the handle yt-dlp reports', () => {
   // twitter.com/CTVJLaidlaw/status/1600649710662213632 reports JocelynVLaidlaw.
   const first = render(recorded('ctv-1600649710662213632-video1'));
-  assert.equal(first.url, 'https://x.com/JocelynVLaidlaw/status/1600649710662213632');
+  assert.equal(first.url, 'https://x.com/i/status/1600649710662213632');
   assert.equal(frontmatter(first).channel, '"Jocelyn Laidlaw (@JocelynVLaidlaw)"');
 
   const second = render(recorded('ctv-1600649710662213632-video2'));
-  assert.equal(second.url, 'https://x.com/JocelynVLaidlaw/status/1600649710662213632');
+  assert.equal(second.url, 'https://x.com/i/status/1600649710662213632');
   assert.equal(frontmatter(second).duration, '"1:42"');
 });
 
@@ -111,7 +111,7 @@ test('the fetched entry rank determines identity, not the selector in webpage_ur
   };
   const second = render(entry);
 
-  assert.equal(second.url, 'https://x.com/JocelynVLaidlaw/status/1600649710662213632/video/2');
+  assert.equal(second.url, 'https://x.com/i/status/1600649710662213632/video/2');
   assert.equal(second.collisionId, '1600649710662213632-2');
 
   const first = {
@@ -119,7 +119,7 @@ test('the fetched entry rank determines identity, not the selector in webpage_ur
     title: 'Jocelyn Laidlaw - title #1',
     webpageUrl: 'https://x.com/CTVJLaidlaw/status/1600649710662213632/video/2',
   };
-  assert.equal(render(first).url, 'https://x.com/JocelynVLaidlaw/status/1600649710662213632');
+  assert.equal(render(first).url, 'https://x.com/i/status/1600649710662213632');
 });
 
 test('an entry with no rank suffix is the first video, regardless of the requested number', () => {
@@ -128,8 +128,8 @@ test('an entry with no rank suffix is the first video, regardless of the request
     title: 'Jocelyn Laidlaw - a single video',
     webpageUrl: 'https://x.com/poteto/status/1600649710662213632',
   };
-  assert.equal(render(bare).url, 'https://x.com/JocelynVLaidlaw/status/1600649710662213632');
-  assert.equal(render({ ...bare, webpageUrl: '' }).url, 'https://x.com/JocelynVLaidlaw/status/1600649710662213632');
+  assert.equal(render(bare).url, 'https://x.com/i/status/1600649710662213632');
+  assert.equal(render({ ...bare, webpageUrl: '' }).url, 'https://x.com/i/status/1600649710662213632');
 });
 
 test('the post id identifies the transcript, never the media id', () => {
@@ -204,7 +204,7 @@ test('a post with no text is titled by its handle and id, and filed under them',
 test('a quote post is the quoting post, from its own first video', () => {
   const transcript = render(recorded('maiyang-2102344659276099794'));
 
-  assert.equal(transcript.url, 'https://x.com/MaiYangAI/status/2102344659276099794');
+  assert.equal(transcript.url, 'https://x.com/i/status/2102344659276099794');
   assert.equal(frontmatter(transcript).channel, '"Mai Yang (@MaiYangAI)"');
   assert.equal(frontmatter(transcript).duration, '"25:23"');
 });
