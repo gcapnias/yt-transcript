@@ -24,3 +24,8 @@ has typical recognition errors: on the first post examined, "Potato" for the han
   decision is revisited. Transcripts already on disk cannot be relabelled after the fact.
 - On an X transcript, `subtitles: auto` contradicts what `yt-dlp -J` reports. That reads as a bug
   until you know this was deliberate, which is why this record exists.
+- The label records where the track came from. It does not decide how the track is cleaned.
+  Cleaning still follows what the track looks like, which for X is manual. The auto cleaning
+  rules are built for YouTube's rolling captions, and they lose speech on X: cleaning the
+  recorded X fixture as auto drops 1 of its 261 words. A fixture test checks that cleaning an X
+  track loses no word.

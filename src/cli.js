@@ -13,7 +13,8 @@ const USAGE = `Usage: yt-transcript <url|id> [--lang <code>] [--playlist] [--for
                 link, a playlist URL, a channel URL, or a bare @handle; or
                 an X post URL (x.com or twitter.com /<handle>/status/<id>,
                 /i/status/<id>, or a t.co link), which fetches one video:
-                its first, or the Nth for a trailing /video/N
+                its first, or the media item a trailing /video/N or
+                /photo/N selects
   --lang <code> subtitle language, matched exactly (default: en)
   --playlist    read a watch?v=...&list=... URL as the playlist, not the video
   --force       in a batch, ignore the skip set and re-fetch everything. A
