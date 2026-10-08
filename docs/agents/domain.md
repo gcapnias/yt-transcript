@@ -24,7 +24,7 @@ If any of these files don't exist, **proceed silently**. Don't flag their absenc
 └── ...
 ```
 
-If this repo ever grows into a monorepo, switch to the multi-context layout: a root `CONTEXT-MAP.md` pointing at one `GLOSSARY.md` per context, with context-scoped ADRs under `src/<context>/docs/adr/`.
+If this repo ever grows into a monorepo, switch to the multi-context layout: a root `GLOSSARY-MAP.md` pointing at one `GLOSSARY.md` per context, with context-scoped ADRs under `src/<context>/docs/adr/` and system-wide ADRs staying in the root `docs/adr/`.
 
 ## Use the glossary's vocabulary
 
