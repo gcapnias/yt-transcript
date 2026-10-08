@@ -6,8 +6,6 @@
 <https://www.youtube.com/watch?v=QsU0f-547rQ>
 <https://www.youtube.com/watch?v=3fdb_giOrLo>
 <https://www.youtube.com/watch?v=QDJ0CW5s7gA>
-<https://www.youtube.com/watch?v=CwL_XeedKw4>
-<https://www.youtube.com/watch?v=NBZmxhcz5lo>
 
 ## GitHub Repositories
 
@@ -19,7 +17,7 @@
 
 ---
 
-## SKILLS FEATURED IN THIS VIDEO
+## Skills Featured In This Video
 
 - #9 Caveman - <https://github.com/JuliusBrussee/caveman>
 - #8 Poteto Mode (pstack) - <https://github.com/cursor/plugins/tree/main/pstack>
@@ -33,7 +31,7 @@
   - Taste - <https://github.com/Leonxlnx/taste-skill>
 - #1 Autoresearch (Andrej Karpathy) - <https://github.com/karpathy/autoresearch>
 
-## HONOURABLE MENTIONS
+## Honourable Mentions
 
 - Unlazy - <https://github.com/Leonxlnx/unlazy>
 - AI Job Search - <https://github.com/MadsLorentzen/ai-job-search>
