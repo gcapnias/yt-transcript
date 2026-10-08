@@ -1,6 +1,6 @@
 {
   "name": "yt-transcript",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Turns YouTube videos into Markdown transcripts that read as prose.",
   "type": "module",
   "private": true,
