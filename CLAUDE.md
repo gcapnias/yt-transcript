@@ -12,7 +12,7 @@ The five canonical triage roles, used verbatim as GitHub labels. See `docs/agent
 
 ### Domain docs
 
-Single-context: `CONTEXT.md` + `docs/adr/` at the repo root. See `docs/agents/domain.md`.
+Single-context: `GLOSSARY.md` + `docs/adr/` at the repo root. See `docs/agents/domain.md`.
 
 ### Git Commits
 
