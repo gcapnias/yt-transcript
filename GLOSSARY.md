@@ -41,8 +41,12 @@ A run of consecutive cues merged into prose, broken at the first sentence end af
 _Avoid_: Block, chunk, section
 
 **Subtitle track**:
-The source text for a transcript, either **manual** (authored by a human) or **auto** (produced by a site's machinery — speech recognition, or YouTube's machine translation of another language's recognition). Manual is preferred; which one was used is always recorded. There are only these two kinds: a translated track is an auto track, every X track is an auto track, and a transcript does not say what language was spoken.
+The source text for a transcript, either **manual** (authored by a human) or **auto** (produced by a site's machinery — speech recognition, or YouTube's machine translation of another language's recognition). Manual is preferred; which one was used is always recorded. There are only these two kinds: a translated track is an auto track, every X track is an auto track, and a transcript does not say what language was spoken. When several tracks are acceptable, a manual one is preferred over an auto one, then the plain language over a regional variant.
 _Avoid_: Captions, CC, transcript (the track is the input, the transcript is the output)
+
+**Regional variant**:
+A subtitle track whose language carries a region, such as `en-US` or `en-GB`. English, the default language, is accepted as plain `en` or as either of those two regional variants; any other language is accepted only exactly as asked for. A transcript does not say which of them it came from.
+_Avoid_: Locale, dialect, sub-language
 
 **Catalog**:
 A Markdown index of every transcript, derived wholly from transcript frontmatter so it cannot drift from what is on disk.
