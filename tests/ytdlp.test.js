@@ -23,8 +23,9 @@ import {
   parseMetadata,
 } from '../src/ytdlp.js';
 import { xPost } from '../src/site.js';
+import { classifyTrack } from '../src/subtitle-track.js';
 import { withTempDir } from '../src/temp-dir.js';
-import { readXListing, readXPrintLine } from './fixtures.js';
+import { readFixture, readXListing, readXPrintLine } from './fixtures.js';
 
 const URL = 'https://www.youtube.com/watch?v=o3CX_Y59_74';
 
@@ -39,6 +40,67 @@ test('a zero-byte subtitle file is no subtitle file', async () => {
     await fs.writeFile(path.join(dir, 'o3CX_Y59_74.el.vtt'), 'WEBVTT\n', 'utf8');
     assert.equal(await findSubtitleTrack(dir), path.join(dir, 'o3CX_Y59_74.el.vtt'));
   });
+});
+
+// The default English can land up to three tracks (ADR-0006); the one chosen
+// is ranked, never whichever the directory listing happens to return first.
+
+const MANUAL_TRACK = 'WEBVTT\n\n00:00:00.000 --> 00:00:02.000\nHello and welcome.\n';
+const AUTO_TRACK =
+  'WEBVTT\n\n00:00:00.000 --> 00:00:02.000 align:start position:0%\nHello<00:00:00.500><c> and</c>\n';
+
+/** Writes `tracks` into a fresh directory in the order given, and ranks them. */
+async function chosenTrack(tracks) {
+  return withTempDir(async (dir) => {
+    for (const [name, text] of tracks) await fs.writeFile(path.join(dir, name), text, 'utf8');
+    const chosen = await findSubtitleTrack(dir);
+    return chosen && path.basename(chosen);
+  });
+}
+
+test('a manual en-US track beats an auto en one', async () => {
+  // The recorded case: a translated auto `en` beside the only manual English.
+  const tracks = [
+    ['QIHnmqYU614.en-US.vtt', readFixture('manual', 'QIHnmqYU614')],
+    ['QIHnmqYU614.en.vtt', readFixture('auto', 'o3CX_Y59_74')],
+  ];
+
+  assert.equal(await chosenTrack(tracks), 'QIHnmqYU614.en-US.vtt');
+  assert.equal(await chosenTrack(tracks.toReversed()), 'QIHnmqYU614.en-US.vtt');
+});
+
+test('between tracks of one kind, en beats en-US beats en-GB, in any order on disk', async () => {
+  for (const text of [MANUAL_TRACK, AUTO_TRACK]) {
+    const all = ['X.en-GB.vtt', 'X.en-US.vtt', 'X.en.vtt'].map((name) => [name, text]);
+
+    // `X.en-US.vtt` sorts before `X.en.vtt`, so a first-found rule picks it.
+    assert.equal(await chosenTrack(all), 'X.en.vtt');
+    assert.equal(await chosenTrack(all.toReversed()), 'X.en.vtt');
+    assert.equal(await chosenTrack([all[0], all[1]]), 'X.en-US.vtt');
+    assert.equal(await chosenTrack([all[1], all[0]]), 'X.en-US.vtt');
+  }
+});
+
+test('kind outranks language: every manual variant beats every auto one', async () => {
+  assert.equal(
+    await chosenTrack([
+      ['X.en.vtt', AUTO_TRACK],
+      ['X.en-US.vtt', AUTO_TRACK],
+      ['X.en-GB.vtt', MANUAL_TRACK],
+    ]),
+    'X.en-GB.vtt',
+  );
+});
+
+test('a language asked for exactly is still found', async () => {
+  for (const lang of ['de', 'en-US', 'pt-BR']) {
+    assert.equal(await chosenTrack([[`X.${lang}.vtt`, MANUAL_TRACK]]), `X.${lang}.vtt`);
+  }
+});
+
+test('the recorded en-US track reads as manual', () => {
+  // What makes it `subtitles: manual` once chosen.
+  assert.equal(classifyTrack(readFixture('manual', 'QIHnmqYU614')), 'manual');
 });
 
 test('a recorded process outcome becomes the failure it means', () => {
@@ -61,18 +123,42 @@ test('a recorded process outcome becomes the failure it means', () => {
   assert.match(rateLimited.message, /may succeed/);
 });
 
-test('--lang reaches yt-dlp verbatim, and is matched exactly', () => {
+test('a youtube fetch that exits 0 with a refused subtitle download and no track is retried', () => {
+  const outcome = { url: URL, lang: 'en', exitCode: 0, hasTrack: false };
+  const stderr = "WARNING: Unable to download video subtitles for 'en': HTTP Error 429: Too Many Requests\n";
+
+  const rateLimited = fetchFailure({ ...outcome, stderr });
+  assert.equal(rateLimited.failure, RATE_LIMITED);
+  assert.equal(rateLimited.retryable, true);
+  assert.match(rateLimited.message, /may succeed/);
+
+  assert.equal(fetchFailure({ ...outcome, stderr: '' }).failure, NO_SUBTITLES);
+  assert.equal(fetchFailure({ ...outcome, hasTrack: true, stderr }), null);
+});
+
+test('the default English asks for en, en-US and en-GB, and outlives one of them failing', () => {
   const args = fetchArgs({ url: URL, lang: 'en', destDir: '/tmp/run' });
 
-  assert.equal(args[args.indexOf('--sub-langs') + 1], 'en');
-  // `en` must not match `en-US`, `en-orig` is never requested, and exactness
-  // is also what keeps `live_chat` out of a live stream's "manual" track.
+  // `en` is widened to its two regional variants (ADR-0006): a video whose
+  // only manual English is `en-US` is no longer left to a translated `en`.
+  assert.equal(args[args.indexOf('--sub-langs') + 1], 'en,en-US,en-GB');
+  assert.ok(args.includes('--ignore-errors'), 'a 429 on one variant would abort the rest');
+  // Still exact codes: `en-orig` is never requested, and nothing broadens to
+  // `all`, which would let `live_chat` in as a live stream's "manual" track.
   assert.ok(!args.includes('all'), 'broadened to --sub-langs all');
-  assert.ok(!args.some((arg) => arg.endsWith('-orig')), 'requested an -orig track');
-  assert.deepEqual(
-    fetchArgs({ url: URL, lang: 'el', destDir: '/tmp/run' }).filter((arg) => arg === 'el'),
-    ['el'],
+  assert.ok(
+    !args.some((arg) => arg.split(',').some((code) => code.endsWith('-orig'))),
+    'requested an -orig track',
   );
+});
+
+test('any other --lang reaches yt-dlp verbatim, and is matched exactly', () => {
+  for (const lang of ['en-US', 'en-GB', 'de', 'el']) {
+    const args = fetchArgs({ url: URL, lang, destDir: '/tmp/run' });
+
+    assert.equal(args[args.indexOf('--sub-langs') + 1], lang);
+    assert.ok(!args.includes('--ignore-errors'), `--lang ${lang} was widened`);
+  }
 });
 
 // Expansion: the only invocation that reads a playlist. Both halves below are
@@ -134,7 +220,7 @@ test('expansion failure names the playlist and what yt-dlp said', () => {
 
 const POST_URL = 'https://x.com/poteto/status/2102050467505430555';
 
-test('the youtube invocation is exactly what it was', () => {
+test('the youtube invocation is exactly what it was, with English widened', () => {
   assert.deepEqual(fetchArgs({ url: URL, lang: 'en', destDir: '/tmp/run' }), [
     '--js-runtimes',
     'node',
@@ -143,7 +229,8 @@ test('the youtube invocation is exactly what it was', () => {
     '--write-sub',
     '--write-auto-sub',
     '--sub-langs',
-    'en',
+    'en,en-US,en-GB',
+    '--ignore-errors',
     '--no-simulate',
     '--print',
     '%(.{title,channel,duration_string,upload_date})j',
@@ -163,6 +250,9 @@ test('a post is fetched as playlist entry 1, printing what ranks the video fetch
   // quote post, so the first is asked for by number.
   assert.equal(args[args.indexOf('--playlist-items') + 1], '1');
   assert.equal(args.at(-1), POST_URL);
+  // English is asked for as it is of a YouTube video (ADR-0006).
+  assert.equal(args[args.indexOf('--sub-langs') + 1], 'en,en-US,en-GB');
+  assert.ok(args.includes('--ignore-errors'));
   // The fetch itself leaves no file but the track.
   assert.ok(!args.includes('--write-info-json'));
   assert.ok(!args.includes('--dump-json') && !args.includes('-J'));

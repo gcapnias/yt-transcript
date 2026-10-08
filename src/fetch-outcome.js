@@ -6,10 +6,11 @@
  * testable without a live, rate-limited third party. `ytdlp.js` applies them
  * to a real invocation.
  *
- * A YouTube video's outcome is an exit code and whether a track landed, and
- * nothing more (`classifyFetch`). An X post's outcome adds the stderr text and
- * the reported extractor (`classifyPostFetch`), because its permanent failures
- * exit like a 429 and only their words tell them apart.
+ * A YouTube video's outcome is an exit code and whether a track landed, plus
+ * one stderr warning when it exits 0 with no track (`classifyFetch`). An X
+ * post's outcome adds the rest of the stderr text and the reported extractor
+ * (`classifyPostFetch`), because its permanent failures exit like a 429 and
+ * only their words tell them apart.
  */
 
 /** The requested language has no subtitle track. Permanent. */
@@ -48,15 +49,24 @@ export const UNLISTED_VIDEO = 'unlisted-video';
 export const RETRY_DELAYS_MS = [5000, 15000, 45000];
 
 /**
+ * The warning a refused subtitle download leaves under `--ignore-errors`,
+ * which the default English passes (ADR-0006). Recorded from `yt-dlp`
+ * 2026.08.19: `Unable to download video subtitles for 'en': HTTP Error 429`.
+ */
+const SUBTITLE_RATE_LIMIT = /Unable to download video subtitles for '[^']*': HTTP Error 429/;
+
+/**
  * Classifies one fetch from its exit code and whether a subtitle track landed.
  *
  * **Success is exit 0 *and* a non-empty subtitle file.** Both halves: a video
  * with no captions in the requested language exits 0, says `There are no
- * subtitles for the requested languages`, and writes nothing.
+ * subtitles for the requested languages`, and writes nothing. Any track is a
+ * success, whatever alternatives were refused on the way.
  *
- * **No stderr is parsed, and none is accepted here.** Measured: no captions
- * exits 0, an HTTP 429 exits 1, so the exit code alone separates the permanent
- * failure from the retryable one.
+ * **Stderr is read in one case only: exit 0 with no track.** Measured: no
+ * captions exits 0, and an HTTP 429 exits 1, unless `--ignore-errors` made it
+ * a warning (ADR-0006), when it exits 0 too. That warning is what tells a
+ * refused download from a video with no captions; nothing else is read.
  *
  * A consequence worth stating plainly: every non-zero exit is treated as
  * rate-limited and retried, including a private or deleted video. The spec
@@ -65,12 +75,14 @@ export const RETRY_DELAYS_MS = [5000, 15000, 45000];
  * failure is permanent" is the reasoning behind the rule rather than a
  * distinction this code can draw. `describeFailure` is worded accordingly.
  *
- * @param {{ exitCode: number, hasTrack: boolean }} outcome
+ * @param {{ exitCode: number, hasTrack: boolean, stderr?: string }} outcome
  * @returns {{ ok: true } | { ok: false, failure: string, retryable: boolean }}
  */
-export function classifyFetch({ exitCode, hasTrack }) {
+export function classifyFetch({ exitCode, hasTrack, stderr = '' }) {
   if (exitCode === 0 && hasTrack) return { ok: true };
-  if (exitCode === 0) return { ok: false, failure: NO_SUBTITLES, retryable: false };
+  if (exitCode === 0 && !SUBTITLE_RATE_LIMIT.test(stderr)) {
+    return { ok: false, failure: NO_SUBTITLES, retryable: false };
+  }
   return { ok: false, failure: RATE_LIMITED, retryable: true };
 }
 
@@ -94,9 +106,9 @@ const OTHER_SITE_ERROR = /^ERROR: (?:\[(?!twitter)[^\]]+\]|Unsupported URL)/m;
 /**
  * Classifies one X post fetch.
  *
- * **Unlike `classifyFetch`, this reads stderr**, and only for a post, only
- * after a non-zero exit. A YouTube video's permanent failures can be told from
- * a 429 by nothing but their exit code, so none of its text is read. X's
+ * **Unlike `classifyFetch`, this reads stderr after a non-zero exit**, and only
+ * for a post. A YouTube video's permanent failures can be told from a 429 by
+ * nothing but their exit code, so none of that text is read. X's
  * cannot: a post with no video, no such video or a login wall all exit 1, the
  * same as a 429, and retrying them three times would spend a minute on a
  * certainty. Anything unrecognised stays what it was: rate-limited, retried.
@@ -127,7 +139,7 @@ export function classifyPostFetch({
     if (hasTrack && (!uploaderId || !displayId)) {
       return { ok: false, failure: NO_POST_IDENTITY, retryable: false };
     }
-    return classifyFetch({ exitCode, hasTrack });
+    return classifyFetch({ exitCode, hasTrack, stderr });
   }
 
   // Who failed comes before what failed: another site's words are never read
@@ -207,8 +219,9 @@ export function describeFailure({ failure, url, lang }) {
   // minute. It is a near-zero standing allowance, not a quota on a timer.
   return (
     `Rate-limited fetching ${url}.\n` +
-    'yt-dlp exited non-zero with no subtitle track on every attempt, which is what ' +
-    'an HTTP 429 looks like. Nothing was written, and a later run may succeed.'
+    'yt-dlp wrote no subtitle track on any attempt, and either reported an HTTP 429 or ' +
+    'exited non-zero, which is what one looks like. Nothing was written, and a later run ' +
+    'may succeed.'
   );
 }
 

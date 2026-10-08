@@ -26,8 +26,31 @@ export const AUTO_IDS = [
   'o3CX_Y59_74',
 ];
 
-/** The five manual tracks, the only ones in the repository. */
-export const MANUAL_IDS = ['8nHBGFKLHZQ', 'DxL2HoqLbyA', 'arj7oStGLkU', 'iG9CE55wbtY', 'rNxC16mlO60'];
+/** The six manual tracks, the only ones in the repository. */
+export const MANUAL_IDS = [
+  '8nHBGFKLHZQ',
+  'DxL2HoqLbyA',
+  'arj7oStGLkU',
+  'iG9CE55wbtY',
+  'rNxC16mlO60',
+  'QIHnmqYU614',
+];
+
+/**
+ * A track's language where it is not plain `en`. `QIHnmqYU614` has no manual
+ * `en` track, only `en-US` (ADR-0006); it was recorded from `yt-dlp`
+ * 2026.08.19 with `--lang en-US`.
+ */
+const TRACK_LANGUAGES = { QIHnmqYU614: 'en-US' };
+
+/**
+ * The file name `yt-dlp` gave a recorded track: `<id>.<lang>.vtt`.
+ *
+ * @param {string} id a video id
+ */
+export function fixtureName(id) {
+  return `${id}.${TRACK_LANGUAGES[id] ?? 'en'}.vtt`;
+}
 
 /**
  * X posts, recorded from `yt-dlp` 2026.08.19: `x/<name>.json` is the line its
@@ -74,5 +97,5 @@ export function readXTrack() {
  * @returns {string} the subtitle track exactly as downloaded
  */
 export function readFixture(kind, id) {
-  return fs.readFileSync(path.join(FIXTURES_DIR, kind, `${id}.en.vtt`), 'utf8');
+  return fs.readFileSync(path.join(FIXTURES_DIR, kind, fixtureName(id)), 'utf8');
 }

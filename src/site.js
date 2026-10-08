@@ -33,8 +33,9 @@ export const YOUTUBE = {
   name: 'youtube',
   printFields: 'title,channel,duration_string,upload_date',
   extraArgs: [],
-  // Exit code and track only: a video's stderr is never read (`classifyFetch`).
-  classify: ({ exitCode, hasTrack }) => classifyFetch({ exitCode, hasTrack }),
+  // Exit code and track, and stderr only after exit 0 with no track, for the
+  // warning a refused subtitle download leaves (`classifyFetch`, ADR-0006).
+  classify: ({ exitCode, hasTrack, stderr }) => classifyFetch({ exitCode, hasTrack, stderr }),
   identify({ metadata, url, videoId, trackKind }) {
     const title = metadata?.title ?? '';
     return {

@@ -5,6 +5,7 @@ import path from 'node:path';
 import { sanitizeChildEnv } from './child-env.js';
 import { describeFailure } from './fetch-outcome.js';
 import { xPost, YOUTUBE } from './site.js';
+import { classifyTrack } from './subtitle-track.js';
 import { parseTarget, TargetParseError } from './target.js';
 
 /** The binary name looked up on PATH. Overridable so tests need not uninstall it. */
@@ -141,6 +142,23 @@ export function parseMetadata(stdout) {
 }
 
 /**
+ * English as the default `--lang en` accepts it, in the order a track of one
+ * kind is preferred (ADR-0006). Any other language is matched exactly.
+ */
+export const ENGLISH_VARIANTS = ['en', 'en-US', 'en-GB'];
+
+/**
+ * What `--sub-langs` asks for. Widening `en` needs `--ignore-errors`: without
+ * it, the first variant to fail (a translated `en`, with a 429) aborts the run
+ * before the next is tried. With it, that failure is a `WARNING` and the run
+ * exits 0; extractor errors still exit 1.
+ */
+function subLangArgs(lang) {
+  if (lang !== 'en') return ['--sub-langs', lang];
+  return ['--sub-langs', ENGLISH_VARIANTS.join(','), '--ignore-errors'];
+}
+
+/**
  * Builds the one settled per-video invocation. Every flag is load-bearing; see
  * the spec's Fetching section before changing any of them.
  *
@@ -155,8 +173,7 @@ export function fetchArgs({ url, lang, destDir, site = YOUTUBE }) {
     ...site.extraArgs,
     '--write-sub',
     '--write-auto-sub',
-    '--sub-langs',
-    lang,
+    ...subLangArgs(lang),
     '--no-simulate',
     '--print',
     `%(.{${site.printFields}})j`,
@@ -203,7 +220,8 @@ export async function fetchSubtitleTrack({ url, lang = 'en', destDir, site = YOU
  * code to a retryable failure is testable without a live invocation.
  *
  * The whole outcome is handed to the `site`, which decides what of it to read:
- * an X post reads stderr and the reported extractor, a YouTube video neither.
+ * an X post reads stderr and the reported extractor, a YouTube video stderr
+ * only after exit 0 with no track.
  *
  * @param {{ exitCode: number, hasTrack: boolean, url: string, lang: string,
  *           site?: import('./site.js').Site, stderr?: string,
@@ -378,9 +396,13 @@ export async function expandPlaylist({ url, binary = YT_DLP }) {
  * Success requires a subtitle file that is actually there and not empty.
  *
  * `--skip-download` means nothing else can land in the directory, so any
- * non-empty file is the track. Extension is a preference, not a filter: no
+ * non-empty file is a track. Extension is a preference, not a filter: no
  * `--sub-format` is passed, so treating a non-vtt track as "no subtitles"
  * would report the wrong failure.
+ *
+ * The default English can land up to three tracks, and the best is returned
+ * (ADR-0006): manual over auto, then `en`, `en-US`, `en-GB`. The ranking never
+ * rests on listing order, which puts `X.en-US.vtt` before `X.en.vtt`.
  */
 export async function findSubtitleTrack(destDir) {
   const entries = await fs.readdir(destDir, { withFileTypes: true });
@@ -390,8 +412,35 @@ export async function findSubtitleTrack(destDir) {
     if (!entry.isFile()) continue;
     const trackPath = path.join(destDir, entry.name);
     const { size } = await fs.stat(trackPath);
-    if (size > 0) candidates.push(trackPath);
+    if (size === 0) continue;
+
+    const kind = classifyTrack(await fs.readFile(trackPath, 'utf8'));
+    candidates.push({ trackPath, rank: trackRank(entry.name, kind) });
   }
 
-  return candidates.find((file) => file.toLowerCase().endsWith('.vtt')) ?? candidates[0] ?? null;
+  candidates.sort((a, b) => compareRanks(a.rank, b.rank) || a.trackPath.localeCompare(b.trackPath));
+  return candidates[0]?.trackPath ?? null;
+}
+
+/**
+ * A track's place in the preference order, lowest first. The language is the
+ * file name's second-to-last segment (`<id>.<lang>.<ext>`; neither a video id
+ * nor a media id holds a dot). A language outside the English variants is one
+ * asked for exactly, and the only one in the directory.
+ */
+function trackRank(name, kind) {
+  const variant = ENGLISH_VARIANTS.indexOf(name.split('.').at(-2));
+
+  return [
+    kind === 'manual' ? 0 : 1,
+    variant === -1 ? ENGLISH_VARIANTS.length : variant,
+    name.toLowerCase().endsWith('.vtt') ? 0 : 1,
+  ];
+}
+
+function compareRanks(a, b) {
+  for (let index = 0; index < a.length; index += 1) {
+    if (a[index] !== b[index]) return a[index] - b[index];
+  }
+  return 0;
 }

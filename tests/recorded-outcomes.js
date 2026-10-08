@@ -44,7 +44,8 @@ const POST_FAILURES = [
 export function recordedFailure({ failure, url, lang = 'en', message }) {
   const exitCode = failure === NO_SUBTITLES ? 0 : 1;
   // A post failure is a recorded exit 1 whose stderr is what says it is
-  // permanent; `classifyFetch` reads no stderr, so it is not asked about them.
+  // permanent; `classifyFetch` reads no stderr after a non-zero exit, so it is
+  // not asked about them.
   const retryable = POST_FAILURES.includes(failure)
     ? false
     : classifyFetch({ exitCode, hasTrack: false }).retryable;
