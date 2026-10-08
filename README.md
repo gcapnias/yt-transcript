@@ -55,15 +55,20 @@ fragment is ignored.
   post's video, fetches its own first video. A trailing `/video/N` (or `/photo/N`)
   fetches the post's own Nth media item instead. `N` counts the post's own photos as
   well as its videos, so selecting a photo fails, and a quoted video is reachable only
-  through the quoted post's URL. There is no fetch-every-video mode.
+  through the quoted post's URL. There is no fetch-every-video mode. A `t.co` link
+  always fetches the first video, even one that points at `/video/N`: X redirects it
+  to the bare post before `yt-dlp` sees the selector.
 - **One transcript per video.** The transcript's `url` is
   `https://x.com/i/status/<post id>`, built from the post id `yt-dlp` reports, plus
   `/video/N` from the post's second video on, where `N` counts videos only. So every
   spelling of a post (`twitter.com`, `/i/status`, `t.co`, `/video/1`) overwrites the
-  same file. A transcript written by v0.2.0 has the handle in its `url`, so fetching
-  that post again writes a second file. `title` is the post text with links removed, `channel` is
-  `Display Name (@handle)`, and `subtitles` is always `auto`: X's tracks are speech
-  recognition. When the post text is too short or not Latin to make a slug, the file
+  same file, and each of the post's later videos gets a file of its own. Selecting a
+  video of a post that has several costs a second request to `yt-dlp`, to list the
+  post's videos and find which one was fetched. If that video is not in the list, the
+  fetch fails and nothing is written. A transcript written by v0.2.0 has the handle in
+  its `url`, so fetching that post again writes a second file. `title` is the post
+  text with links removed, `channel` is `Display Name (@handle)`, and `subtitles` is
+  always `auto`: X's tracks are speech recognition. When the post text is too short or not Latin to make a slug, the file
   is named `<handle>-<post id>.md`, lowercased.
 - **Refused or failed with a message, never retried:** X Broadcasts and Spaces
   (`/i/broadcasts/…`, `/i/events/…`, `/i/spaces/…`), which carry no subtitles; a post
@@ -100,7 +105,9 @@ Both forms need `yt-dlp` on `PATH`; npx does not bundle it.
 
 ## Flags
 
-- `--lang <code>` — subtitle language, matched exactly. Default `en`.
+- `--lang <code>` — subtitle language. Default `en`, which accepts `en`, `en-US` or
+  `en-GB`: a manual track is preferred over an auto one, then the variants in that
+  order. Any other code, `en-US` included, is matched exactly.
 - `--playlist` — read a `watch?v=...&list=...` URL as the playlist rather than the
   single video. A bare playlist or channel URL expands without it.
 - `--force` — in a batch, ignore the skip set and re-fetch everything. A single

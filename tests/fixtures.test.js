@@ -3,20 +3,20 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { AUTO_IDS, FIXTURES_DIR, MANUAL_IDS } from './fixtures.js';
+import { AUTO_IDS, FIXTURES_DIR, fixtureName, MANUAL_IDS } from './fixtures.js';
 
 // These are the entire evidence base for every track-kind-dependent rule, and
 // nothing in the repository can restore them once the root clutter is deleted.
 test('the eight auto subtitle tracks are present and non-empty', () => {
   for (const id of AUTO_IDS) {
-    const file = path.join(FIXTURES_DIR, 'auto', `${id}.en.vtt`);
+    const file = path.join(FIXTURES_DIR, 'auto', fixtureName(id));
     assert.ok(fs.statSync(file).size > 0, `empty or missing auto fixture: ${id}`);
   }
 });
 
-test('the five manual subtitle tracks are present and non-empty', () => {
+test('the six manual subtitle tracks are present and non-empty', () => {
   for (const id of MANUAL_IDS) {
-    const file = path.join(FIXTURES_DIR, 'manual', `${id}.en.vtt`);
+    const file = path.join(FIXTURES_DIR, 'manual', fixtureName(id));
     assert.ok(fs.statSync(file).size > 0, `empty or missing manual fixture: ${id}`);
   }
 });
@@ -28,12 +28,11 @@ test('auto and manual fixtures stay distinguishable by directory', () => {
       .filter((name) => name.endsWith('.vtt'))
       .sort();
 
-  assert.deepEqual(
-    listing('auto'),
-    AUTO_IDS.map((id) => `${id}.en.vtt`).sort(),
-  );
-  assert.deepEqual(
-    listing('manual'),
-    MANUAL_IDS.map((id) => `${id}.en.vtt`).sort(),
-  );
+  assert.deepEqual(listing('auto'), AUTO_IDS.map(fixtureName).sort());
+  assert.deepEqual(listing('manual'), MANUAL_IDS.map(fixtureName).sort());
+});
+
+test('the regional-variant fixture keeps its language in its name', () => {
+  // The one manual track with no plain `en` beside it (ADR-0006).
+  assert.equal(fixtureName('QIHnmqYU614'), 'QIHnmqYU614.en-US.vtt');
 });

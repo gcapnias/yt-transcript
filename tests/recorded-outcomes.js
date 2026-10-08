@@ -23,11 +23,19 @@ import {
   NO_SUCH_VIDEO,
   NO_VIDEO,
   NOT_AN_X_POST,
+  UNLISTED_VIDEO,
 } from '../src/fetch-outcome.js';
 import { FetchError } from '../src/ytdlp.js';
 
 /** The X post failures, none of which is a rate limit and so none retryable. */
-const POST_FAILURES = [NO_VIDEO, NO_SUCH_VIDEO, LOGIN_REQUIRED, NOT_AN_X_POST, NO_POST_IDENTITY];
+const POST_FAILURES = [
+  NO_VIDEO,
+  NO_SUCH_VIDEO,
+  LOGIN_REQUIRED,
+  NOT_AN_X_POST,
+  NO_POST_IDENTITY,
+  UNLISTED_VIDEO,
+];
 
 /**
  * @param {{ failure: string, url: string, lang?: string, message?: string }} outcome
@@ -36,7 +44,8 @@ const POST_FAILURES = [NO_VIDEO, NO_SUCH_VIDEO, LOGIN_REQUIRED, NOT_AN_X_POST, N
 export function recordedFailure({ failure, url, lang = 'en', message }) {
   const exitCode = failure === NO_SUBTITLES ? 0 : 1;
   // A post failure is a recorded exit 1 whose stderr is what says it is
-  // permanent; `classifyFetch` reads no stderr, so it is not asked about them.
+  // permanent; `classifyFetch` reads no stderr after a non-zero exit, so it is
+  // not asked about them.
   const retryable = POST_FAILURES.includes(failure)
     ? false
     : classifyFetch({ exitCode, hasTrack: false }).retryable;

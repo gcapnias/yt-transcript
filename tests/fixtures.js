@@ -26,13 +26,50 @@ export const AUTO_IDS = [
   'o3CX_Y59_74',
 ];
 
-/** The five manual tracks, the only ones in the repository. */
-export const MANUAL_IDS = ['8nHBGFKLHZQ', 'DxL2HoqLbyA', 'arj7oStGLkU', 'iG9CE55wbtY', 'rNxC16mlO60'];
+/** The six manual tracks, the only ones in the repository. */
+export const MANUAL_IDS = [
+  '8nHBGFKLHZQ',
+  'DxL2HoqLbyA',
+  'arj7oStGLkU',
+  'iG9CE55wbtY',
+  'rNxC16mlO60',
+  'QIHnmqYU614',
+];
+
+/**
+ * A track's language where it is not plain `en`. `QIHnmqYU614` has no manual
+ * `en` track, only `en-US` (ADR-0006); it was recorded from `yt-dlp`
+ * 2026.08.19 with `--lang en-US`.
+ */
+const TRACK_LANGUAGES = { QIHnmqYU614: 'en-US' };
+
+/**
+ * What `yt-dlp` 2026.08.19 wrote to stderr on `QIHnmqYU614`, asked for
+ * `en,en-US,en-GB` with `--ignore-errors`: the translated `en` was refused,
+ * and the run exited 0 (ADR-0006).
+ */
+export const SUBTITLE_429_WARNING =
+  "WARNING: Unable to download video subtitles for 'en': HTTP Error 429: Too Many Requests\n";
+
+/**
+ * The file name `yt-dlp` gave a recorded track: `<id>.<lang>.vtt`.
+ *
+ * @param {string} id a video id
+ */
+export function fixtureName(id) {
+  return `${id}.${TRACK_LANGUAGES[id] ?? 'en'}.vtt`;
+}
 
 /**
  * X posts, recorded from `yt-dlp` 2026.08.19: `x/<name>.json` is the line its
- * `--print` emitted for a post, and `x/<media id>.en.vtt` is a track trimmed to
+ * `--print` emitted for a post, `x/<name>-listing.jsonl` what the list-only
+ * invocation printed for one, and `x/<media id>.en.vtt` is a track trimmed to
  * its first cues (the X cue markup is the evidence, not the length).
+ *
+ * The CTV post (two videos, no photos) is recorded fetched four ways: `-post`
+ * bare, `-video1` and `-video2` through `/video/N`, and `-tco` through the
+ * `t.co` link in its text, which resolves to `/video/1` and is then redirected
+ * by X to the bare post.
  */
 export const X_TRACK_ID = '2101938030122868736';
 
@@ -47,6 +84,16 @@ export function readXPrintLine(name) {
   return `${JSON.stringify(JSON.parse(recorded))}\n`;
 }
 
+/**
+ * A recorded listing of a post's videos: the lines the list-only invocation
+ * printed, one JSON object per video, stored exactly as emitted.
+ *
+ * @param {string} name a recorded post, without the `-listing.jsonl` suffix
+ */
+export function readXListing(name) {
+  return fs.readFileSync(path.join(FIXTURES_DIR, 'x', `${name}-listing.jsonl`), 'utf8');
+}
+
 /** The trimmed X track exactly as downloaded. */
 export function readXTrack() {
   return fs.readFileSync(path.join(FIXTURES_DIR, 'x', `${X_TRACK_ID}.en.vtt`), 'utf8');
@@ -58,5 +105,5 @@ export function readXTrack() {
  * @returns {string} the subtitle track exactly as downloaded
  */
 export function readFixture(kind, id) {
-  return fs.readFileSync(path.join(FIXTURES_DIR, kind, `${id}.en.vtt`), 'utf8');
+  return fs.readFileSync(path.join(FIXTURES_DIR, kind, fixtureName(id)), 'utf8');
 }
