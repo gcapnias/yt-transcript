@@ -145,7 +145,7 @@ export function parseMetadata(stdout) {
  * English as the default `--lang en` accepts it, in the order a track of one
  * kind is preferred (ADR-0006). Any other language is matched exactly.
  */
-export const ENGLISH_VARIANTS = ['en', 'en-US', 'en-GB'];
+const ENGLISH_VARIANTS =['en', 'en-US', 'en-GB'];
 
 /**
  * What `--sub-langs` asks for. Widening `en` needs `--ignore-errors`: without
@@ -438,6 +438,7 @@ function trackRank(name, kind) {
   ];
 }
 
+/** Orders two `trackRank`s position by position: kind, then variant, then extension. */
 function compareRanks(a, b) {
   for (let index = 0; index < a.length; index += 1) {
     if (a[index] !== b[index]) return a[index] - b[index];

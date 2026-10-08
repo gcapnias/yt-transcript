@@ -44,6 +44,14 @@ export const MANUAL_IDS = [
 const TRACK_LANGUAGES = { QIHnmqYU614: 'en-US' };
 
 /**
+ * What `yt-dlp` 2026.08.19 wrote to stderr on `QIHnmqYU614`, asked for
+ * `en,en-US,en-GB` with `--ignore-errors`: the translated `en` was refused,
+ * and the run exited 0 (ADR-0006).
+ */
+export const SUBTITLE_429_WARNING =
+  "WARNING: Unable to download video subtitles for 'en': HTTP Error 429: Too Many Requests\n";
+
+/**
  * The file name `yt-dlp` gave a recorded track: `<id>.<lang>.vtt`.
  *
  * @param {string} id a video id

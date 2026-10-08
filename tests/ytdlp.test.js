@@ -25,7 +25,7 @@ import {
 import { xPost } from '../src/site.js';
 import { classifyTrack } from '../src/subtitle-track.js';
 import { withTempDir } from '../src/temp-dir.js';
-import { readFixture, readXListing, readXPrintLine } from './fixtures.js';
+import { readFixture, readXListing, readXPrintLine, SUBTITLE_429_WARNING } from './fixtures.js';
 
 const URL = 'https://www.youtube.com/watch?v=o3CX_Y59_74';
 
@@ -125,7 +125,7 @@ test('a recorded process outcome becomes the failure it means', () => {
 
 test('a youtube fetch that exits 0 with a refused subtitle download and no track is retried', () => {
   const outcome = { url: URL, lang: 'en', exitCode: 0, hasTrack: false };
-  const stderr = "WARNING: Unable to download video subtitles for 'en': HTTP Error 429: Too Many Requests\n";
+  const stderr = SUBTITLE_429_WARNING;
 
   const rateLimited = fetchFailure({ ...outcome, stderr });
   assert.equal(rateLimited.failure, RATE_LIMITED);

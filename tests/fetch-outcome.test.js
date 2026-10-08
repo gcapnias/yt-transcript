@@ -16,6 +16,7 @@ import {
   RATE_LIMITED,
   RETRY_DELAYS_MS,
 } from '../src/fetch-outcome.js';
+import { SUBTITLE_429_WARNING } from './fixtures.js';
 
 test('success needs exit 0 and a subtitle track, both halves', () => {
   assert.deepEqual(classifyFetch({ exitCode: 0, hasTrack: true }), { ok: true });
@@ -36,10 +37,6 @@ test('success needs exit 0 and a subtitle track, both halves', () => {
   });
 });
 
-// Recorded from yt-dlp 2026.08.19 on QIHnmqYU614, asking for `en,en-US,en-GB`
-// with `--ignore-errors`: the translated `en` refused, and the run exited 0.
-const SUBTITLE_429 = "WARNING: Unable to download video subtitles for 'en': HTTP Error 429: Too Many Requests\n";
-
 test('a non-zero exit is decided by its exit code, whatever stderr says', () => {
   const rateLimited = {
     exitCode: 1,
@@ -55,7 +52,7 @@ test('a non-zero exit is decided by its exit code, whatever stderr says', () => 
 test('exit 0 with no track is rate-limited when a subtitle download was refused with a 429', () => {
   // `--ignore-errors` turns the refusal into a warning (ADR-0006), so the
   // exit code no longer tells it from a video with no English at all.
-  assert.deepEqual(classifyFetch({ exitCode: 0, hasTrack: false, stderr: SUBTITLE_429 }), {
+  assert.deepEqual(classifyFetch({ exitCode: 0, hasTrack: false, stderr: SUBTITLE_429_WARNING}), {
     ok: false,
     failure: RATE_LIMITED,
     retryable: true,
@@ -79,7 +76,7 @@ test('exit 0 with no track and no refused download has no subtitles', () => {
 });
 
 test('a track that arrived is a success, whichever alternatives were refused', () => {
-  assert.deepEqual(classifyFetch({ exitCode: 0, hasTrack: true, stderr: SUBTITLE_429 }), { ok: true });
+  assert.deepEqual(classifyFetch({ exitCode: 0, hasTrack: true, stderr: SUBTITLE_429_WARNING}), { ok: true });
 });
 
 test('a rate-limited fetch is retried once per delay, in the settled ladder', async () => {
@@ -235,7 +232,7 @@ test('a post fetch succeeds, or has no subtitles, exactly as a YouTube one does'
 test('a post fetch with no track is rate-limited only when a subtitle download was refused', () => {
   const answered = { exitCode: 0, extractorKey: 'Twitter' };
 
-  assert.deepEqual(classifyPostFetch(post({ ...answered, stderr: SUBTITLE_429 })), {
+  assert.deepEqual(classifyPostFetch(post({ ...answered, stderr: SUBTITLE_429_WARNING})), {
     ok: false,
     failure: RATE_LIMITED,
     retryable: true,
@@ -251,7 +248,7 @@ test('a post fetch with no track is rate-limited only when a subtitle download w
       post({
         ...answered,
         hasTrack: true,
-        stderr: SUBTITLE_429,
+        stderr: SUBTITLE_429_WARNING,
         uploaderId: 'poteto',
         displayId: '2102050467505430555',
       }),
