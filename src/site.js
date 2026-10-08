@@ -1,5 +1,5 @@
 /**
- * The **Site** a fetch reaches (CONTEXT.md): YouTube or X.
+ * The **Site** a fetch reaches (GLOSSARY.md): YouTube or X.
  *
  * Everything about a fetch that differs by site is answered here, once, as a
  * small table: what `yt-dlp` prints, the flags it adds, how its outcome is
