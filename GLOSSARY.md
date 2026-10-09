@@ -49,11 +49,11 @@ An unbroken run of speech by one speaker in a dialog, made of one or more paragr
 _Avoid_: Utterance, line, block, segment
 
 **Subtitle track**:
-The source text for a transcript, either **manual** (authored by a human) or **auto** (produced by a site's machinery — speech recognition, or YouTube's machine translation of another language's recognition). Manual is preferred; which one was used is always recorded. There are only these two kinds: a translated track is an auto track, every X track is an auto track, and a transcript does not say what language was spoken. When several tracks are acceptable, a manual one is preferred over an auto one, then the plain language over a regional variant.
+The source text for a transcript, either **manual** (authored by a human) or **auto** (produced by a site's machinery — speech recognition, or YouTube's machine translation of another language's recognition). Manual is preferred; which one was used is always recorded. There are only these two kinds: a translated track is an auto track, every X track is an auto track, and a transcript does not say what language was spoken. When several tracks are acceptable, a manual one is preferred over an auto one, then the plain language over a regional variant. For English, YouTube's untranslated recognition track `en-orig` is also acceptable, ranked right after plain `en`.
 _Avoid_: Captions, CC, transcript (the track is the input, the transcript is the output)
 
 **Regional variant**:
-A subtitle track whose language carries a region, such as `en-US` or `en-GB`. English, the default language, is accepted as plain `en` or as either of those two regional variants; any other language is accepted only exactly as asked for. A transcript does not say which of them it came from.
+A subtitle track whose language carries a region, such as `en-US` or `en-GB`. English, the default language, is accepted as plain `en`, as `en-orig`, or as either of those two regional variants; `en-orig` is not a regional variant but YouTube's untranslated speech-recognition track. Any other language is accepted only exactly as asked for. A transcript does not say which of them it came from.
 _Avoid_: Locale, dialect, sub-language
 
 **Catalog**:
