@@ -21,8 +21,12 @@ A single Markdown file holding one video's spoken content, laid out as prose or 
 _Avoid_: Caption file, subtitle file, article
 
 **Slug**:
-The kebab-case filename a transcript is stored under, derived from the video title.
+The kebab-case filename a transcript is stored under, derived from the video title. A slug is unique only within its channel folder: two channels may each hold a transcript under the same slug.
 _Avoid_: Filename, title slug, permalink
+
+**Channel folder**:
+The folder a transcript is filed in, named by the kebab-case form of the channel's handle on its site (`@iamseankochel` on YouTube, `@mattpocockuk` on X), not by its display name; a channel with no usable handle falls back to its channel id. The same handle on both sites names one folder. Transcripts sit exactly one level down, in their channel's folder, never deeper and never loose beside the catalog.
+_Avoid_: Channel directory, subfolder, bucket, shelf
 
 **Frontmatter**:
 The YAML block opening a transcript, describing the video it came from.
@@ -57,7 +61,7 @@ A subtitle track whose language carries a region, such as `en-US` or `en-GB`. En
 _Avoid_: Locale, dialect, sub-language
 
 **Catalog**:
-A Markdown index of every transcript, derived wholly from transcript frontmatter so it cannot drift from what is on disk.
+A single Markdown index of every transcript on disk, whichever channel folder holds it, derived wholly from transcript frontmatter so it cannot drift from what is on disk. Channel folders have no index of their own.
 _Avoid_: Index, manifest, database, TOC
 
 **Rebuild**:
