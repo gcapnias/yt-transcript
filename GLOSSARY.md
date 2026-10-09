@@ -37,7 +37,7 @@ One timed unit of text in the subtitle file yt-dlp downloads. Cues are an interm
 _Avoid_: Caption, line, segment, subtitle
 
 **Artifact**:
-Anything a subtitle track carries that is not spoken content: a provenance credit, speaker-change notation, or a sound event. Artifacts are removed while cleaning, so they never reach a transcript; in a dialog, speaker-change notation is still removed as text, but first marks where one turn ends and the next begins. Notation is track-kind-specific, and a transcriber's annotation on speech — an uncertain name, on-screen text — is not an artifact and survives verbatim.
+Anything a subtitle track carries that is not spoken content: a provenance credit, speaker-change notation, or a sound event. Artifacts are removed while cleaning, so they never reach a transcript; in a dialog, speaker-change notation is still removed as text, but first marks where one turn ends and the next begins. Notation is track-kind-specific, except that a named track writes its artifacts the way an auto track does, though it is manual in every other respect; a transcriber's annotation on speech — an uncertain name, on-screen text — is not an artifact and survives verbatim.
 _Avoid_: Noise, junk, markup, tag
 
 **Paragraph**:
@@ -57,8 +57,12 @@ The source text for a transcript, either **manual** (authored by a human) or **a
 _Avoid_: Captions, CC, transcript (the track is the input, the transcript is the output)
 
 **Regional variant**:
-A subtitle track whose language carries a region, such as `en-US` or `en-GB`. English, the default language, is accepted as plain `en`, as `en-orig`, or as either of those two regional variants; `en-orig` is not a regional variant but YouTube's untranslated speech-recognition track. Any other language is accepted only exactly as asked for. A transcript does not say which of them it came from.
+A subtitle track whose language carries a region, such as `en-US` or `en-GB`. English, the default language, is accepted as plain `en`, as `en-orig`, as either of those two regional variants, or as a named track; `en-orig` is not a regional variant but YouTube's untranslated speech-recognition track. Any other language is accepted only exactly as asked for. A transcript does not say which of them it came from.
 _Avoid_: Locale, dialect, sub-language
+
+**Named track**:
+A subtitle track listed under a track name as well as its language, such as `English - CC1` or `English - DTVCC1`, so that one video can carry several tracks in the same language. Among acceptable tracks of one kind, a named track comes after the plain language and its regional variants.
+_Avoid_: Suffixed id, broadcast captions, CC stream
 
 **Catalog**:
 A single Markdown index of every transcript on disk, whichever channel folder holds it, derived wholly from transcript frontmatter so it cannot drift from what is on disk. Channel folders have no index of their own.

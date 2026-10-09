@@ -14,6 +14,9 @@ The threshold comes from the survey in `archive/research/subtitle-speaker-notati
 highest count on a recent single-speaker auto track was 5, from embedded clips and laughter. The
 lowest on a recent multi-speaker one was 81.
 
+ADR-0009 widens the auto marker to `>>` or `>>>`, and has a named track use the auto notation
+although it is manual.
+
 ## Considered options
 
 - **Turns per hour instead of a count.** Rejected: the rates overlap (52 per hour on a solo

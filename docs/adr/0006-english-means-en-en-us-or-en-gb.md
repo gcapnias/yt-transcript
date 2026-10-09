@@ -29,6 +29,8 @@ single `en` track is fetched byte-identically.
   (retried) when stderr says `Unable to download video subtitles for '…': HTTP Error 429`, and
   `no-subtitles` otherwise.
 
+ADR-0009 adds named tracks (`en-` plus an 11-character id) to this list, ranked after `en-GB`.
+
 ## Considered options
 
 - **Keep exact matching, and make the failure name `--lang en-US`.** Rejected: the user still has
