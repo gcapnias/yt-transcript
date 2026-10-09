@@ -8,7 +8,9 @@ Seen in #13.
 and the catalog stays at `transcripts/README.md`.** The channel folder is the channel's handle on
 its site, made kebab-case: `@iamseankochel` on YouTube becomes `iamseankochel/`, `@some_user` on X
 becomes `some-user/`. A channel with no handle, or one whose handle kebab-cases to nothing, falls
-back to its lowercased channel id. The handle comes from the one `yt-dlp` invocation a fetch
+back to its lowercased channel id, and one with neither goes into `unknown-channel/`. The handle
+is kebab-cased the way a transcript slug is, without the slug's retention fallback or length cap.
+The handle comes from the one `yt-dlp` invocation a fetch
 already makes, at fetch time.
 
 - **The same handle on both sites is one folder.** `mattpocockuk/` holds Matt Pocock's YouTube
@@ -27,8 +29,9 @@ already makes, at fetch time.
 ## Considered options
 
 - **The display name, slugged** (`sean-kochel/`). Rejected: it changes whenever a channel renames
-  itself, and X's display names carry no handle to keep the same person together across sites.
-  It would have been derivable from frontmatter alone; the handle is not (see Consequences).
+  itself, and it splits one person across sites, because X's recorded channel is `Name (@handle)`
+  while YouTube's is the bare name (`matt-pocock-mattpocockuk/` beside `matt-pocock/`). It would
+  have been derivable from frontmatter alone; the handle is not (see Consequences).
 - **The channel id always** (`UCFig7skuwYrCIGy0tuZHA2Q/`). Rejected as the rule, kept as the
   fallback: stable, but unreadable in a file browser, which is the whole point of the folders.
 - **A site layer** (`youtube/<handle>/`). Rejected: a second level, and it splits one person

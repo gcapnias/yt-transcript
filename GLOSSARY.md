@@ -25,7 +25,7 @@ The kebab-case filename a transcript is stored under, derived from the video tit
 _Avoid_: Filename, title slug, permalink
 
 **Channel folder**:
-The folder a transcript is filed in, named by the kebab-case form of the channel's handle on its site (`@iamseankochel` on YouTube, `@mattpocockuk` on X), not by its display name; a channel with no usable handle falls back to its channel id. The same handle on both sites names one folder. Transcripts sit exactly one level down, in their channel's folder, never deeper and never loose beside the catalog.
+The folder a transcript is filed in, named by the kebab-case form of the channel's handle on its site (`@iamseankochel` on YouTube, `@mattpocockuk` on X), not by its display name; a channel with no usable handle falls back to its channel id, and one with neither goes into `unknown-channel`. The same handle on both sites names one folder. Transcripts sit exactly one level down, in their channel's folder, never deeper and never loose beside the catalog.
 _Avoid_: Channel directory, subfolder, bucket, shelf
 
 **Frontmatter**:
