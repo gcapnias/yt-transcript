@@ -16,8 +16,9 @@ is manual in every respect but one: it writes its artifacts the way an auto trac
 leading `>>` or `>>>` marks a speaker change and a `[…]` sound event is removed. The auto speaker
 marker is widened to `>>` or `>>>` as well.
 
-- **When a manual track is passed over for another, a single-video fetch says so,** naming each
-  and the `--lang` that would select it. Any other `--lang` is matched exactly, so
+- **When a manual track or a named track is passed over for another, a single-video fetch says
+  so,** naming each and the `--lang` that would select it. A named track is listed whatever its
+  kind, so a CC1 that lost to an auto `en` is still findable. Any other `--lang` is matched exactly, so
   `--lang en-JkeT_87f4cc` already works; the hint only makes it findable.
 - **Kind still outranks everything.** CC1 carries `<c>` timing tags and reads as auto, so DTVCC1,
   which reads as manual, wins wherever both exist, which is everywhere they were seen.
@@ -42,7 +43,9 @@ marker is widened to `>>` or `>>>` as well.
   rank last.
 - Notation now depends on the track's key as well as its kind. ADR-0007's notation table holds
   for every track that is not named.
-- A video with only CC1 would record `subtitles: auto` for a human-made track. Never seen.
+- A video with only CC1 would not use it at all. CC1 reads as auto, and a named track ranks last
+  within its kind, so any auto `en` or `en-orig` beats it; the hint names it. Never seen.
+- On live recordings the default fetch now also downloads CC1, about 5× the size of DTVCC1.
 - `nlGqajJEsWs` (Build 2026, day 2) still gets its junk plain `en`; the hint names the named
   tracks and the `--lang` for them.
 - Verified against `yt-dlp` 2026.08.19.
