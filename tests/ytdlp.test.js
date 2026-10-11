@@ -25,7 +25,7 @@ import {
 import { xPost } from '../src/site.js';
 import { classifyTrack } from '../src/subtitle-track.js';
 import { withTempDir } from '../src/temp-dir.js';
-import { readFixture, readXListing, readXPrintLine, SUBTITLE_429_WARNING } from './fixtures.js';
+import { AUTO_ORIG_ID, fixtureName, readFixture, readXListing, readXPrintLine, SUBTITLE_429_WARNING } from './fixtures.js';
 
 const URL = 'https://www.youtube.com/watch?v=o3CX_Y59_74';
 
@@ -69,16 +69,44 @@ test('a manual en-US track beats an auto en one', async () => {
   assert.equal(await chosenTrack(tracks.toReversed()), 'QIHnmqYU614.en-US.vtt');
 });
 
-test('between tracks of one kind, en beats en-US beats en-GB, in any order on disk', async () => {
+test('between tracks of one kind, en beats en-orig beats en-US beats en-GB, in any order on disk', async () => {
   for (const text of [MANUAL_TRACK, AUTO_TRACK]) {
-    const all = ['X.en-GB.vtt', 'X.en-US.vtt', 'X.en.vtt'].map((name) => [name, text]);
+    const all = ['X.en-GB.vtt', 'X.en-US.vtt', 'X.en-orig.vtt', 'X.en.vtt'].map((name) => [
+      name,
+      text,
+    ]);
 
     // `X.en-US.vtt` sorts before `X.en.vtt`, so a first-found rule picks it.
     assert.equal(await chosenTrack(all), 'X.en.vtt');
     assert.equal(await chosenTrack(all.toReversed()), 'X.en.vtt');
-    assert.equal(await chosenTrack([all[0], all[1]]), 'X.en-US.vtt');
-    assert.equal(await chosenTrack([all[1], all[0]]), 'X.en-US.vtt');
+    // Without `en`, then without `en-orig`, in either order.
+    assert.equal(await chosenTrack(all.slice(0, 3)), 'X.en-orig.vtt');
+    assert.equal(await chosenTrack(all.slice(0, 3).toReversed()), 'X.en-orig.vtt');
+    assert.equal(await chosenTrack(all.slice(0, 2)), 'X.en-US.vtt');
+    assert.equal(await chosenTrack(all.slice(0, 2).toReversed()), 'X.en-US.vtt');
   }
+});
+
+test('a manual regional variant beats an auto en-orig track', async () => {
+  for (const variant of ['en-US', 'en-GB']) {
+    const tracks = [
+      ['X.en-orig.vtt', AUTO_TRACK],
+      [`X.${variant}.vtt`, MANUAL_TRACK],
+    ];
+
+    assert.equal(await chosenTrack(tracks), `X.${variant}.vtt`);
+    assert.equal(await chosenTrack(tracks.toReversed()), `X.${variant}.vtt`);
+  }
+});
+
+test('a lone en-orig track is found, and the recorded one reads as auto', async () => {
+  // The recorded case: `en` refused with a 429 on a dubbed video, `en-orig` written.
+  const name = fixtureName(AUTO_ORIG_ID);
+  const text = readFixture('auto', AUTO_ORIG_ID);
+
+  assert.equal(name, 'MN9dGgmLyso.en-orig.vtt');
+  assert.equal(await chosenTrack([[name, text]]), name);
+  assert.equal(classifyTrack(text), 'auto');
 });
 
 test('kind outranks language: every manual variant beats every auto one', async () => {
@@ -136,24 +164,20 @@ test('a youtube fetch that exits 0 with a refused subtitle download and no track
   assert.equal(fetchFailure({ ...outcome, hasTrack: true, stderr }), null);
 });
 
-test('the default English asks for en, en-US and en-GB, and outlives one of them failing', () => {
+test('the default English asks for en, en-orig, en-US and en-GB, and outlives one of them failing', () => {
   const args = fetchArgs({ url: URL, lang: 'en', destDir: '/tmp/run' });
 
-  // `en` is widened to its two regional variants (ADR-0006): a video whose
-  // only manual English is `en-US` is no longer left to a translated `en`.
-  assert.equal(args[args.indexOf('--sub-langs') + 1], 'en,en-US,en-GB');
+  // `en` is widened (ADR-0006): a video whose only manual English is `en-US`,
+  // or whose translated `en` is refused, is not left to that `en`.
+  assert.equal(args[args.indexOf('--sub-langs') + 1], 'en,en-orig,en-US,en-GB');
   assert.ok(args.includes('--ignore-errors'), 'a 429 on one variant would abort the rest');
-  // Still exact codes: `en-orig` is never requested, and nothing broadens to
-  // `all`, which would let `live_chat` in as a live stream's "manual" track.
+  // Still exact codes: nothing broadens to `all`, which would let `live_chat`
+  // in as a live stream's "manual" track.
   assert.ok(!args.includes('all'), 'broadened to --sub-langs all');
-  assert.ok(
-    !args.some((arg) => arg.split(',').some((code) => code.endsWith('-orig'))),
-    'requested an -orig track',
-  );
 });
 
 test('any other --lang reaches yt-dlp verbatim, and is matched exactly', () => {
-  for (const lang of ['en-US', 'en-GB', 'de', 'el']) {
+  for (const lang of ['en-US', 'en-GB', 'en-orig', 'de', 'de-orig', 'el']) {
     const args = fetchArgs({ url: URL, lang, destDir: '/tmp/run' });
 
     assert.equal(args[args.indexOf('--sub-langs') + 1], lang);
@@ -229,7 +253,7 @@ test('the youtube invocation is exactly what it was, with English widened', () =
     '--write-sub',
     '--write-auto-sub',
     '--sub-langs',
-    'en,en-US,en-GB',
+    'en,en-orig,en-US,en-GB',
     '--ignore-errors',
     '--no-simulate',
     '--print',
@@ -251,7 +275,7 @@ test('a post is fetched as playlist entry 1, printing what ranks the video fetch
   assert.equal(args[args.indexOf('--playlist-items') + 1], '1');
   assert.equal(args.at(-1), POST_URL);
   // English is asked for as it is of a YouTube video (ADR-0006).
-  assert.equal(args[args.indexOf('--sub-langs') + 1], 'en,en-US,en-GB');
+  assert.equal(args[args.indexOf('--sub-langs') + 1], 'en,en-orig,en-US,en-GB');
   assert.ok(args.includes('--ignore-errors'));
   // The fetch itself leaves no file but the track.
   assert.ok(!args.includes('--write-info-json'));
