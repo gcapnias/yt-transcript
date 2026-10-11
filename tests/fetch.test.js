@@ -16,7 +16,14 @@ import {
 // throwaway transcripts directory, so no test writes into the repository's.
 import { withTempDir as withTranscriptsDir } from '../src/temp-dir.js';
 import { FetchError, parseListing, parseMetadata } from '../src/ytdlp.js';
-import { readXListing, readXPrintLine, readXTrack, X_TRACK_ID } from './fixtures.js';
+import {
+  NAMED_VIDEO_ID,
+  readNamedFixture,
+  readXListing,
+  readXPrintLine,
+  readXTrack,
+  X_TRACK_ID,
+} from './fixtures.js';
 import { recordedFailure } from './recorded-outcomes.js';
 
 const URL = 'https://www.youtube.com/watch?v=o3CX_Y59_74';
@@ -65,6 +72,31 @@ function recordedFetch(outcomes) {
     },
   };
 }
+
+test('a named track is cleaned by its key and the tracks passed over come back with the transcript', async () => {
+  await withTranscriptsDir(async (dir) => {
+    const key = 'en-JkeT_87f4cc';
+    const passedOver = [{ kind: 'auto', key: 'en-uYU-mmqFLq8' }];
+
+    const result = await fetchTranscript(
+      { url: URL, videoId: VIDEO_ID, lang: 'en' },
+      {
+        dir,
+        fetchTrack: async ({ destDir }) => {
+          const trackPath = path.join(destDir, `${NAMED_VIDEO_ID}.${key}.vtt`);
+          await fs.writeFile(trackPath, readNamedFixture(key), 'utf8');
+          return { metadata: METADATA, trackPath, passedOver };
+        },
+      },
+    );
+
+    // The key is read from the file name, hyphens and underscores and all.
+    assert.equal(result.transcript.trackKind, 'manual');
+    assert.match(result.transcript.contents, /^All right\. Good morning\./m);
+    assert.ok(!result.transcript.contents.includes('>>'), 'a speaker marker survived');
+    assert.deepEqual(result.passedOver, passedOver);
+  });
+});
 
 test('a fetch that exits 0 but writes no subtitle file is a failure, not a success', async () => {
   await withTranscriptsDir(async (dir) => {

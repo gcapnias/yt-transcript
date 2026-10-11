@@ -13,7 +13,7 @@
  * | Class                   | Manual           | Auto        | Disposition                    |
  * |-------------------------|------------------|-------------|--------------------------------|
  * | Provenance credits      | `Transcriber:`   | none        | Drop the cue, first or last only |
- * | Speaker change          | leading `- `     | leading `>>`| Delete the marker, keep the cue |
+ * | Speaker change          | leading `- `     | leading `>>`/`>>>` | Delete the marker, keep the cue |
  * | Sound events            | `(Laughter)`     | `[snorts]`  | Strip the token, shape-guarded |
  * | Transcriber annotations | `[Caplin?]`      | none        | Keep verbatim, brackets and all |
  *
@@ -46,11 +46,16 @@ const CREDIT = /^(Transcriber|Reviewer|Translator|Subtitles by|Captions by|Amara
  *
  * Each notation is applied only to its own kind. A `>>` on a manual track is
  * someone quoting Markdown and a `[snorts]` never occurs there at all, so
- * crossing them over could only ever delete content.
+ * crossing them over could only ever delete content. The one exception is a
+ * named track, which is manual but written with the auto notation (ADR-0009):
+ * `stripArtifacts` is told which notation to read, not which kind it is.
+ *
+ * The auto marker is two or three `>`, removed whole: `>>>` is a speaker
+ * change too, and `>>` alone would leave a stray `>`.
  */
 const NOTATION = {
   manual: { marker: /^-\s+/, soundEvent: /\(([^()]*)\)/g },
-  auto: { marker: /^>>\s*/, soundEvent: /\[([^[\]]*)\]/g },
+  auto: { marker: /^>>>?\s*/, soundEvent: /\[([^[\]]*)\]/g },
 };
 
 /**
@@ -72,8 +77,8 @@ function isSoundEvent(enclosed) {
  * Manual tracks only — the notation does not occur on auto ones, so applying
  * it there could only ever delete speech.
  */
-function dropsAsCredit(lines, index, total, trackKind) {
-  if (trackKind !== 'manual') return false;
+function dropsAsCredit(lines, index, total, notation) {
+  if (notation !== 'manual') return false;
   if (index !== 0 && index !== total - 1) return false;
   return lines.some((line) => CREDIT.test(line));
 }
@@ -95,17 +100,18 @@ function dropsAsCredit(lines, index, total, trackKind) {
  * @param {string[][]} cues cue lines, already tag-stripped, entity-decoded,
  *   whitespace-collapsed and trimmed — `CREDIT` and both markers anchor at the
  *   start of a line and read that trim as given
- * @param {'auto'|'manual'} trackKind
+ * @param {'auto'|'manual'} notation which kind's notation to read: the track's
+ *   kind, except that a named track reads as `'auto'` (ADR-0009)
  * @returns {string[][]} the surviving cues, each a single-element line list
  */
-export function stripArtifacts(cues, trackKind) {
-  const { marker, soundEvent } = NOTATION[trackKind];
+export function stripArtifacts(cues, notation) {
+  const { marker, soundEvent } = NOTATION[notation];
   const stripped = [];
 
   for (const [index, lines] of cues.entries()) {
     // Evaluated against the list as it arrives, so dropping a cue can never
     // promote its neighbour into first or last position.
-    if (dropsAsCredit(lines, index, cues.length, trackKind)) continue;
+    if (dropsAsCredit(lines, index, cues.length, notation)) continue;
 
     const text = lines
       .map((line) => line.replace(marker, ''))

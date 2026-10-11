@@ -106,9 +106,12 @@ Both forms need `yt-dlp` on `PATH`; npx does not bundle it.
 ## Flags
 
 - `--lang <code>` — subtitle language. Default `en`, which accepts `en`,
-  `en-orig`, `en-US` or `en-GB`: a manual track is preferred over an auto one,
-  then the variants in that order. Any other code, `en-US` included, is matched
-  exactly.
+  `en-orig`, `en-US`, `en-GB` or a named track (`en-` plus an 11-character id,
+  such as `en-JkeT_87f4cc` for a live recording's `English - DTVCC1`): a manual
+  track is preferred over an auto one, then the variants in that order, named
+  tracks last. When a manual or named track loses, a single-video fetch names
+  it and the `--lang` that selects it. Any other code, `en-US` included, is
+  matched exactly.
 - `--playlist` — read a `watch?v=...&list=...` URL as the playlist rather than the
   single video. A bare playlist or channel URL expands without it.
 - `--force` — in a batch, ignore the skip set and re-fetch everything. A single

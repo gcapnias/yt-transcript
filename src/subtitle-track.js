@@ -40,6 +40,36 @@ export function classifyTrack(rawText) {
   return AUTO_SIGNAL.test(rawText) ? 'auto' : 'manual';
 }
 
+/**
+ * A named track's key: a 2-3 letter language, no region, then exactly eleven
+ * characters of YouTube's track id (ADR-0009). The id holds `-` and `_`, so
+ * the key can hold more hyphens than the language and id show.
+ */
+const NAMED_TRACK = /^[A-Za-z]{2,3}-[A-Za-z0-9_-]{11}$/;
+
+/**
+ * Whether a track's key is a named track's, such as `en-JkeT_87f4cc`. True
+ * however the track was asked for; `en`, `en-orig`, `en-US` and `en-GB` are
+ * not named, nor is a translation keyed `en-` plus a longer track key.
+ *
+ * @param {string} language a track's key, as `trackLanguage` reads it
+ */
+export function isNamedTrack(language) {
+  return NAMED_TRACK.test(language);
+}
+
+/**
+ * A track's key, read from the file name `yt-dlp` gave it: everything between
+ * the id and the extension (`<id>.<key>.<ext>`). Neither a video id nor a
+ * media id holds a dot, and a key never does either: `yt-dlp` writes its dots
+ * as hyphens.
+ *
+ * @param {string} fileName
+ */
+export function trackLanguage(fileName) {
+  return fileName.slice(fileName.indexOf('.') + 1, fileName.lastIndexOf('.'));
+}
+
 /** Milliseconds, as an integer, so cue arithmetic never rounds. */
 function toMilliseconds(timestamp) {
   const [clock, fraction = '0'] = timestamp.replace(',', '.').split('.');

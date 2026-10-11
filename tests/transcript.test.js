@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { renderTranscript } from '../src/transcript.js';
-import { readFixture } from './fixtures.js';
+import { readFixture, readNamedFixture } from './fixtures.js';
 
 const METADATA = {
   title: 'OpenAI Codex Crash Course – Build & Deploy Apps with Autonomous AI',
@@ -463,4 +463,66 @@ test('artifacts are stripped before dedup, so repeated boilerplate never feeds t
   );
 
   assert.equal(body(contents).trimEnd(), 'the plan is simple and it works.');
+});
+
+// ------------------------------------------------- named tracks (ADR-0009)
+
+const DTVCC1 = 'en-JkeT_87f4cc';
+const CC1 = 'en-uYU-mmqFLq8';
+
+test('a named track that reads as manual stays manual, minus its speaker markers and sound events', () => {
+  const { contents, trackKind } = render(readNamedFixture(DTVCC1), { trackKey: DTVCC1 });
+  const text = body(contents);
+
+  assert.equal(trackKind, 'manual');
+  assert.match(contents, /^subtitles: manual$/m);
+  // The recorded excerpt opens `>>> All right.` and holds one `[ Applause ]`.
+  assert.match(text, /^All right\. Good morning\./);
+  assert.ok(!text.includes('>'), 'a speaker marker survived');
+  assert.ok(!text.includes('[ Applause ]'), 'a padded sound event survived');
+});
+
+test('a manual track that is not named keeps its markers and sound events, as it always did', () => {
+  // The same recorded track, asked for by a key that is not a named one's.
+  const text = body(render(readNamedFixture(DTVCC1), { trackKey: 'en' }).contents);
+
+  assert.match(text, /^>>> All right\./);
+  assert.ok(text.includes('>> Thank you, Satya.'));
+  assert.equal(text.match(/\[ Applause \]/g).length, 1);
+  // No key at all is not a named one either.
+  assert.match(body(render(readNamedFixture(DTVCC1)).contents), /^>>> All right\./);
+});
+
+test('a named track that reads as auto is cleaned as auto, with no stray angle bracket', () => {
+  const { contents, trackKind } = render(readNamedFixture(CC1), { trackKey: CC1 });
+  const text = body(contents);
+
+  assert.equal(trackKind, 'auto');
+  assert.match(contents, /^subtitles: auto$/m);
+  assert.match(text, /^All right\. Good morning\./);
+  assert.ok(!text.includes('>'), text);
+});
+
+test('a named manual track still skips dedup and keeps a credit-like line', () => {
+  // Kind still decides these (ADR-0009): a repeated cue stays, and a line that
+  // reads like a credit is kept, because the auto table has no credit rule.
+  const cues = ['Transcriber: Jane Doe', 'Hello there.', 'Hello there.', 'Goodbye now.'];
+  const { contents } = render(track(cues), { trackKey: DTVCC1 });
+
+  assert.equal(body(contents).trimEnd(), 'Transcriber: Jane Doe Hello there. Hello there. Goodbye now.');
+});
+
+test('a named manual track takes the auto notation only: dashes and parentheses are speech', () => {
+  const { contents } = render(track(['- Heat. (Laughter) Warmth.', '&gt;&gt; Light.']), { trackKey: DTVCC1 });
+
+  assert.equal(body(contents).trimEnd(), '- Heat. (Laughter) Warmth. Light.');
+});
+
+test('the auto speaker marker is >> or >>>, removed whole, on a named track as on any auto one', () => {
+  const lines = ['&gt;&gt;&gt; So this is the plan.', '&gt;&gt; It is a good one.', '[ Applause ]'];
+
+  for (const trackKey of [undefined, 'en', CC1]) {
+    const { contents } = render(track(lines, { auto: true }), { trackKey });
+    assert.equal(body(contents).trimEnd(), 'So this is the plan. It is a good one.', trackKey);
+  }
 });

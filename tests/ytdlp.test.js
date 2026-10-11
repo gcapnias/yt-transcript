@@ -23,9 +23,18 @@ import {
   parseMetadata,
 } from '../src/ytdlp.js';
 import { xPost } from '../src/site.js';
-import { classifyTrack } from '../src/subtitle-track.js';
+import { classifyTrack, isNamedTrack, trackLanguage } from '../src/subtitle-track.js';
 import { withTempDir } from '../src/temp-dir.js';
-import { AUTO_ORIG_ID, fixtureName, readFixture, readXListing, readXPrintLine, SUBTITLE_429_WARNING } from './fixtures.js';
+import {
+  AUTO_ORIG_ID,
+  fixtureName,
+  namedFixtureName,
+  readFixture,
+  readNamedFixture,
+  readXListing,
+  readXPrintLine,
+  SUBTITLE_429_WARNING,
+} from './fixtures.js';
 
 const URL = 'https://www.youtube.com/watch?v=o3CX_Y59_74';
 
@@ -38,7 +47,7 @@ test('a zero-byte subtitle file is no subtitle file', async () => {
     assert.equal(await findSubtitleTrack(dir), null);
 
     await fs.writeFile(path.join(dir, 'o3CX_Y59_74.el.vtt'), 'WEBVTT\n', 'utf8');
-    assert.equal(await findSubtitleTrack(dir), path.join(dir, 'o3CX_Y59_74.el.vtt'));
+    assert.equal((await findSubtitleTrack(dir)).trackPath, path.join(dir, 'o3CX_Y59_74.el.vtt'));
   });
 });
 
@@ -53,8 +62,16 @@ const AUTO_TRACK =
 async function chosenTrack(tracks) {
   return withTempDir(async (dir) => {
     for (const [name, text] of tracks) await fs.writeFile(path.join(dir, name), text, 'utf8');
-    const chosen = await findSubtitleTrack(dir);
-    return chosen && path.basename(chosen);
+    const found = await findSubtitleTrack(dir);
+    return found && path.basename(found.trackPath);
+  });
+}
+
+/** What was passed over, as `kind key` pairs, in the order the picker ranked them. */
+async function passedOver(tracks) {
+  return withTempDir(async (dir) => {
+    for (const [name, text] of tracks) await fs.writeFile(path.join(dir, name), text, 'utf8');
+    return (await findSubtitleTrack(dir)).passedOver.map(({ kind, key }) => `${kind} ${key}`);
   });
 }
 
@@ -126,6 +143,132 @@ test('a language asked for exactly is still found', async () => {
   }
 });
 
+// Named tracks (ADR-0009): the key is a language plus an 11-character id, and
+// the id may itself hold `-` and `_`, as a video id can.
+
+const CC1 = 'en-uYU-mmqFLq8';
+const DTVCC1 = 'en-JkeT_87f4cc';
+
+test('a named track is a language plus an 11-character id, and nothing else', () => {
+  for (const key of [DTVCC1, CC1, 'en-1JJtFDtHuZg', 'fr-JkeT_87f4cc', 'yue-JkeT_87f4cc']) {
+    assert.equal(isNamedTrack(key), true, key);
+  }
+  for (const key of [
+    'en',
+    'en-orig',
+    'en-US',
+    'en-GB',
+    'en-fr',
+    `en-${CC1}`,
+    `${DTVCC1}1`,
+    DTVCC1.slice(0, -1),
+    'en-US-JkeT_87f4cc',
+    'JkeT_87f4cc',
+  ]) {
+    assert.equal(isNamedTrack(key), false, key);
+  }
+});
+
+test('a track file name gives its language, whatever hyphens the id and key hold', () => {
+  assert.equal(trackLanguage(`ilmBGeGldrI.${DTVCC1}.vtt`), DTVCC1);
+  // A video id holding a `-` and a `_`, and a key holding a `-` inside its id.
+  assert.equal(trackLanguage(`LoMOPj-lO8U.${CC1}.vtt`), CC1);
+  assert.equal(trackLanguage('o3CX_Y59_74.en.srt'), 'en');
+  assert.equal(trackLanguage('2101938030122868736.en-US.vtt'), 'en-US');
+});
+
+test('a manual plain en beats a manual named track, in any order on disk', async () => {
+  const tracks = [
+    [`X.${DTVCC1}.vtt`, MANUAL_TRACK],
+    ['X.en.vtt', MANUAL_TRACK],
+  ];
+
+  assert.equal(await chosenTrack(tracks), 'X.en.vtt');
+  assert.equal(await chosenTrack(tracks.toReversed()), 'X.en.vtt');
+});
+
+test('a manual named track beats every auto track', async () => {
+  const tracks = ['en', 'en-orig', 'en-US', 'en-GB'].map((lang) => [`X.${lang}.vtt`, AUTO_TRACK]);
+  tracks.push([`X.${DTVCC1}.vtt`, MANUAL_TRACK]);
+
+  assert.equal(await chosenTrack(tracks), `X.${DTVCC1}.vtt`);
+  assert.equal(await chosenTrack(tracks.toReversed()), `X.${DTVCC1}.vtt`);
+});
+
+test('an auto en-GB beats an auto named track, which alone is still found', async () => {
+  const tracks = [
+    [`X.${CC1}.vtt`, AUTO_TRACK],
+    ['X.en-GB.vtt', AUTO_TRACK],
+  ];
+
+  assert.equal(await chosenTrack(tracks), 'X.en-GB.vtt');
+  assert.equal(await chosenTrack(tracks.toReversed()), 'X.en-GB.vtt');
+  assert.equal(await chosenTrack([[`X.${CC1}.vtt`, AUTO_TRACK]]), `X.${CC1}.vtt`);
+});
+
+test('the recorded DTVCC1 reads as manual and beats the recorded CC1, which reads as auto', async () => {
+  const dtvcc1 = readNamedFixture(DTVCC1);
+  const cc1 = readNamedFixture(CC1);
+  const tracks = [
+    [namedFixtureName(CC1), cc1],
+    [namedFixtureName(DTVCC1), dtvcc1],
+  ];
+
+  assert.equal(classifyTrack(dtvcc1), 'manual');
+  assert.equal(classifyTrack(cc1), 'auto');
+  assert.equal(await chosenTrack(tracks), namedFixtureName(DTVCC1));
+  assert.equal(await chosenTrack(tracks.toReversed()), namedFixtureName(DTVCC1));
+});
+
+// The picker also says what it passed over, so a single-video fetch can name
+// the tracks a person might have wanted instead (ADR-0009).
+
+test('manual and named tracks passed over are reported, unnamed auto ones are not', async () => {
+  assert.deepEqual(
+    await passedOver([
+      ['X.en.vtt', MANUAL_TRACK],
+      [`X.${DTVCC1}.vtt`, MANUAL_TRACK],
+      [`X.${CC1}.vtt`, AUTO_TRACK],
+      ['X.en-orig.vtt', AUTO_TRACK],
+      ['X.en-US.vtt', AUTO_TRACK],
+    ]),
+    [`manual ${DTVCC1}`, `auto ${CC1}`],
+  );
+});
+
+test('a named auto track that lost to an auto en is reported', async () => {
+  assert.deepEqual(
+    await passedOver([
+      ['X.en.vtt', AUTO_TRACK],
+      [`X.${CC1}.vtt`, AUTO_TRACK],
+    ]),
+    [`auto ${CC1}`],
+  );
+});
+
+test('a manual track that lost to a better manual one is reported with its key', async () => {
+  assert.deepEqual(
+    await passedOver([
+      ['X.en-US.vtt', MANUAL_TRACK],
+      ['X.en.vtt', MANUAL_TRACK],
+    ]),
+    ['manual en-US'],
+  );
+});
+
+test('nothing is reported when only unnamed auto tracks were passed over', async () => {
+  assert.deepEqual(
+    await passedOver([
+      ['X.en.vtt', MANUAL_TRACK],
+      ['X.en-orig.vtt', AUTO_TRACK],
+      ['X.en-GB.vtt', AUTO_TRACK],
+    ]),
+    [],
+  );
+  assert.deepEqual(await passedOver([['X.en.vtt', AUTO_TRACK]]), []);
+  assert.deepEqual(await passedOver([[`X.${DTVCC1}.vtt`, MANUAL_TRACK]]), []);
+});
+
 test('the recorded en-US track reads as manual', () => {
   // What makes it `subtitles: manual` once chosen.
   assert.equal(classifyTrack(readFixture('manual', 'QIHnmqYU614')), 'manual');
@@ -164,12 +307,12 @@ test('a youtube fetch that exits 0 with a refused subtitle download and no track
   assert.equal(fetchFailure({ ...outcome, hasTrack: true, stderr }), null);
 });
 
-test('the default English asks for en, en-orig, en-US and en-GB, and outlives one of them failing', () => {
+test('the default English asks for en, en-orig, en-US, en-GB and a named track, and outlives one of them failing', () => {
   const args = fetchArgs({ url: URL, lang: 'en', destDir: '/tmp/run' });
 
   // `en` is widened (ADR-0006): a video whose only manual English is `en-US`,
   // or whose translated `en` is refused, is not left to that `en`.
-  assert.equal(args[args.indexOf('--sub-langs') + 1], 'en,en-orig,en-US,en-GB');
+  assert.equal(args[args.indexOf('--sub-langs') + 1], 'en,en-orig,en-US,en-GB,en-[A-Za-z0-9_-]{11}');
   assert.ok(args.includes('--ignore-errors'), 'a 429 on one variant would abort the rest');
   // Still exact codes: nothing broadens to `all`, which would let `live_chat`
   // in as a live stream's "manual" track.
@@ -253,7 +396,7 @@ test('the youtube invocation is exactly what it was, with English widened', () =
     '--write-sub',
     '--write-auto-sub',
     '--sub-langs',
-    'en,en-orig,en-US,en-GB',
+    'en,en-orig,en-US,en-GB,en-[A-Za-z0-9_-]{11}',
     '--ignore-errors',
     '--no-simulate',
     '--print',
@@ -275,7 +418,7 @@ test('a post is fetched as playlist entry 1, printing what ranks the video fetch
   assert.equal(args[args.indexOf('--playlist-items') + 1], '1');
   assert.equal(args.at(-1), POST_URL);
   // English is asked for as it is of a YouTube video (ADR-0006).
-  assert.equal(args[args.indexOf('--sub-langs') + 1], 'en,en-orig,en-US,en-GB');
+  assert.equal(args[args.indexOf('--sub-langs') + 1], 'en,en-orig,en-US,en-GB,en-[A-Za-z0-9_-]{11}');
   assert.ok(args.includes('--ignore-errors'));
   // The fetch itself leaves no file but the track.
   assert.ok(!args.includes('--write-info-json'));
