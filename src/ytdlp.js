@@ -401,8 +401,9 @@ export async function expandPlaylist({ url, binary = YT_DLP }) {
  * would report the wrong failure.
  *
  * The default English can land up to four tracks, and the best is returned
- * (ADR-0006): manual over auto, then `en`, `en-orig`, `en-US`, `en-GB`. The ranking never
- * rests on listing order, which puts `X.en-US.vtt` before `X.en.vtt`.
+ * (ADR-0006): manual over auto, then `en`, `en-orig`, `en-US`, `en-GB`. The
+ * ranking never rests on listing order, which puts `X.en-US.vtt` before
+ * `X.en.vtt`.
  */
 export async function findSubtitleTrack(destDir) {
   const entries = await fs.readdir(destDir, { withFileTypes: true });

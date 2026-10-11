@@ -29,7 +29,7 @@ export const AUTO_IDS = [
 /**
  * The one `en-orig` track (ADR-0006, #12): the untranslated recognition of a
  * dubbed video whose stacked `en` is refused with a 429. Recorded from `yt-dlp`
- * 2026.08.19 with `--lang en-orig`, trimmed to its first cues. Kept out of
+ * 2026.08.19 with `--sub-langs en-orig`, trimmed to its first cues. Kept out of
  * `AUTO_IDS`, which is the cleaning rules' acceptance set.
  */
 export const AUTO_ORIG_ID = 'MN9dGgmLyso';
@@ -53,7 +53,7 @@ const TRACK_LANGUAGES = { QIHnmqYU614: 'en-US', MN9dGgmLyso: 'en-orig' };
 
 /**
  * What `yt-dlp` 2026.08.19 wrote to stderr on `QIHnmqYU614`, asked for
- * `en,en-orig,en-US,en-GB` with `--ignore-errors`: the translated `en` was refused,
+ * `en,en-US,en-GB` with `--ignore-errors`: the translated `en` was refused,
  * and the run exited 0 (ADR-0006).
  */
 export const SUBTITLE_429_WARNING =
