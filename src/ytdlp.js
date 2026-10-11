@@ -145,7 +145,7 @@ export function parseMetadata(stdout) {
  * English as the default `--lang en` accepts it, in the order a track of one
  * kind is preferred (ADR-0006). Any other language is matched exactly.
  */
-const ENGLISH_VARIANTS =['en', 'en-US', 'en-GB'];
+const ENGLISH_VARIANTS = ['en', 'en-orig', 'en-US', 'en-GB'];
 
 /**
  * What `--sub-langs` asks for. Widening `en` needs `--ignore-errors`: without
@@ -400,8 +400,8 @@ export async function expandPlaylist({ url, binary = YT_DLP }) {
  * `--sub-format` is passed, so treating a non-vtt track as "no subtitles"
  * would report the wrong failure.
  *
- * The default English can land up to three tracks, and the best is returned
- * (ADR-0006): manual over auto, then `en`, `en-US`, `en-GB`. The ranking never
+ * The default English can land up to four tracks, and the best is returned
+ * (ADR-0006): manual over auto, then `en`, `en-orig`, `en-US`, `en-GB`. The ranking never
  * rests on listing order, which puts `X.en-US.vtt` before `X.en.vtt`.
  */
 export async function findSubtitleTrack(destDir) {

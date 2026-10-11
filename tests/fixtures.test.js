@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { AUTO_IDS, FIXTURES_DIR, fixtureName, MANUAL_IDS } from './fixtures.js';
+import { AUTO_IDS, AUTO_ORIG_ID, FIXTURES_DIR, fixtureName, MANUAL_IDS } from './fixtures.js';
 
 // These are the entire evidence base for every track-kind-dependent rule, and
 // nothing in the repository can restore them once the root clutter is deleted.
@@ -28,7 +28,7 @@ test('auto and manual fixtures stay distinguishable by directory', () => {
       .filter((name) => name.endsWith('.vtt'))
       .sort();
 
-  assert.deepEqual(listing('auto'), AUTO_IDS.map(fixtureName).sort());
+  assert.deepEqual(listing('auto'), [...AUTO_IDS, AUTO_ORIG_ID].map(fixtureName).sort());
   assert.deepEqual(listing('manual'), MANUAL_IDS.map(fixtureName).sort());
 });
 
