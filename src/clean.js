@@ -15,7 +15,7 @@
  */
 
 import { stripArtifacts } from './artifacts.js';
-import { classifyTrack, parseCues } from './subtitle-track.js';
+import { classifyTrack, isNamedTrack, parseCues } from './subtitle-track.js';
 
 /** Settled across every speaker tested, and hard-coded by decision, not a flag. */
 const PARAGRAPH_MIN_WORDS = 100;
@@ -133,10 +133,18 @@ function toParagraphs(words) {
 /**
  * The whole pipeline.
  *
+ * A named track (ADR-0009) takes its notation from the auto table, so `>>`,
+ * `>>>` and `[ … ]` are artifacts even on a track that reads as manual, and
+ * the credit rule, which is manual notation, does not apply to it. Dedup and
+ * the recorded kind (the frontmatter) still follow the classified kind, which
+ * is why the notation is chosen apart from it.
+ *
  * @param {string} rawText the subtitle track exactly as downloaded
+ * @param {{ trackKey?: string }} [options] the track's key, such as
+ *   `en-JkeT_87f4cc`; absent when not known, which is not a named track
  * @returns {{ trackKind: 'auto'|'manual', paragraphs: string[] }}
  */
-export function cleanTrack(rawText) {
+export function cleanTrack(rawText, { trackKey } = {}) {
   // Classify first: the rule reads raw cue text, and every later branch needs
   // the answer.
   const trackKind = classifyTrack(rawText);
@@ -154,7 +162,8 @@ export function cleanTrack(rawText) {
   // sound-event rule matches within a single cue. The edge is forced — the
   // overlap detection below has no minimum match length, so repeated
   // boilerplate is precisely the repetition it mis-fires on.
-  const spoken = stripArtifacts(cues, trackKind);
+  const notation = trackKey !== undefined && isNamedTrack(trackKey) ? 'auto' : trackKind;
+  const spoken = stripArtifacts(cues, notation);
 
   return { trackKind, paragraphs: toParagraphs(mergeCues(spoken, { dedup: trackKind === 'auto' })) };
 }

@@ -29,6 +29,8 @@ import { YOUTUBE } from './site.js';
  *           displayId?: string }} input.metadata
  * @param {number} [input.videoNumber] for an X post, which of its videos the
  *   track is, from 1; settled by the fetch, and required for a post
+ * @param {string} [input.trackKey] the track's key, such as `en-JkeT_87f4cc`;
+ *   a named track is cleaned with the auto notation (ADR-0009)
  * @param {Date} [input.fetchedAt]
  *
  * `collisionId` in the result is what the filename collision rule suffixes: the
@@ -47,9 +49,10 @@ export function renderTranscript({
   site = YOUTUBE,
   metadata,
   videoNumber,
+  trackKey,
   fetchedAt = new Date(),
 }) {
-  const { trackKind: detectedKind, paragraphs } = cleanTrack(trackText);
+  const { trackKind: detectedKind, paragraphs } = cleanTrack(trackText, { trackKey });
   const { url, collisionId, trackKind, title, channel, slug } = site.identify({
     metadata,
     url: fetchedUrl,

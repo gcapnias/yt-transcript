@@ -155,6 +155,83 @@ test('a successful fetch reports the video title, channel, duration and upload d
   assert.match(report, /\(auto subtitle track\)/);
 });
 
+// The hint (ADR-0009): a single-video fetch says which manual or named tracks
+// lost to the one it used, and which --lang selects each.
+
+const HINT_FETCH = (passedOver) => async () => ({
+  file: 'transcripts/a-talk.md',
+  transcript: { url: URL, trackKind: 'manual', video: { title: 'A Talk' } },
+  passedOver,
+});
+
+async function singleVideoOutput(passedOver, argv = ['o3CX_Y59_74']) {
+  const { out, io } = capture();
+  const code = await main(argv, io, {
+    preflight: async () => '2026.09.01',
+    fetchTranscript: HINT_FETCH(passedOver),
+    rebuildCatalog: async () => ({ file: 'transcripts/README.md', count: 1, warnings: [] }),
+  });
+  assert.equal(code, 0);
+  return out;
+}
+
+test('the tracks passed over are named after the track kind line, each with its key', async () => {
+  const out = await singleVideoOutput([
+    { kind: 'manual', key: 'en-JkeT_87f4cc' },
+    { kind: 'auto', key: 'en-uYU-mmqFLq8' },
+  ]);
+
+  assert.equal(out[1], `  ${URL}  (manual subtitle track)`);
+  assert.equal(
+    out[2],
+    '  also on this video: manual en-JkeT_87f4cc, auto en-uYU-mmqFLq8; ' +
+      're-run with --lang <key> to use one',
+  );
+  assert.match(out[3], /^ +title +A Talk$/);
+});
+
+test('one track passed over is named the same way', async () => {
+  const out = await singleVideoOutput([{ kind: 'auto', key: 'en-uYU-mmqFLq8' }]);
+
+  assert.equal(
+    out[2],
+    '  also on this video: auto en-uYU-mmqFLq8; re-run with --lang <key> to use one',
+  );
+});
+
+test('nothing is added when no track was passed over', async () => {
+  for (const passedOver of [[], undefined]) {
+    const out = await singleVideoOutput(passedOver);
+    assert.ok(!out.join('\n').includes('also on this video'), out.join('\n'));
+  }
+});
+
+test('a batch never prints the hint', async () => {
+  const { deps } = batchDeps({
+    fetchTranscript: async ({ url, videoId }) => ({
+      file: `transcripts/${videoId}.md`,
+      transcript: { url, trackKind: 'manual' },
+      passedOver: [{ kind: 'manual', key: 'en-JkeT_87f4cc' }],
+    }),
+  });
+  const { out, err, io } = capture();
+
+  assert.equal(await main([PLAYLIST], io, deps), 0);
+  assert.ok(!`${out.join('\n')}${err.join('\n')}`.includes('also on this video'));
+});
+
+test('the usage text says the default English also takes named tracks, last', async () => {
+  const { err, io } = capture();
+
+  assert.equal(await main(['--bogus'], io, {}), 1);
+  const usage = err.join('\n');
+  assert.match(usage, /named track/);
+  assert.ok(
+    usage.split('\n').every((line) => line.length <= 80),
+    'a usage line is wider than 80 columns',
+  );
+});
+
 test('each rung of the retry ladder is reported, naming the video', async () => {
   const { err, io } = capture();
 

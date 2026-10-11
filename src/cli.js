@@ -16,8 +16,9 @@ const USAGE = `Usage: yt-transcript <url|id> [--lang <code>] [--playlist] [--for
                 its first, or the media item a trailing /video/N or
                 /photo/N selects
   --lang <code> subtitle language (default: en). en accepts en, en-orig,
-                en-US or en-GB, preferring a manual track, then that
-                order; any other code is matched exactly
+                en-US, en-GB or a named track (en-JkeT_87f4cc), preferring
+                a manual track, then that order, named tracks last; any
+                other code is matched exactly
   --playlist    read a watch?v=...&list=... URL as the playlist, not the video
   --force       in a batch, ignore the skip set and re-fetch everything. A
                 single video is re-fetched either way.
@@ -159,7 +160,7 @@ export async function main(argv, io = {}, deps = {}) {
     // An X post has no video id and its identity is only known after the fetch
     // (ADR-0004); it is fetched by the url it was typed as, and the video
     // number it chose.
-    const { transcript, file } = await fetchOne(
+    const { transcript, file, passedOver } = await fetchOne(
       {
         url: target.url,
         videoId: target.videoId,
@@ -169,7 +170,7 @@ export async function main(argv, io = {}, deps = {}) {
       { onRetry: (retry) => err(describeRetry({ url: target.url, ...retry })) },
     );
 
-    report(out, transcript, file);
+    report(out, transcript, file, passedOver);
 
     // The rebuild is a full rescan rather than an appended row, so it runs
     // after the write and reflects the whole directory. A batch (ytdlp-xmu.6)
@@ -214,12 +215,22 @@ export async function main(argv, io = {}, deps = {}) {
  * step with the first. A field the metadata did not carry is left out rather
  * than printed empty or as a placeholder.
  *
+ * The line after the track kind names the manual and named tracks that lost
+ * to the one used, so a person who wanted one can say which (ADR-0009). It is
+ * absent when none did.
+ *
  * Single-video only. A batch reports per-video progress and a roll-call
  * instead, and a block per video would bury both.
+ *
+ * @param {import('./ytdlp.js').PassedOverTrack[]} [passedOver]
  */
-function report(out, transcript, file) {
+function report(out, transcript, file, passedOver = []) {
   out(file);
   out(`  ${transcript.url}  (${transcript.trackKind} subtitle track)`);
+  if (passedOver.length > 0) {
+    const tracks = passedOver.map(({ kind, key }) => `${kind} ${key}`).join(', ');
+    out(`  also on this video: ${tracks}; re-run with --lang <key> to use one`);
+  }
 
   const fields = Object.entries(transcript.video ?? {}).filter(([, value]) => value);
   // Aligned on the longest label present, so the column is never a constant
