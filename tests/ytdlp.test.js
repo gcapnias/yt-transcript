@@ -23,7 +23,7 @@ import {
   parseMetadata,
 } from '../src/ytdlp.js';
 import { xPost } from '../src/site.js';
-import { classifyTrack, isNamedTrack, trackLanguage } from '../src/subtitle-track.js';
+import { classifyTrack, isNamedTrack, trackKeyFromFileName } from '../src/subtitle-track.js';
 import { withTempDir } from '../src/temp-dir.js';
 import {
   AUTO_ORIG_ID,
@@ -169,12 +169,12 @@ test('a named track is a language plus an 11-character id, and nothing else', ()
   }
 });
 
-test('a track file name gives its language, whatever hyphens the id and key hold', () => {
-  assert.equal(trackLanguage(`ilmBGeGldrI.${DTVCC1}.vtt`), DTVCC1);
+test('a track file name gives its key, whatever hyphens the id and key hold', () => {
+  assert.equal(trackKeyFromFileName(`ilmBGeGldrI.${DTVCC1}.vtt`), DTVCC1);
   // A video id holding a `-` and a `_`, and a key holding a `-` inside its id.
-  assert.equal(trackLanguage(`LoMOPj-lO8U.${CC1}.vtt`), CC1);
-  assert.equal(trackLanguage('o3CX_Y59_74.en.srt'), 'en');
-  assert.equal(trackLanguage('2101938030122868736.en-US.vtt'), 'en-US');
+  assert.equal(trackKeyFromFileName(`LoMOPj-lO8U.${CC1}.vtt`), CC1);
+  assert.equal(trackKeyFromFileName('o3CX_Y59_74.en.srt'), 'en');
+  assert.equal(trackKeyFromFileName('2101938030122868736.en-US.vtt'), 'en-US');
 });
 
 test('a manual plain en beats a manual named track, in any order on disk', async () => {

@@ -504,8 +504,9 @@ test('a named track that reads as auto is cleaned as auto, with no stray angle b
 });
 
 test('a named manual track still skips dedup and keeps a credit-like line', () => {
-  // Kind still decides these (ADR-0009): a repeated cue stays, and a line that
-  // reads like a credit is kept, because the auto table has no credit rule.
+  // Kind still decides dedup (ADR-0009), so a repeated cue stays. A line that
+  // reads like a credit is kept for another reason: the named track reads the
+  // auto notation, and that table has no credit rule.
   const cues = ['Transcriber: Jane Doe', 'Hello there.', 'Hello there.', 'Goodbye now.'];
   const { contents } = render(track(cues), { trackKey: DTVCC1 });
 

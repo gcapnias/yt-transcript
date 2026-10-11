@@ -15,7 +15,7 @@ import path from 'node:path';
 
 import { describeFailure, UNLISTED_VIDEO, withRateLimitRetries } from './fetch-outcome.js';
 import { xPost, YOUTUBE } from './site.js';
-import { trackLanguage } from './subtitle-track.js';
+import { trackKeyFromFileName } from './subtitle-track.js';
 import { withTempDir } from './temp-dir.js';
 import { renderTranscript } from './transcript.js';
 import { writeTranscript } from './transcript-store.js';
@@ -42,7 +42,7 @@ import { FetchError, fetchSubtitleTrack, listPostVideos } from './ytdlp.js';
  *           sleep?: (ms: number) => Promise<void>, delays?: number[],
  *           onRetry?: Function }} [deps]
  * @returns {Promise<{ transcript: object, file: string,
- *                     passedOver: { kind: 'auto'|'manual', key: string }[] }>}
+ *                     passedOver: import('./ytdlp.js').PassedOverTrack[] }>}
  *   `passedOver` is the tracks that lost to the one used, as `findSubtitleTrack`
  *   lists them, for a single-video fetch to name
  * @throws {FetchError} carrying `failure` and `retryable`
@@ -77,7 +77,7 @@ export async function fetchTranscript({ url, videoId, post, lang = 'en' }, deps 
           metadata,
           videoNumber,
           // The key is what tells a named track, whatever it was asked for by.
-          trackKey: trackLanguage(path.basename(trackPath)),
+          trackKey: trackKeyFromFileName(path.basename(trackPath)),
         });
         return { transcript, passedOver };
       }),

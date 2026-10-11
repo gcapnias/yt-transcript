@@ -52,10 +52,10 @@ const NAMED_TRACK = /^[A-Za-z]{2,3}-[A-Za-z0-9_-]{11}$/;
  * however the track was asked for; `en`, `en-orig`, `en-US` and `en-GB` are
  * not named, nor is a translation keyed `en-` plus a longer track key.
  *
- * @param {string} language a track's key, as `trackLanguage` reads it
+ * @param {string} key a track's key, as `trackKeyFromFileName` reads it
  */
-export function isNamedTrack(language) {
-  return NAMED_TRACK.test(language);
+export function isNamedTrack(key) {
+  return NAMED_TRACK.test(key);
 }
 
 /**
@@ -66,7 +66,7 @@ export function isNamedTrack(language) {
  *
  * @param {string} fileName
  */
-export function trackLanguage(fileName) {
+export function trackKeyFromFileName(fileName) {
   return fileName.slice(fileName.indexOf('.') + 1, fileName.lastIndexOf('.'));
 }
 

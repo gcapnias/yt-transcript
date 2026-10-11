@@ -67,10 +67,10 @@ export const SUBTITLE_429_WARNING =
  * https://www.youtube.com/watch?v=ilmBGeGldrI`, then trimmed (the files are
  * otherwise byte-for-byte what it wrote, LF line endings):
  *
- * - `DTVCC1` ("English - DTVCC1", key `en-JkeT_87f4cc`): the header and the
- *   first 478 lines, which are cues from 00:19:35.849 to 00:24:56.599. It holds
+ * - `DTVCC1` ("English - DTVCC1", key `en-JkeT_87f4cc`): the first
+ *   478 lines, which are cues from 00:19:35.849 to 00:24:56.599. It holds
  *   a `>>>` and a `>>` speaker marker and one `[ Applause ]` event.
- * - `CC1` ("English - CC1", key `en-uYU-mmqFLq8`): the header and the first 60
+ * - `CC1` ("English - CC1", key `en-uYU-mmqFLq8`): the first 60
  *   lines, which are cues from 00:19:35.774 to 00:19:52.891. It opens with a
  *   `>>>` speaker marker.
  */

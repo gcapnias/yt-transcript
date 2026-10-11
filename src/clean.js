@@ -133,10 +133,11 @@ function toParagraphs(words) {
 /**
  * The whole pipeline.
  *
- * A named track (ADR-0009) is cleaned by its kind in every respect but one:
- * its notation is the auto notation, so `>>`, `>>>` and `[ … ]` are artifacts
- * even on a track that reads as manual. Dedup and the credit rule still follow
- * the kind, which is why the notation is chosen apart from it.
+ * A named track (ADR-0009) takes its notation from the auto table, so `>>`,
+ * `>>>` and `[ … ]` are artifacts even on a track that reads as manual, and
+ * the credit rule, which is manual notation, does not apply to it. Dedup and
+ * the recorded kind (the frontmatter) still follow the classified kind, which
+ * is why the notation is chosen apart from it.
  *
  * @param {string} rawText the subtitle track exactly as downloaded
  * @param {{ trackKey?: string }} [options] the track's key, such as

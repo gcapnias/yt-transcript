@@ -74,8 +74,9 @@ function isSoundEvent(enclosed) {
 
 /**
  * Whether a cue is a provenance credit standing where only a credit can stand.
- * Manual tracks only — the notation does not occur on auto ones, so applying
- * it there could only ever delete speech.
+ * Manual notation only — it does not occur on auto tracks, so applying it
+ * there could only ever delete speech, and a named track, which reads the
+ * auto notation, keeps such a line.
  */
 function dropsAsCredit(lines, index, total, notation) {
   if (notation !== 'manual') return false;

@@ -222,7 +222,7 @@ export async function main(argv, io = {}, deps = {}) {
  * Single-video only. A batch reports per-video progress and a roll-call
  * instead, and a block per video would bury both.
  *
- * @param {{ kind: 'auto'|'manual', key: string }[]} [passedOver]
+ * @param {import('./ytdlp.js').PassedOverTrack[]} [passedOver]
  */
 function report(out, transcript, file, passedOver = []) {
   out(file);

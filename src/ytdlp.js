@@ -5,7 +5,7 @@ import path from 'node:path';
 import { sanitizeChildEnv } from './child-env.js';
 import { describeFailure } from './fetch-outcome.js';
 import { xPost, YOUTUBE } from './site.js';
-import { classifyTrack, isNamedTrack, trackLanguage } from './subtitle-track.js';
+import { classifyTrack, isNamedTrack, trackKeyFromFileName } from './subtitle-track.js';
 import { parseTarget, TargetParseError } from './target.js';
 
 /** The binary name looked up on PATH. Overridable so tests need not uninstall it. */
@@ -193,13 +193,21 @@ export function fetchArgs({ url, lang, destDir, site = YOUTUBE }) {
 }
 
 /**
+ * A track that lost to the one chosen.
+ *
+ * @typedef {object} PassedOverTrack
+ * @property {'auto'|'manual'} kind
+ * @property {string} key the track's key, such as `en-JkeT_87f4cc`
+ */
+
+/**
  * One blind invocation per video: downloads the subtitle track into `destDir`
  * and emits the metadata on stdout. No pre-flight query and no `.info.json`
  * is ever written. The one second round-trip is an X post's, when the fetch
  * cannot say which of the post's videos it was (`listPostVideos`).
  *
  * @returns {Promise<{ metadata: object, trackPath: string,
- *                     passedOver: { kind: 'auto'|'manual', key: string }[] }>}
+ *                     passedOver: PassedOverTrack[] }>}
  */
 export async function fetchSubtitleTrack({ url, lang = 'en', destDir, site = YOUTUBE, binary = YT_DLP }) {
   const { exitCode, stdout, stderr } = await run(binary, fetchArgs({ url, lang, destDir, site }));
@@ -418,8 +426,7 @@ export async function expandPlaylist({ url, binary = YT_DLP }) {
  * manual track and every named one, whatever its kind, best first. An unnamed
  * auto track is never listed.
  *
- * @returns {Promise<{ trackPath: string,
- *                     passedOver: { kind: 'auto'|'manual', key: string }[] }|null>}
+ * @returns {Promise<{ trackPath: string, passedOver: PassedOverTrack[] }|null>}
  */
 export async function findSubtitleTrack(destDir) {
   const entries = await fs.readdir(destDir, { withFileTypes: true });
@@ -432,7 +439,7 @@ export async function findSubtitleTrack(destDir) {
     if (size === 0) continue;
 
     const kind = classifyTrack(await fs.readFile(trackPath, 'utf8'));
-    const key = trackLanguage(entry.name);
+    const key = trackKeyFromFileName(entry.name);
     candidates.push({ trackPath, kind, key, rank: trackRank(key, kind, entry.name) });
   }
   if (candidates.length === 0) return null;
@@ -450,8 +457,8 @@ export async function findSubtitleTrack(destDir) {
  * after the English variants, as does a language outside them, which is one
  * asked for exactly and the only one in the directory.
  */
-function trackRank(language, kind, name) {
-  const variant = ENGLISH_VARIANTS.indexOf(language);
+function trackRank(key, kind, name) {
+  const variant = ENGLISH_VARIANTS.indexOf(key);
 
   return [
     kind === 'manual' ? 0 : 1,
