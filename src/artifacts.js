@@ -13,7 +13,7 @@
  * | Class                   | Manual           | Auto        | Disposition                    |
  * |-------------------------|------------------|-------------|--------------------------------|
  * | Provenance credits      | `Transcriber:`   | none        | Drop the cue, first or last only |
- * | Speaker change          | leading `- `     | leading `>>`/`>>>` | Delete the marker, keep the cue |
+ * | Speaker change          | leading `- `     | `>>`, `>>>` | Delete the marker, keep the cue |
  * | Sound events            | `(Laughter)`     | `[snorts]`  | Strip the token, shape-guarded |
  * | Transcriber annotations | `[Caplin?]`      | none        | Keep verbatim, brackets and all |
  *

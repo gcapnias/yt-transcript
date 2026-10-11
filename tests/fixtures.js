@@ -71,7 +71,7 @@ export const SUBTITLE_429_WARNING =
  *   first 478 lines, which are cues from 00:19:35.849 to 00:24:56.599. It holds
  *   a `>>>` and a `>>` speaker marker and one `[ Applause ]` event.
  * - `CC1` ("English - CC1", key `en-uYU-mmqFLq8`): the header and the first 60
- *   lines, which are cues from 00:19:35.774 to 00:19:53.091. It opens with a
+ *   lines, which are cues from 00:19:35.774 to 00:19:52.891. It opens with a
  *   `>>>` speaker marker.
  */
 export const NAMED_VIDEO_ID = 'ilmBGeGldrI';
