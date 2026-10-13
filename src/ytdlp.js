@@ -99,14 +99,15 @@ export async function preflight({ binary = YT_DLP } = {}) {
  * `yt-dlp` reported them; reformatting is the transcript's business.
  *
  * @param {string} stdout
- * The last eight fields are printed for an X post only, and are empty strings
+ * `uploaderId` and `channelId` name the channel folder and are printed for both
+ * sites. Of the rest, the last eight are printed for an X post only, and are empty strings
  * (`playlistIndex` `null`) for a YouTube video. `playlistIndex` is `null` on
  * an X post too unless the whole post was fetched.
  *
  * @returns {{ title: string, channel: string, duration: string, uploadDate: string,
  *             description: string, uploader: string, uploaderId: string,
  *             displayId: string, extractorKey: string, webpageUrl: string,
- *             mediaId: string, playlistIndex: number|null }|null}
+ *             mediaId: string, playlistIndex: number|null, channelId: string }|null}
  */
 export function parseMetadata(stdout) {
   const line = stdout
@@ -131,6 +132,7 @@ export function parseMetadata(stdout) {
     description: parsed.description ?? '',
     uploader: parsed.uploader ?? '',
     uploaderId: parsed.uploader_id ?? '',
+    channelId: parsed.channel_id ?? '',
     displayId: parsed.display_id ?? '',
     extractorKey: parsed.extractor_key ?? '',
     webpageUrl: parsed.webpage_url ?? '',

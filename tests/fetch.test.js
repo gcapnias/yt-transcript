@@ -38,9 +38,20 @@ Hello and welcome.
 const METADATA = {
   title: 'A Talk',
   channel: 'A Channel',
+  uploaderId: '@AChannel',
+  channelId: 'UCaaaaaaaaaaaaaaaaaaaaaa',
   duration: '1:00',
   uploadDate: '20260910',
 };
+
+/** The transcripts a fetch wrote, as paths relative to the directory, folders included. */
+async function writtenFiles(dir) {
+  const entries = await fs.readdir(dir, { recursive: true, withFileTypes: true });
+  return entries
+    .filter((entry) => entry.isFile())
+    .map((entry) => path.relative(dir, path.join(entry.parentPath, entry.name)).split(path.sep).join('/'))
+    .sort();
+}
 
 /**
  * Replays recorded process outcomes in place of spawning `yt-dlp`, so the exit
@@ -166,7 +177,9 @@ test('a rate limit that lifts produces the transcript it was holding up', async 
     );
 
     assert.deepEqual(slept, [5000, 15000]);
-    assert.deepEqual(await fs.readdir(dir), ['a-talk.md']);
+    // Filed under the channel's handle, which the print line carries.
+    assert.deepEqual(await writtenFiles(dir), ['achannel/a-talk.md']);
+    assert.equal(file, path.join(dir, 'achannel', 'a-talk.md'));
     assert.match(await fs.readFile(file, 'utf8'), /Hello and welcome\./);
   });
 });
@@ -240,8 +253,9 @@ test('a post is fetched as a post, with a canonical handle-free url', async () =
       spellings.map((url) => [url, 'x']),
     );
     // Two spellings, one post: the second overwrote the first.
-    const files = await fs.readdir(dir);
+    const files = await writtenFiles(dir);
     assert.equal(files.length, 1);
+    assert.match(files[0], /^poteto\//, 'a post is filed under its author\'s handle');
     assert.match(
       await fs.readFile(path.join(dir, files[0]), 'utf8'),
       /^---\ntitle: "here's how i shipped.*\nurl: https:\/\/x\.com\/i\/status\/2102050467505430555\n/,
@@ -270,7 +284,7 @@ test('two different posts sharing a title are told apart by post id', async () =
     await fetchPost('2102050467505430999', 1);
     await fetchPost('2102050467505430555', 2);
 
-    const files = await fs.readdir(dir);
+    const files = await writtenFiles(dir);
     assert.equal(files.length, 3);
     assert.ok(files.some((file) => file.endsWith('-2102050467505430999.md')));
     assert.ok(files.some((file) => file.endsWith('-2102050467505430555-2.md')));
@@ -341,7 +355,7 @@ test("/video/1 and the bare post are one transcript, the later video another", a
     assert.equal(fromBare.transcript.collisionId, '1600649710662213632');
     assert.equal(fromFirst.transcript.collisionId, '1600649710662213632');
     assert.equal(fromFirst.file, fromBare.file, '/video/1 did not overwrite the bare post');
-    assert.equal((await fs.readdir(dir)).length, 2, 'video 2 overwrote video 1');
+    assert.equal((await writtenFiles(dir)).length, 2, 'video 2 overwrote video 1');
   });
 });
 

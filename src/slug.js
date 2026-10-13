@@ -79,6 +79,26 @@ function cap(slug) {
   return cut.replace(/-+$/, '');
 }
 
+/** Where a transcript goes when its channel has neither a handle nor an id. */
+export const UNKNOWN_CHANNEL_FOLDER = 'unknown-channel';
+
+/**
+ * The channel folder a transcript is filed in (ADR-0008): the channel's handle,
+ * kebab-cased the way a slug is — a leading `@` drops out, and any run of other
+ * characters, `_`, `.` and `-` included, becomes one `-` — but with neither the
+ * retention fallback nor the length cap. A folder names a channel, not a title:
+ * a handle cannot be too lossy to be honest, only empty.
+ *
+ * A handle that is missing, or kebab-cases to nothing (non-Latin), falls back to
+ * the lowercased channel id, and a channel with neither to `unknown-channel`.
+ *
+ * @param {{ handle?: string, channelId?: string }} channel as `yt-dlp` reported it
+ * @returns {string}
+ */
+export function channelFolder({ handle, channelId } = {}) {
+  return slugify(handle ?? '') || String(channelId ?? '').toLowerCase() || UNKNOWN_CHANNEL_FOLDER;
+}
+
 /**
  * The slug a transcript is filed under.
  *
