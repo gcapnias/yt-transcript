@@ -7,8 +7,9 @@ removed as text, but it first marks where one turn ends and the next begins.
 **A track is a dialog when it carries 10 or more speaker-change turns. Otherwise it is prose.**
 On an auto track the marker is a leading `>>`, and a turn that holds only a sound event (such as
 `>> [music]`) doesn't count. On a manual track the marker is a leading `- `, and `- ...` continues
-the current turn rather than starting a new one. Each turn opens with an em dash. No speaker is
-named, because no track names its speakers reliably.
+the current turn rather than starting a new one. Speech before the first marker is a turn too,
+and counts toward the threshold. Each turn opens with an em dash. No speaker is named, because
+no track names its speakers reliably.
 
 The threshold comes from the survey in `archive/research/subtitle-speaker-notation.md`. The
 highest count on a recent single-speaker auto track was 5, from embedded clips and laughter. The

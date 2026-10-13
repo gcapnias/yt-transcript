@@ -5,8 +5,8 @@ import { renderCatalog, scanTranscriptUrls } from '../src/catalog.js';
 import { renderFrontmatter } from '../src/frontmatter.js';
 
 /**
- * A transcript exactly as the writer produces one: seven keys, settled order,
- * `title`/`channel`/`duration` double-quoted.
+ * A transcript exactly as the writer produced one before `layout`: the seven
+ * required keys, settled order, `title`/`channel`/`duration` double-quoted.
  */
 function transcript(overrides = {}) {
   const video = {

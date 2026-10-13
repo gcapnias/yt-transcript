@@ -1,7 +1,7 @@
 {
   "name": "yt-transcript",
   "version": "0.2.2",
-  "description": "Turns YouTube videos into Markdown transcripts that read as prose.",
+  "description": "Turns YouTube and X videos into Markdown transcripts that read as prose or as dialog.",
   "type": "module",
   "private": true,
   "bin": {
