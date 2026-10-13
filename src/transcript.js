@@ -26,7 +26,7 @@ import { YOUTUBE } from './site.js';
  *   ignores `url` and `videoId`, and rebuilds both from the metadata
  * @param {{ title: string, channel: string, duration: string, uploadDate: string,
  *           description?: string, uploader?: string, uploaderId?: string,
- *           displayId?: string }} input.metadata
+ *           displayId?: string, channelId?: string }} input.metadata
  * @param {number} [input.videoNumber] for an X post, which of its videos the
  *   track is, from 1; settled by the fetch, and required for a post
  * @param {string} [input.trackKey] the track's key, such as `en-JkeT_87f4cc`;
@@ -38,7 +38,8 @@ import { YOUTUBE } from './site.js';
  * `url` is the frontmatter `url`, for an X post the one built from metadata.
  *
  * @returns {{ slug: string, filename: string, contents: string,
- *             url: string, collisionId: string, trackKind: 'auto'|'manual',
+ *             url: string, collisionId: string, channelFolder: string,
+ *             trackKind: 'auto'|'manual',
  *             video: { title: string, channel: string, duration: string,
  *                      uploaded: string } }}
  */
@@ -53,7 +54,7 @@ export function renderTranscript({
   fetchedAt = new Date(),
 }) {
   const { trackKind: detectedKind, paragraphs } = cleanTrack(trackText, { trackKey });
-  const { url, collisionId, trackKind, title, channel, slug } = site.identify({
+  const { url, collisionId, trackKind, title, channel, channelFolder, slug } = site.identify({
     metadata,
     url: fetchedUrl,
     videoId: fetchedVideoId,
@@ -83,6 +84,8 @@ export function renderTranscript({
     contents: `${frontmatter}\n\n${body}\n`,
     url,
     collisionId,
+    // Where the store files it (ADR-0008); never written into the frontmatter.
+    channelFolder,
     trackKind,
     // What the run tells the human it just fetched. Carried out here rather
     // than re-read from the file or re-formatted by the CLI, so the terminal

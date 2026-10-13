@@ -4,9 +4,15 @@ Turns videos on YouTube and X into Markdown transcripts that read as prose, for 
 agent input or reference material. It produces transcripts, never summaries.
 
 Each fetch downloads a subtitle track, cleans it into paragraphs, and writes one
-Markdown file under `transcripts/` with frontmatter describing the video. A catalog
-at `transcripts/README.md` lists every transcript on disk, derived from their
-frontmatter so it cannot drift from what is there.
+Markdown file with frontmatter describing the video, filed in a folder per channel:
+`transcripts/<channel folder>/<slug>.md`. The folder is the channel's handle in
+kebab-case (`@iamseankochel` on YouTube becomes `iamseankochel/`), falling back to its
+channel id, or to `unknown-channel/`; the same handle on YouTube and X is one folder
+(see [ADR-0008](docs/adr/0008-transcripts-are-filed-by-channel-handle.md)). Fetching a
+video again removes any older transcript of it elsewhere, so a renamed channel or a
+retitled video moves rather than duplicates. A catalog at `transcripts/README.md`
+lists every transcript on disk, derived from their frontmatter so it cannot drift
+from what is there; it warns about any transcript left outside a channel folder.
 
 ## Prerequisites
 

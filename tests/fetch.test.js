@@ -25,6 +25,7 @@ import {
   X_TRACK_ID,
 } from './fixtures.js';
 import { recordedFailure } from './recorded-outcomes.js';
+import { listFiles as writtenFiles, put } from './transcripts-dir.js';
 
 const URL = 'https://www.youtube.com/watch?v=o3CX_Y59_74';
 const VIDEO_ID = 'o3CX_Y59_74';
@@ -38,6 +39,8 @@ Hello and welcome.
 const METADATA = {
   title: 'A Talk',
   channel: 'A Channel',
+  uploaderId: '@AChannel',
+  channelId: 'UCaaaaaaaaaaaaaaaaaaaaaa',
   duration: '1:00',
   uploadDate: '20260910',
 };
@@ -155,6 +158,24 @@ test('a rate-limited fetch climbs the ladder, then leaves nothing behind', async
   });
 });
 
+test('a failed fetch of a video already on disk leaves its existing transcript alone', async () => {
+  await withTranscriptsDir(async (dir) => {
+    const existing = `---\ntitle: "A Talk"\nurl: ${URL}\n---\n\nOlder prose.\n`;
+    await put(dir, 'old-handle/a-talk.md', existing);
+    const recorded = recordedFetch([{ failure: NO_SUBTITLES }]);
+
+    await assert.rejects(
+      fetchTranscript(
+        { url: URL, videoId: VIDEO_ID, lang: 'en' },
+        { fetchTrack: recorded.fetchTrack, dir },
+      ),
+    );
+
+    assert.deepEqual(await writtenFiles(dir), ['old-handle/a-talk.md']);
+    assert.equal(await fs.readFile(path.join(dir, 'old-handle', 'a-talk.md'), 'utf8'), existing);
+  });
+});
+
 test('a rate limit that lifts produces the transcript it was holding up', async () => {
   await withTranscriptsDir(async (dir) => {
     const recorded = recordedFetch([{ failure: RATE_LIMITED }, { failure: RATE_LIMITED }, {}]);
@@ -166,7 +187,9 @@ test('a rate limit that lifts produces the transcript it was holding up', async 
     );
 
     assert.deepEqual(slept, [5000, 15000]);
-    assert.deepEqual(await fs.readdir(dir), ['a-talk.md']);
+    // Filed under the channel's handle, which the print line carries.
+    assert.deepEqual(await writtenFiles(dir), ['achannel/a-talk.md']);
+    assert.equal(file, path.join(dir, 'achannel', 'a-talk.md'));
     assert.match(await fs.readFile(file, 'utf8'), /Hello and welcome\./);
   });
 });
@@ -240,8 +263,9 @@ test('a post is fetched as a post, with a canonical handle-free url', async () =
       spellings.map((url) => [url, 'x']),
     );
     // Two spellings, one post: the second overwrote the first.
-    const files = await fs.readdir(dir);
+    const files = await writtenFiles(dir);
     assert.equal(files.length, 1);
+    assert.match(files[0], /^poteto\//, 'a post is filed under its author\'s handle');
     assert.match(
       await fs.readFile(path.join(dir, files[0]), 'utf8'),
       /^---\ntitle: "here's how i shipped.*\nurl: https:\/\/x\.com\/i\/status\/2102050467505430555\n/,
@@ -270,7 +294,7 @@ test('two different posts sharing a title are told apart by post id', async () =
     await fetchPost('2102050467505430999', 1);
     await fetchPost('2102050467505430555', 2);
 
-    const files = await fs.readdir(dir);
+    const files = await writtenFiles(dir);
     assert.equal(files.length, 3);
     assert.ok(files.some((file) => file.endsWith('-2102050467505430999.md')));
     assert.ok(files.some((file) => file.endsWith('-2102050467505430555-2.md')));
@@ -341,7 +365,7 @@ test("/video/1 and the bare post are one transcript, the later video another", a
     assert.equal(fromBare.transcript.collisionId, '1600649710662213632');
     assert.equal(fromFirst.transcript.collisionId, '1600649710662213632');
     assert.equal(fromFirst.file, fromBare.file, '/video/1 did not overwrite the bare post');
-    assert.equal((await fs.readdir(dir)).length, 2, 'video 2 overwrote video 1');
+    assert.equal((await writtenFiles(dir)).length, 2, 'video 2 overwrote video 1');
   });
 });
 

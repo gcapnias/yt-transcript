@@ -214,8 +214,11 @@ test('a quote post is the quoting post, from its own first video', () => {
 
 test('the catalog lists a post transcript with no change of its own', () => {
   const transcript = render(recorded('poteto-2102050467505430555'));
-  const { markdown, warnings } = renderCatalog([{ path: transcript.filename, text: transcript.contents }]);
+  assert.equal(transcript.channelFolder, 'poteto');
+  const { markdown, warnings } = renderCatalog([
+    { path: `${transcript.channelFolder}/${transcript.filename}`, text: transcript.contents },
+  ]);
 
   assert.deepEqual(warnings, []);
-  assert.match(markdown, /\(heres-how-i-shipped-2-500-prs[^)]*\.md\) \| lauren \(@poteto\) \| 38:01 \| 2026-09-21 \| auto \|/);
+  assert.match(markdown, /\(poteto\/heres-how-i-shipped-2-500-prs[^)]*\.md\) \| lauren \(@poteto\) \| 38:01 \| 2026-09-21 \| auto \|/);
 });

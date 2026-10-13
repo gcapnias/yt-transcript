@@ -39,11 +39,23 @@ const COLUMNS = [
 const REQUIRED_KEYS = ['title', 'url', 'channel', 'duration', 'upload_date', 'fetched', 'subtitles'];
 
 /**
+ * Whether a file's path puts it in a channel folder. The one place that rule
+ * lives: paths are relative to `transcripts/` and `/`-separated, which is how
+ * `readTranscriptFiles` produces them, so a folder shows as a `/`.
+ *
+ * @param {string} filePath
+ */
+export function isInChannelFolder(filePath) {
+  return filePath.includes('/');
+}
+
+/**
  * Renders the catalog.
  *
  * @param {Array<{ path: string, text: string }>} files every `.md` in the
- *   transcripts directory, the catalog itself included — it is excluded by the
- *   scan rule below, with no filename special case.
+ *   transcripts directory and its channel folders, the catalog itself included
+ *   — it is excluded by the scan rule below, with no filename special case.
+ *   `path` is relative to the transcripts directory and is the row's link.
  * @returns {{ markdown: string, warnings: string[], count: number }} the spec's
  *   seam names the two keys it covers, and every test exercises exactly those;
  *   `count` is the row count handed back rather than re-parsed out of the
@@ -64,6 +76,12 @@ export function renderCatalog(files) {
     if (frontmatter.error) {
       warnings.push(`Skipped ${file.path}: ${frontmatter.error}. Re-download it to restore it.`);
       continue;
+    }
+
+    // Still listed, so it is not dropped from the catalog nor fetched again;
+    // the warning is how it gets filed where it belongs (ADR-0008).
+    if (!isInChannelFolder(file.path)) {
+      warnings.push(`${file.path} is outside a channel folder. Move it into its channel folder.`);
     }
 
     rows.push({ path: file.path, ...frontmatter.values });
