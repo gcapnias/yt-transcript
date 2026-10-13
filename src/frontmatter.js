@@ -2,9 +2,10 @@
  * The frontmatter: the YAML block opening a transcript, describing the video
  * it came from.
  *
- * Exactly seven keys, in one order, closed. Every value format below was
- * settled against a YAML parser rather than by eye — see the spec's Transcript
- * contract section before widening any of it.
+ * Seven keys, in one order, then `layout`, which is newer than the rest and the
+ * only one a transcript may lack. Every value format below was settled against
+ * a YAML parser rather than by eye — see the spec's Transcript contract section
+ * before widening any of it.
  */
 
 /**
@@ -42,7 +43,8 @@ function formatFetched(date) {
 
 /**
  * @param {{ title: string, url: string, channel: string, duration: string,
- *           uploadDate: string, fetchedAt: Date, subtitles: 'auto'|'manual' }} video
+ *           uploadDate: string, fetchedAt: Date, subtitles: 'auto'|'manual',
+ *           layout: 'prose'|'dialog' }} video
  * @returns {string} the block, closing `---` included, with no trailing newline
  */
 export function renderFrontmatter(video) {
@@ -59,6 +61,9 @@ export function renderFrontmatter(video) {
     `upload_date: ${formatUploadDate(video.uploadDate)}`,
     `fetched: ${formatFetched(video.fetchedAt)}`,
     `subtitles: ${video.subtitles}`,
+    // The layout used, not the one asked for. Written on every new transcript,
+    // but the catalog never requires it: transcripts older than it have none.
+    `layout: ${video.layout}`,
     '---',
   ].join('\n');
 }

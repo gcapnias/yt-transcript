@@ -5,8 +5,8 @@ import { renderCatalog, scanTranscriptUrls } from '../src/catalog.js';
 import { renderFrontmatter } from '../src/frontmatter.js';
 
 /**
- * A transcript exactly as the writer produces one: seven keys, settled order,
- * `title`/`channel`/`duration` double-quoted.
+ * A transcript exactly as the writer produced one before `layout`: the seven
+ * required keys, settled order, `title`/`channel`/`duration` double-quoted.
  */
 function transcript(overrides = {}) {
   const video = {
@@ -150,6 +150,7 @@ test('a title the writer had to escape survives the round trip into a cell', () 
     uploadDate: '20260910',
     fetchedAt: new Date('2026-09-16T14:03:05.123Z'),
     subtitles: 'auto',
+    layout: 'prose',
   })}\n\nProse.\n`;
 
   const { markdown, warnings } = renderCatalog([{ path: 'a-channel/wayfinder.md', text }]);
@@ -175,6 +176,7 @@ test('the scan reads back the url the writer really wrote', () => {
     uploadDate: '20260910',
     fetchedAt: new Date('2026-09-16T14:03:05.123Z'),
     subtitles: 'auto',
+    layout: 'prose',
   })}\n\nProse.\n`;
 
   assert.deepEqual(scanTranscriptUrls([{ path: 'renamed-by-hand.md', text }]), [

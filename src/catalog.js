@@ -9,7 +9,7 @@
  * the filesystem; `catalog-store.js` does the reading and the writing.
  *
  * **Derivability is the standing test for any future column**: computable from
- * the seven frontmatter keys plus the file path, or it does not belong. `url`
+ * the frontmatter keys plus the file path, or it does not belong. `url`
  * and `fetched` are deliberately not surfaced **in the table** — `fetched`
  * would churn a row on every re-fetch.
  *
@@ -32,9 +32,14 @@ const COLUMNS = [
 ];
 
 /**
- * The frontmatter contract is closed at exactly seven keys, so "incomplete"
- * has no other referent: a file missing one did not come from this tool, and
- * re-downloading it is the honest advice.
+ * Every transcript this tool has ever written carries all seven of these keys,
+ * so "incomplete" has no other referent: a file missing one did not come from
+ * this tool, and re-downloading it is the honest advice.
+ *
+ * `layout`, the eighth key, is deliberately not here: it is newer than the
+ * rest, and every transcript written before it lacks it. Requiring it would
+ * warn about all of them and ask for a re-download that changes nothing but
+ * the key.
  */
 const REQUIRED_KEYS = ['title', 'url', 'channel', 'duration', 'upload_date', 'fetched', 'subtitles'];
 
@@ -221,8 +226,8 @@ export function readFrontmatter(text) {
 /**
  * `readFrontmatter` plus the catalog's completeness judgement.
  *
- * The frontmatter contract is closed at seven keys, so a file missing one did
- * not come from this tool and earns the warning that says so.
+ * Every transcript this tool writes carries the seven required keys, so a file
+ * missing one did not come from this tool and earns the warning that says so.
  *
  * @returns {null | { error: string } | { values: Record<string, string> }}
  */

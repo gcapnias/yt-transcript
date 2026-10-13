@@ -7,7 +7,7 @@
  * render are handed a site and ask it; none of them asks which site it has.
  *
  * Everything after the subtitle track is downloaded is the same for both:
- * cleaning, the frontmatter's seven keys, the store and the catalog.
+ * cleaning, the frontmatter's keys, the store and the catalog.
  */
 
 import { classifyFetch, classifyPostFetch } from './fetch-outcome.js';

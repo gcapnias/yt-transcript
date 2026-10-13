@@ -1,45 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { renderTranscript } from '../src/transcript.js';
 import { readFixture, readNamedFixture } from './fixtures.js';
-
-const METADATA = {
-  title: 'OpenAI Codex Crash Course – Build & Deploy Apps with Autonomous AI',
-  channel: 'freeCodeCamp.org',
-  duration: '41:18',
-  uploadDate: '20260910',
-};
-
-const FETCHED_AT = new Date('2026-09-16T14:03:05.123Z');
-
-/**
- * Builds a subtitle track from cue texts. `auto` decides which track kind the
- * classifier will read out of the body, using the same two signals a real
- * track carries: `<c>` word-timing tags and `align:start position:0%`.
- */
-function track(cueTexts, { auto = false } = {}) {
-  const stamp = (n) => `00:00:${String(n).padStart(2, '0')}.000`;
-  const settings = auto ? ' align:start position:0%' : '';
-  const cues = cueTexts.map((text, index) => {
-    const body = auto ? text.replace(/(\s)(\S+)$/, '$1<00:00:00.500><c>$2</c>') : text;
-    return `${stamp(index)} --> ${stamp(index + 1)}${settings}\n${body}`;
-  });
-  return `WEBVTT\nKind: captions\nLanguage: en\n\n${cues.join('\n\n')}\n`;
-}
-
-function render(trackText, overrides = {}) {
-  return renderTranscript({
-    trackText,
-    url: 'https://www.youtube.com/watch?v=o3CX_Y59_74',
-    videoId: 'o3CX_Y59_74',
-    metadata: METADATA,
-    fetchedAt: FETCHED_AT,
-    ...overrides,
-  });
-}
-
-const body = (contents) => contents.split(/\n---\n\n/)[1];
+import { body, METADATA, render, track } from './inline-track.js';
 
 // ---------------------------------------------------------------- slug
 
@@ -157,7 +120,7 @@ test('the rendered transcript carries what the run reports about the video', () 
 
 // -------------------------------------------------------- frontmatter
 
-test('frontmatter carries exactly the seven keys, in order, with the settled quoting', () => {
+test('frontmatter carries exactly its keys, in order, with the settled quoting', () => {
   const { contents } = render(track(['Hello there.'], { auto: true }));
 
   assert.ok(
@@ -171,6 +134,7 @@ test('frontmatter carries exactly the seven keys, in order, with the settled quo
         'upload_date: 2026-09-10',
         'fetched: 2026-09-16T14:03:05Z',
         'subtitles: auto',
+        'layout: prose',
         '---',
         '',
         '',
@@ -234,7 +198,7 @@ test('the body is prose: no heading, no timestamps, no markup', () => {
   assert.ok(!/&(amp|lt|gt|quot|#39);/.test(prose), 'the body carries an undecoded entity');
 });
 
-test('paragraphs are separated by blank lines and break at a sentence end past 100 words', () => {
+test('paragraphs are separated by blank lines and break at a sentence end past 130 words', () => {
   // Ten words per cue, each ending a sentence, and each cue distinct so dedup
   // has nothing to find either way.
   const cues = Array.from(
@@ -245,8 +209,8 @@ test('paragraphs are separated by blank lines and break at a sentence end past 1
   const paragraphs = body(contents).trimEnd().split('\n\n');
 
   assert.equal(paragraphs.length, 2);
-  assert.equal(paragraphs[0].split(' ').length, 100);
-  assert.equal(paragraphs[1].split(' ').length, 50);
+  assert.equal(paragraphs[0].split(' ').length, 130);
+  assert.equal(paragraphs[1].split(' ').length, 20);
   assert.ok(paragraphs[0].endsWith('.'));
 });
 
@@ -313,13 +277,11 @@ test('manual output keeps every sentence the auto dedup heuristic would have eat
 
   // Dialogue echo: k=2, the second speaker's opening word deleted.
   //
-  // The literal lost its two `- ` prefixes when artifact stripping landed:
-  // both cues are line-start speaker markers, and deleting them is this
-  // pipeline's settled behaviour. What the assertion measures is unchanged —
-  // both utterances survive, nothing is deleted — and it reads like an
-  // accidental duplication precisely because the marker is gone. It is not
-  // one, and dedup still never runs on a manual track.
-  assert.ok(warmth.includes('Warmth. Warmth, light.'), 'the two-speaker exchange lost a word');
+  // This track marks enough `- ` turns to be a dialog, so each speaker's reply
+  // is its own turn: the `- ` markers become the em dashes. What the assertion
+  // measures is unchanged — both replies survive, nothing is deleted — and
+  // dedup still never runs on a manual track.
+  assert.ok(warmth.includes('— Warmth.\n\n— Warmth, light.'), 'the two-speaker exchange lost a word');
   // Number split across cues: k=1, a whole magnitude deleted.
   assert.ok(warmth.includes('100 trillion, trillion atoms'), 'the split number lost a magnitude');
   // Rhetorical repeat: k=2, the entire cue erased.

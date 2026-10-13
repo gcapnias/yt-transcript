@@ -37,7 +37,7 @@ import { FetchError, fetchSubtitleTrack, listPostVideos } from './ytdlp.js';
  * turned into the site every layer below asks (see `site.js`).
  *
  * @param {{ url: string, videoId: string|null, post?: { videoNumber: number },
- *           lang?: string }} video
+ *           lang?: string, layout?: 'auto'|'prose'|'dialog' }} video
  * @param {{ fetchTrack?: Function, listVideos?: Function, write?: Function, dir?: string,
  *           sleep?: (ms: number) => Promise<void>, delays?: number[],
  *           onRetry?: Function }} [deps]
@@ -47,7 +47,7 @@ import { FetchError, fetchSubtitleTrack, listPostVideos } from './ytdlp.js';
  *   lists them, for a single-video fetch to name
  * @throws {FetchError} carrying `failure` and `retryable`
  */
-export async function fetchTranscript({ url, videoId, post, lang = 'en' }, deps = {}) {
+export async function fetchTranscript({ url, videoId, post, lang = 'en', layout }, deps = {}) {
   // `fetchTrack` downloads the subtitle track; a *fetch*, in this codebase's
   // vocabulary, is the whole operation this function performs.
   const {
@@ -78,6 +78,7 @@ export async function fetchTranscript({ url, videoId, post, lang = 'en' }, deps 
           videoNumber,
           // The key is what tells a named track, whatever it was asked for by.
           trackKey: trackKeyFromFileName(path.basename(trackPath)),
+          layout,
         });
         return { transcript, passedOver };
       }),
