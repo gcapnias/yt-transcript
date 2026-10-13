@@ -150,6 +150,7 @@ test('a title the writer had to escape survives the round trip into a cell', () 
     uploadDate: '20260910',
     fetchedAt: new Date('2026-09-16T14:03:05.123Z'),
     subtitles: 'auto',
+    layout: 'prose',
   })}\n\nProse.\n`;
 
   const { markdown, warnings } = renderCatalog([{ path: 'a-channel/wayfinder.md', text }]);
@@ -175,6 +176,7 @@ test('the scan reads back the url the writer really wrote', () => {
     uploadDate: '20260910',
     fetchedAt: new Date('2026-09-16T14:03:05.123Z'),
     subtitles: 'auto',
+    layout: 'prose',
   })}\n\nProse.\n`;
 
   assert.deepEqual(scanTranscriptUrls([{ path: 'renamed-by-hand.md', text }]), [

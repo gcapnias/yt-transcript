@@ -30,9 +30,11 @@ const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
  * Runs one fetch per url, in order.
  *
  * @param {string[]} urls canonical video urls, already stripped of what is on disk
- * @param {{ fetchOne: Function, lang?: string, sleep?: (ms: number) => Promise<void>,
- *           delayMs?: number, onProgress?: Function, onRetry?: Function,
- *           onFailure?: Function }} deps
+ * @param {{ fetchOne: Function, lang?: string, layout?: 'auto'|'prose'|'dialog',
+ *           sleep?: (ms: number) => Promise<void>, delayMs?: number,
+ *           onProgress?: Function, onRetry?: Function, onFailure?: Function,
+ *           onWarning?: (warning: string) => void }} deps `layout` is applied to
+ *   every fetch alike; `onWarning` gets what a fetch owes the human about it
  * @returns {Promise<{ fetched: Array<{ url: string, file: string }>,
  *                     failures: Array<{ url: string, failure: string|null, message: string }> }>}
  */
@@ -40,11 +42,13 @@ export async function runBatch(urls, deps) {
   const {
     fetchOne,
     lang = 'en',
+    layout = 'auto',
     sleep = wait,
     delayMs = FETCH_DELAY_MS,
     onProgress,
     onRetry,
     onFailure,
+    onWarning,
   } = deps;
 
   const fetched = [];
@@ -58,11 +62,12 @@ export async function runBatch(urls, deps) {
     onProgress?.({ url, position: index + 1, total: urls.length });
 
     try {
-      const { file } = await fetchOne(
-        { url, videoId: parseTarget(url).videoId, lang },
+      const { file, transcript } = await fetchOne(
+        { url, videoId: parseTarget(url).videoId, lang, layout },
         { onRetry: onRetry && ((retry) => onRetry({ url, ...retry })) },
       );
       fetched.push({ url, file });
+      for (const warning of transcript?.warnings ?? []) onWarning?.(warning);
     } catch (error) {
       // `failure` is the classification a FetchError carries. Anything else
       // reaching here is still collected rather than thrown past the loop:

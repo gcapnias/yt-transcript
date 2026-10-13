@@ -35,6 +35,10 @@ const COLUMNS = [
  * The frontmatter contract is closed at exactly seven keys, so "incomplete"
  * has no other referent: a file missing one did not come from this tool, and
  * re-downloading it is the honest advice.
+ *
+ * `layout` is deliberately not here: it is newer than the contract, and every
+ * transcript written before it lacks it. Requiring it would warn about all of
+ * them and ask for a re-download that changes nothing but the key.
  */
 const REQUIRED_KEYS = ['title', 'url', 'channel', 'duration', 'upload_date', 'fetched', 'subtitles'];
 

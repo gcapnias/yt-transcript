@@ -45,12 +45,14 @@ test('flags parse to the settled set', () => {
   assert.deepEqual(parseArgs(['o3CX_Y59_74']), {
     target: 'o3CX_Y59_74',
     lang: 'en',
+    layout: 'auto',
     playlist: false,
     force: false,
   });
   assert.deepEqual(parseArgs(['--lang', 'el', '--playlist', '--force', 'o3CX_Y59_74']), {
     target: 'o3CX_Y59_74',
     lang: 'el',
+    layout: 'auto',
     playlist: true,
     force: true,
   });
@@ -589,6 +591,7 @@ test('a post is a single fetch of that post, never a batch', async () => {
       videoId: null,
       post: { videoNumber: 2 },
       lang: 'en',
+      layout: 'auto',
     },
   ]);
   assert.match(out.join('\n'), /video\/2 {2}\(auto subtitle track\)/);

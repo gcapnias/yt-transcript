@@ -1,9 +1,9 @@
 # yt-transcript
 
-Turns videos on YouTube and X into Markdown transcripts that read as prose, for use as
+Turns videos on YouTube and X into Markdown transcripts that read as prose or as dialog, for use as
 agent input or reference material. It produces transcripts, never summaries.
 
-Each fetch downloads a subtitle track, cleans it into paragraphs, and writes one
+Each fetch downloads a subtitle track, cleans it into paragraphs or, for a multi-speaker track, turns, and writes one
 Markdown file with frontmatter describing the video, filed in a folder per channel:
 `transcripts/<channel folder>/<slug>.md`. The folder is the channel's handle in
 kebab-case (`@iamseankochel` on YouTube becomes `iamseankochel/`), falling back to its
@@ -118,6 +118,11 @@ Both forms need `yt-dlp` on `PATH`; npx does not bundle it.
   tracks last. When a manual or named track loses, a single-video fetch names
   it and the `--lang` that selects it. Any other code, `en-US` included, is
   matched exactly.
+- `--layout auto|prose|dialog` — default `auto`: a track that marks 10 or more speaker
+  changes (`>>` on auto and named tracks, `- ` on other manual ones) becomes a dialog, one
+  turn per change, each opening with `— `; any other track is prose. `prose` and `dialog`
+  force one, in a batch for every video; `dialog` on a track with no speaker changes gives
+  one turn and a warning. The layout used is recorded as `layout:` in the frontmatter.
 - `--playlist` — read a `watch?v=...&list=...` URL as the playlist rather than the
   single video. A bare playlist or channel URL expands without it.
 - `--force` — in a batch, ignore the skip set and re-fetch everything. A single

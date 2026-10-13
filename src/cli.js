@@ -6,7 +6,8 @@ import { describeRetry } from './fetch-outcome.js';
 import { parseTarget, TargetParseError } from './target.js';
 import { preflight, expandPlaylist, ExpansionError, FetchError, YtDlpMissingError } from './ytdlp.js';
 
-const USAGE = `Usage: yt-transcript <url|id> [--lang <code>] [--playlist] [--force]
+const USAGE = `Usage: yt-transcript <url|id> [--lang <code>] [--layout auto|prose|dialog]
+                     [--playlist] [--force]
        yt-transcript catalog
 
   <url|id>      a YouTube video URL, a bare video id, a youtu.be or /shorts
@@ -19,7 +20,11 @@ const USAGE = `Usage: yt-transcript <url|id> [--lang <code>] [--playlist] [--for
                 en-US, en-GB or a named track (en-JkeT_87f4cc), preferring
                 a manual track, then that order, named tracks last; any
                 other code is matched exactly
-  --playlist    read a watch?v=...&list=... URL as the playlist, not the video
+  --layout <l>  auto|prose|dialog (default: auto). auto lays a track out as
+                a dialog, one turn per speaker change, when it marks 10 or
+                more of them, and as prose otherwise. prose and dialog force
+                one; in a batch it applies to every video
+  --playlist   read a watch?v=...&list=... URL as the playlist, not the video
   --force       in a batch, ignore the skip set and re-fetch everything. A
                 single video is re-fetched either way.
 
@@ -34,12 +39,15 @@ const USAGE = `Usage: yt-transcript <url|id> [--lang <code>] [--playlist] [--for
  */
 const CATALOG_COMMAND = 'catalog';
 
+/** The values `--layout` takes; `auto` applies the turn threshold (ADR-0007). */
+const LAYOUTS = ['auto', 'prose', 'dialog'];
+
 /**
  * Splits argv into a target and the settled flag set. Purely syntactic; an
  * unknown flag is a usage error rather than something passed on to `yt-dlp`.
  */
 export function parseArgs(argv) {
-  const options = { target: null, lang: 'en', playlist: false, force: false };
+  const options = { target: null, lang: 'en', layout: 'auto', playlist: false, force: false };
 
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
@@ -47,6 +55,13 @@ export function parseArgs(argv) {
       const value = argv[index + 1];
       if (!value || value.startsWith('-')) throw new UsageError('--lang needs a language code.');
       options.lang = value;
+      index += 1;
+    } else if (arg === '--layout') {
+      const value = argv[index + 1];
+      if (!LAYOUTS.includes(value)) {
+        throw new UsageError(`--layout needs one of ${LAYOUTS.join(', ')}.`);
+      }
+      options.layout = value;
       index += 1;
     } else if (arg === '--playlist') {
       options.playlist = true;
@@ -166,11 +181,13 @@ export async function main(argv, io = {}, deps = {}) {
         videoId: target.videoId,
         ...(target.kind === 'post' && { post: { videoNumber: target.videoNumber } }),
         lang: options.lang,
+        layout: options.layout,
       },
       { onRetry: (retry) => err(describeRetry({ url: target.url, ...retry })) },
     );
 
     report(out, transcript, file, passedOver);
+    for (const warning of transcript.warnings ?? []) err(warning);
 
     // The rebuild is a full rescan rather than an appended row, so it runs
     // after the write and reflects the whole directory. A batch (ytdlp-xmu.6)
@@ -292,7 +309,9 @@ async function batch({ target, options, io: { out, err }, deps }) {
   const { fetched, failures } = await runBatch(toFetch, {
     fetchOne,
     lang: options.lang,
+    layout: options.layout,
     sleep,
+    onWarning: (warning) => err(warning),
     onProgress: ({ url, position, total }) => out(`[${position}/${total}] ${url}`),
     onRetry: (retry) => err(describeRetry(retry)),
     // In full, exactly as the single-video path reports it: the wording is

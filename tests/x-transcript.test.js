@@ -46,7 +46,7 @@ function frontmatter(transcript) {
   );
 }
 
-test('a post transcript has the seven keys, built from what yt-dlp reported', () => {
+test('a post transcript has the settled keys, built from what yt-dlp reported', () => {
   const transcript = render(recorded('poteto-2102050467505430555'));
   const fields = frontmatter(transcript);
 
@@ -58,6 +58,7 @@ test('a post transcript has the seven keys, built from what yt-dlp reported', ()
     'upload_date',
     'fetched',
     'subtitles',
+    'layout',
   ]);
   assert.equal(fields.url, 'https://x.com/i/status/2102050467505430555');
   assert.equal(fields.channel, '"lauren (@poteto)"');
