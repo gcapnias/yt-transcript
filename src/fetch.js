@@ -47,7 +47,7 @@ import { FetchError, fetchSubtitleTrack, listPostVideos } from './ytdlp.js';
  *   lists them, for a single-video fetch to name
  * @throws {FetchError} carrying `failure` and `retryable`
  */
-export async function fetchTranscript({ url, videoId, post, lang = 'en', layout = 'auto' }, deps = {}) {
+export async function fetchTranscript({ url, videoId, post, lang = 'en', layout }, deps = {}) {
   // `fetchTrack` downloads the subtitle track; a *fetch*, in this codebase's
   // vocabulary, is the whole operation this function performs.
   const {

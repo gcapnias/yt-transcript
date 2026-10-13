@@ -4,39 +4,9 @@ import assert from 'node:assert/strict';
 import { runBatch } from '../src/batch.js';
 import { readFrontmatter, renderCatalog } from '../src/catalog.js';
 import { main, parseArgs, UsageError } from '../src/cli.js';
-import { renderTranscript } from '../src/transcript.js';
+import { body, render, track, URL } from './inline-track.js';
 
-const METADATA = { title: 'A Talk', channel: 'Chan', duration: '1:00', uploadDate: '20260910' };
-const URL = 'https://www.youtube.com/watch?v=o3CX_Y59_74';
-
-/**
- * A track from cues, each cue a list of lines. `auto` adds the two signals the
- * classifier reads, so the cue text stays exactly what the test wrote.
- */
-function track(cues, { auto = false } = {}) {
-  const stamp = (n) => `00:00:${String(n).padStart(2, '0')}.000`;
-  const settings = auto ? ' align:start position:0%' : '';
-  const blocks = cues.map((lines, index) => {
-    const text = (Array.isArray(lines) ? lines : [lines]).join('\n');
-    const body = auto ? text.replace(/(\S+)$/, '<c>$1</c>') : text;
-    return `${stamp(index)} --> ${stamp(index + 1)}${settings}\n${body}`;
-  });
-  return `WEBVTT\nKind: captions\nLanguage: en\n\n${blocks.join('\n\n')}\n`;
-}
-
-function render(trackText, overrides = {}) {
-  return renderTranscript({
-    trackText,
-    url: URL,
-    videoId: 'o3CX_Y59_74',
-    metadata: METADATA,
-    fetchedAt: new Date('2026-09-16T14:03:05Z'),
-    ...overrides,
-  });
-}
-
-const body = (contents) => contents.split(/\n---\n\n/)[1].trimEnd();
-const paragraphs = (contents) => body(contents).split('\n\n');
+const paragraphsOf = (contents) => body(contents).trimEnd().split('\n\n');
 const layoutOf = (contents) => /^layout: (\w+)$/m.exec(contents)?.[1];
 
 /** n turns, each `>> Turn k said something.` */
@@ -49,10 +19,10 @@ test('an auto track with ten turns is a dialog, one em-dashed paragraph per turn
   const { contents } = render(track(autoTurns(10), { auto: true }));
 
   assert.equal(layoutOf(contents), 'dialog');
-  const blocks = paragraphs(contents);
-  assert.equal(blocks.length, 10);
-  assert.equal(blocks[0], '— Turn 0 said something.');
-  assert.ok(blocks.every((block) => block.startsWith('— ')));
+  const paragraphs = paragraphsOf(contents);
+  assert.equal(paragraphs.length, 10);
+  assert.equal(paragraphs[0], '— Turn 0 said something.');
+  assert.ok(paragraphs.every((paragraph) => paragraph.startsWith('— ')));
   assert.doesNotMatch(body(contents), />/);
 });
 
@@ -80,17 +50,17 @@ test('a manual track with ten dash turns is a dialog', () => {
   const { contents, trackKind } = render(track(manualTurns(10)));
   assert.equal(trackKind, 'manual');
   assert.equal(layoutOf(contents), 'dialog');
-  assert.equal(paragraphs(contents).length, 10);
+  assert.equal(paragraphsOf(contents).length, 10);
 });
 
 test('on a manual track a `- ...` line continues the turn it interrupts', () => {
   const cues = [...manualTurns(9), '- Final turn.', '- ... and on we go.', '- … again.'];
   const { contents } = render(track(cues));
-  const blocks = paragraphs(contents);
+  const paragraphs = paragraphsOf(contents);
 
   assert.equal(layoutOf(contents), 'dialog');
-  assert.equal(blocks.length, 10);
-  assert.equal(blocks[9], '— Final turn. ... and on we go. … again.');
+  assert.equal(paragraphs.length, 10);
+  assert.equal(paragraphs[9], '— Final turn. ... and on we go. … again.');
 });
 
 test('a `- ...` line does not turn nine turns into ten', () => {
@@ -101,19 +71,19 @@ test('a `- ...` line does not turn nine turns into ten', () => {
 test('speech before the first marker is the first turn, and carries the dash', () => {
   const cues = ['Welcome everyone.', ...autoTurns(9)];
   const { contents } = render(track(cues, { auto: true }));
-  const blocks = paragraphs(contents);
+  const paragraphs = paragraphsOf(contents);
 
   assert.equal(layoutOf(contents), 'dialog');
-  assert.equal(blocks.length, 10);
-  assert.equal(blocks[0], '— Welcome everyone.');
+  assert.equal(paragraphs.length, 10);
+  assert.equal(paragraphs[0], '— Welcome everyone.');
 });
 
 test('a marker on the second line of a cue starts a turn there', () => {
   const cues = [['First speaker.', '>> Second speaker.'], ...autoTurns(8)];
-  const blocks = paragraphs(render(track(cues, { auto: true })).contents);
+  const paragraphs = paragraphsOf(render(track(cues, { auto: true })).contents);
 
-  assert.equal(blocks[0], '— First speaker.');
-  assert.equal(blocks[1], '— Second speaker.');
+  assert.equal(paragraphs[0], '— First speaker.');
+  assert.equal(paragraphs[1], '— Second speaker.');
 });
 
 test('rolling-cue repeats of one marker line count as one turn', () => {
@@ -129,13 +99,49 @@ test('rolling-cue repeats of one marker line count as one turn', () => {
 
   const ten = render(track(cues.slice(0, 19), { auto: true })).contents;
   assert.equal(layoutOf(ten), 'dialog');
-  assert.equal(paragraphs(ten).length, 10);
+  assert.equal(paragraphsOf(ten).length, 10);
+});
+
+test('a turn opening on the word the last turn ended on keeps its boundary and words', () => {
+  const cues = ['>> So what do you think?', '>> Yeah.', '>> Yeah, sure.', '>> Great.'];
+  const { contents } = render(track(cues, { auto: true }), { layout: 'dialog' });
+  assert.deepEqual(paragraphsOf(contents), [
+    '— So what do you think?',
+    '— Yeah.',
+    '— Yeah, sure.',
+    '— Great.',
+  ]);
+});
+
+test('the same exchange in rolling cues still counts each marker line once', () => {
+  // Each cue repeats the last line of the one before, as YouTube's rolling window does.
+  const cues = [
+    ['>> So what do you think?'],
+    ['>> So what do you think?', '>> Yeah.'],
+    ['>> Yeah.'],
+    ['>> Yeah.', '>> Yeah, sure.'],
+    ['>> Yeah, sure.'],
+    ['>> Yeah, sure.', '>> Great.'],
+  ];
+  const { contents } = render(track(cues, { auto: true }), { layout: 'dialog' });
+  assert.deepEqual(paragraphsOf(contents), [
+    '— So what do you think?',
+    '— Yeah.',
+    '— Yeah, sure.',
+    '— Great.',
+  ]);
+});
+
+test('a turn that repeats the last word of a turn-less stretch is still a turn', () => {
+  const cues = ['I said yes.', '>> Yes.'];
+  const { contents } = render(track(cues, { auto: true }), { layout: 'dialog' });
+  assert.deepEqual(paragraphsOf(contents), ['— I said yes.', '— Yes.']);
 });
 
 test('a short interjection is kept as its own turn', () => {
   const cues = ['>> Tell me more about it.', '>> Yeah.', '>> It began in 1995.', ...autoTurns(7)];
-  const blocks = paragraphs(render(track(cues, { auto: true })).contents);
-  assert.equal(blocks[1], '— Yeah.');
+  const paragraphs = paragraphsOf(render(track(cues, { auto: true })).contents);
+  assert.equal(paragraphs[1], '— Yeah.');
 });
 
 test('the triple marker is a turn too, and no stray > is left behind', () => {
@@ -162,19 +168,19 @@ test('a turn longer than 130 words splits into paragraphs, and only the first is
   const sentence = 'one two three four five six seven eight nine ten.';
   const longTurn = Array.from({ length: 16 }, () => sentence).join(' '); // 160 words
   const cues = [`>> ${longTurn}`, ...autoTurns(9)];
-  const blocks = paragraphs(render(track(cues, { auto: true })).contents);
+  const paragraphs = paragraphsOf(render(track(cues, { auto: true })).contents);
 
-  assert.equal(blocks.length, 11);
-  assert.ok(blocks[0].startsWith('— one two'));
-  assert.equal(blocks[0].split(' ').length, 1 + 130);
-  assert.ok(!blocks[1].startsWith('— '));
-  assert.equal(blocks[1].split(' ').length, 30);
-  assert.ok(blocks[2].startsWith('— Turn 0'));
+  assert.equal(paragraphs.length, 11);
+  assert.ok(paragraphs[0].startsWith('— one two'));
+  assert.equal(paragraphs[0].split(' ').length, 1 + 130);
+  assert.ok(!paragraphs[1].startsWith('— '));
+  assert.equal(paragraphs[1].split(' ').length, 30);
+  assert.ok(paragraphs[2].startsWith('— Turn 0'));
 });
 
 test('a paragraph never spans two turns, even short of 130 words', () => {
-  const blocks = paragraphs(render(track(autoTurns(10), { auto: true })).contents);
-  assert.ok(blocks.every((block) => (block.match(/Turn/g) ?? []).length === 1));
+  const paragraphs = paragraphsOf(render(track(autoTurns(10), { auto: true })).contents);
+  assert.ok(paragraphs.every((paragraph) => (paragraph.match(/Turn/g) ?? []).length === 1));
 });
 
 test('prose breaks at the first sentence end after 130 words, not 100', () => {
@@ -182,11 +188,11 @@ test('prose breaks at the first sentence end after 130 words, not 100', () => {
     { length: 15 },
     (_u, k) => `word${k} bravo charlie delta echo foxtrot golf hotel india juliet.`,
   );
-  const blocks = paragraphs(render(track(cues, { auto: true })).contents);
+  const paragraphs = paragraphsOf(render(track(cues, { auto: true })).contents);
 
-  assert.equal(blocks.length, 2);
-  assert.equal(blocks[0].split(' ').length, 130);
-  assert.equal(blocks[1].split(' ').length, 20);
+  assert.equal(paragraphs.length, 2);
+  assert.equal(paragraphs[0].split(' ').length, 130);
+  assert.equal(paragraphs[1].split(' ').length, 20);
 });
 
 test('NAME: labels survive verbatim in both layouts', () => {
@@ -217,13 +223,13 @@ test('--layout prose forces prose on a ten-turn track, recorded as prose', () =>
   const { contents } = render(track(autoTurns(10), { auto: true }), { layout: 'prose' });
   assert.equal(layoutOf(contents), 'prose');
   assert.doesNotMatch(body(contents), /^— /m);
-  assert.equal(paragraphs(contents).length, 1);
+  assert.equal(paragraphsOf(contents).length, 1);
 });
 
 test('--layout dialog uses every turn of a three-turn track', () => {
   const { contents, warnings } = render(track(autoTurns(3), { auto: true }), { layout: 'dialog' });
   assert.equal(layoutOf(contents), 'dialog');
-  assert.equal(paragraphs(contents).length, 3);
+  assert.equal(paragraphsOf(contents).length, 3);
   assert.deepEqual(warnings, []);
 });
 
@@ -233,9 +239,23 @@ test('--layout dialog on a track with no notation is one turn, with a warning na
   });
 
   assert.equal(layoutOf(contents), 'dialog');
-  assert.deepEqual(paragraphs(contents), ['— Hello there. General Kenobi.']);
+  assert.deepEqual(paragraphsOf(contents), ['— Hello there. General Kenobi.']);
   assert.equal(warnings.length, 1);
   assert.ok(warnings[0].includes(URL), warnings[0]);
+});
+
+test('--layout dialog does not warn about a track whose only marker opens it', () => {
+  const { contents, warnings } = render(track(['>> Hello there.', 'General Kenobi.'], { auto: true }), {
+    layout: 'dialog',
+  });
+
+  assert.deepEqual(paragraphsOf(contents), ['— Hello there. General Kenobi.']);
+  assert.deepEqual(warnings, []);
+});
+
+test('--layout dialog does not warn about a track with no speech at all', () => {
+  const { warnings } = render(track(['[music]', '[applause]'], { auto: true }), { layout: 'dialog' });
+  assert.deepEqual(warnings, []);
 });
 
 test('--layout auto never warns and is never written to the frontmatter', () => {
@@ -305,7 +325,7 @@ test('--layout reaches every fetch of a batch, and each warning is reported', as
   assert.deepEqual(warned, [`w ${A}`, `w ${B}`]);
 });
 
-test('a batch fetches with layout auto unless told otherwise', async () => {
+test('a batch told no layout leaves it to the cleaner, whose default is auto', async () => {
   const seen = [];
   await runBatch(['https://www.youtube.com/watch?v=4JofSJIrjwU'], {
     sleep: async () => {},
@@ -314,7 +334,11 @@ test('a batch fetches with layout auto unless told otherwise', async () => {
       return { file: 'x.md' };
     },
   });
-  assert.deepEqual(seen, ['auto']);
+  assert.deepEqual(seen, [undefined]);
+
+  // What the cleaner then does with no layout: a ten-turn track is a dialog.
+  const { contents } = render(track(autoTurns(10), { auto: true }), { layout: undefined });
+  assert.equal(layoutOf(contents), 'dialog');
 });
 
 // ------------------------------------------------------------ catalog

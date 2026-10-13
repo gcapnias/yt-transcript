@@ -1,6 +1,7 @@
 import { describeBatch, runBatch } from './batch.js';
 import { planBatch } from './batch-plan.js';
 import { readExistingUrls, rebuildCatalog } from './catalog-store.js';
+import { LAYOUTS } from './clean.js';
 import { fetchTranscript } from './fetch.js';
 import { describeRetry } from './fetch-outcome.js';
 import { parseTarget, TargetParseError } from './target.js';
@@ -21,10 +22,10 @@ const USAGE = `Usage: yt-transcript <url|id> [--lang <code>] [--layout auto|pros
                 a manual track, then that order, named tracks last; any
                 other code is matched exactly
   --layout <l>  auto|prose|dialog (default: auto). auto lays a track out as
-                a dialog, one turn per speaker change, when it marks 10 or
-                more of them, and as prose otherwise. prose and dialog force
+                a dialog, one turn per speaker change, when it has 10 or
+                more turns, and as prose otherwise. prose and dialog force
                 one; in a batch it applies to every video
-  --playlist   read a watch?v=...&list=... URL as the playlist, not the video
+  --playlist    read a watch?v=...&list=... URL as the playlist, not the video
   --force       in a batch, ignore the skip set and re-fetch everything. A
                 single video is re-fetched either way.
 
@@ -38,9 +39,6 @@ const USAGE = `Usage: yt-transcript <url|id> [--lang <code>] [--layout auto|pros
  * command's own argument shape is left exactly as it was.
  */
 const CATALOG_COMMAND = 'catalog';
-
-/** The values `--layout` takes; `auto` applies the turn threshold (ADR-0007). */
-const LAYOUTS = ['auto', 'prose', 'dialog'];
 
 /**
  * Splits argv into a target and the settled flag set. Purely syntactic; an

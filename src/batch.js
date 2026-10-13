@@ -34,7 +34,8 @@ const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
  *           sleep?: (ms: number) => Promise<void>, delayMs?: number,
  *           onProgress?: Function, onRetry?: Function, onFailure?: Function,
  *           onWarning?: (warning: string) => void }} deps `layout` is applied to
- *   every fetch alike; `onWarning` gets what a fetch owes the human about it
+ *   every fetch alike, and when absent the cleaner's `auto` applies; `onWarning`
+ *   gets what a fetch owes the human about it
  * @returns {Promise<{ fetched: Array<{ url: string, file: string }>,
  *                     failures: Array<{ url: string, failure: string|null, message: string }> }>}
  */
@@ -42,7 +43,7 @@ export async function runBatch(urls, deps) {
   const {
     fetchOne,
     lang = 'en',
-    layout = 'auto',
+    layout,
     sleep = wait,
     delayMs = FETCH_DELAY_MS,
     onProgress,

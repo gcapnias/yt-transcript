@@ -34,9 +34,9 @@ const TURN_DASH = '— ';
  *   track is, from 1; settled by the fetch, and required for a post
  * @param {string} [input.trackKey] the track's key, such as `en-JkeT_87f4cc`;
  *   a named track is cleaned with the auto notation (ADR-0009)
- * @param {'auto'|'prose'|'dialog'} [input.layout] the layout asked for; `auto`
- *   unless given. The result's `layout` is the one used, and `warnings` is what
- *   the caller owes the human about it.
+ * @param {'auto'|'prose'|'dialog'} [input.layout] the layout asked for, which
+ *   `cleanTrack` takes as `auto` when absent. The result's `layout` is the one
+ *   used, and `warnings` is what the caller owes the human about it.
  * @param {Date} [input.fetchedAt]
  *
  * `collisionId` in the result is what the filename collision rule suffixes: the
@@ -58,10 +58,10 @@ export function renderTranscript({
   metadata,
   videoNumber,
   trackKey,
-  layout: requestedLayout = 'auto',
+  layout: requestedLayout,
   fetchedAt = new Date(),
 }) {
-  const { trackKind: detectedKind, layout, turns } = cleanTrack(trackText, {
+  const { trackKind: detectedKind, layout, marksTurns, turns } = cleanTrack(trackText, {
     trackKey,
     layout: requestedLayout,
   });
@@ -96,10 +96,12 @@ export function renderTranscript({
     )
     .join('\n\n');
 
-  // Forcing a dialog onto a track that marks no speaker change is honoured, but
-  // the human asked for turns and got one, so they are told which video.
+  // Forcing a dialog onto a track with no speaker-change notation is honoured,
+  // but the human asked for turns and got one, so they are told which video. A
+  // track whose only marker opens it does carry notation, and an empty track
+  // has no turn at all; the warning describes neither.
   const warnings =
-    requestedLayout === 'dialog' && turns.length < 2
+    requestedLayout === 'dialog' && !marksTurns && turns.length === 1
       ? [`--layout dialog: ${url} marks no speaker changes, so its dialog is a single turn.`]
       : [];
 

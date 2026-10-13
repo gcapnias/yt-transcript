@@ -13,7 +13,7 @@
  * | Class                   | Manual           | Auto        | Disposition                    |
  * |-------------------------|------------------|-------------|--------------------------------|
  * | Provenance credits      | `Transcriber:`   | none        | Drop the cue, first or last only |
- * | Speaker change          | leading `- `     | `>>`, `>>>` | Delete the marker, keep the cue, note the turn |
+ * | Speaker change          | leading `- `     | `>>`, `>>>` | Delete the marker, keep the cue |
  * | Sound events            | `(Laughter)`     | `[snorts]`  | Strip the token, shape-guarded |
  * | Transcriber annotations | `[Caplin?]`      | none        | Keep verbatim, brackets and all |
  *
@@ -46,9 +46,9 @@ const CREDIT = /^(Transcriber|Reviewer|Translator|Subtitles by|Captions by|Amara
  * `marker` is line-start speaker change. `continuation`, where a kind has one,
  * is a marked line that is the same speaker resuming rather than a new one: a
  * manual `- ...` follows an interjection, so it is stripped but opens no turn.
- * `soundEvent` is non-nesting by
- * construction: the enclosed text may not contain its own delimiters, so the
- * match can never run past the token it opened.
+ * `soundEvent` is non-nesting by construction: the enclosed text may not
+ * contain its own delimiters, so the match can never run past the token it
+ * opened.
  *
  * Each notation is applied only to its own kind. A `>>` on a manual track is
  * someone quoting Markdown and a `[snorts]` never occurs there at all, so
@@ -65,11 +65,17 @@ const NOTATION = {
 };
 
 /**
- * Stands where a turn begins while a cue's lines are joined and its sound events
- * removed, then is read back out as a word position. A control character, so it
- * can neither occur in a track nor be mistaken for a word.
+ * Stand where a turn begins and where a cue line begins while the cue's lines
+ * are joined and its sound events removed, then are read back out as word
+ * positions. Control characters, so they can neither occur in a track nor be
+ * mistaken for a word.
  */
 const TURN_MARK = '\u0001';
+const LINE_MARK = '\u0002';
+const MARKS = /[\u0001\u0002]/g;
+
+/** The marks a run of text holds, space-separated so they read back out as tokens. */
+const marksIn = (text) => (text.match(MARKS) ?? []).join(' ');
 
 /**
  * The shape guard, and a deliberate cost. A curated vocabulary of event words
@@ -115,14 +121,17 @@ function dropsAsCredit(lines, index, total, notation) {
  * the cue's text where the turn begins. A cue with no words survives if it
  * carries one: `>> [music]` has no words but still ends the turn before it.
  * Whether a turn with no words counts is `./clean.js`'s call, not this one's.
+ * Where each cue line begins is reported too: rolling repetition repeats whole
+ * lines, and that is how `./clean.js` tells a repeated marker from a new one.
  *
  * @param {string[][]} cues cue lines, already tag-stripped, entity-decoded,
  *   whitespace-collapsed and trimmed — `CREDIT` and both markers anchor at the
  *   start of a line and read that trim as given
  * @param {'auto'|'manual'} notation which kind's notation to read: the track's
  *   kind, except that a named track reads as `'auto'` (ADR-0009)
- * @returns {Array<{ text: string, turnStarts: number[] }>} the surviving cues,
- *   `turnStarts` counted in words from the start of `text`, ascending
+ * @returns {Array<{ text: string, turnStarts: number[], lineStarts: number[] }>}
+ *   the surviving cues, both lists counted in words from the start of `text`,
+ *   ascending
  */
 export function stripArtifacts(cues, notation) {
   const { marker, continuation, soundEvent } = NOTATION[notation];
@@ -133,22 +142,29 @@ export function stripArtifacts(cues, notation) {
     // promote its neighbour into first or last position.
     if (dropsAsCredit(lines, index, cues.length, notation)) continue;
 
+    // A sound event split across two lines holds a line mark: it is judged
+    // without the mark, and leaves the mark behind when it goes.
     const joined = lines
       .map((line) => line.replace(marker, continuation?.test(line) ? '' : `${TURN_MARK} `))
+      .map((line) => `${LINE_MARK} ${line}`)
       .join(' ')
-      .replace(soundEvent, (token, enclosed) => (isSoundEvent(enclosed) ? ' ' : token))
+      .replace(soundEvent, (token, enclosed) =>
+        isSoundEvent(enclosed.replace(MARKS, '')) ? ` ${marksIn(enclosed)} ` : token,
+      )
       .replace(/\s+/g, ' ')
       .trim();
 
     const words = [];
     const turnStarts = [];
+    const lineStarts = [];
     for (const token of joined.split(' ').filter(Boolean)) {
       if (token === TURN_MARK) turnStarts.push(words.length);
+      else if (token === LINE_MARK) lineStarts.push(words.length);
       else words.push(token);
     }
 
     if (words.length > 0 || turnStarts.length > 0) {
-      stripped.push({ text: words.join(' '), turnStarts });
+      stripped.push({ text: words.join(' '), turnStarts, lineStarts });
     }
   }
 

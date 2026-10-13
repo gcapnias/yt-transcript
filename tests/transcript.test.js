@@ -1,45 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { renderTranscript } from '../src/transcript.js';
 import { readFixture, readNamedFixture } from './fixtures.js';
-
-const METADATA = {
-  title: 'OpenAI Codex Crash Course – Build & Deploy Apps with Autonomous AI',
-  channel: 'freeCodeCamp.org',
-  duration: '41:18',
-  uploadDate: '20260910',
-};
-
-const FETCHED_AT = new Date('2026-09-16T14:03:05.123Z');
-
-/**
- * Builds a subtitle track from cue texts. `auto` decides which track kind the
- * classifier will read out of the body, using the same two signals a real
- * track carries: `<c>` word-timing tags and `align:start position:0%`.
- */
-function track(cueTexts, { auto = false } = {}) {
-  const stamp = (n) => `00:00:${String(n).padStart(2, '0')}.000`;
-  const settings = auto ? ' align:start position:0%' : '';
-  const cues = cueTexts.map((text, index) => {
-    const body = auto ? text.replace(/(\s)(\S+)$/, '$1<00:00:00.500><c>$2</c>') : text;
-    return `${stamp(index)} --> ${stamp(index + 1)}${settings}\n${body}`;
-  });
-  return `WEBVTT\nKind: captions\nLanguage: en\n\n${cues.join('\n\n')}\n`;
-}
-
-function render(trackText, overrides = {}) {
-  return renderTranscript({
-    trackText,
-    url: 'https://www.youtube.com/watch?v=o3CX_Y59_74',
-    videoId: 'o3CX_Y59_74',
-    metadata: METADATA,
-    fetchedAt: FETCHED_AT,
-    ...overrides,
-  });
-}
-
-const body = (contents) => contents.split(/\n---\n\n/)[1];
+import { body, METADATA, render, track } from './inline-track.js';
 
 // ---------------------------------------------------------------- slug
 
@@ -314,9 +277,9 @@ test('manual output keeps every sentence the auto dedup heuristic would have eat
 
   // Dialogue echo: k=2, the second speaker's opening word deleted.
   //
-  // This track marks enough `- ` turns to be a dialog, so each utterance is
-  // its own turn: the `- ` markers become the em dashes. What the assertion
-  // measures is unchanged — both utterances survive, nothing is deleted — and
+  // This track marks enough `- ` turns to be a dialog, so each speaker's reply
+  // is its own turn: the `- ` markers become the em dashes. What the assertion
+  // measures is unchanged — both replies survive, nothing is deleted — and
   // dedup still never runs on a manual track.
   assert.ok(warmth.includes('— Warmth.\n\n— Warmth, light.'), 'the two-speaker exchange lost a word');
   // Number split across cues: k=1, a whole magnitude deleted.

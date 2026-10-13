@@ -27,6 +27,12 @@ const PARAGRAPH_MIN_WORDS = 130;
 /** A track with this many turns or more is laid out as a dialog; ADR-0007. */
 const DIALOG_MIN_TURNS = 10;
 
+/**
+ * The layouts that can be asked for. `auto` applies the turn threshold, so it
+ * is a request and never the layout a transcript records.
+ */
+export const LAYOUTS = ['auto', 'prose', 'dialog'];
+
 /** A word ends a sentence, allowing one closing quote or bracket after the stop. */
 const SENTENCE_END = /[.!?]["')\]]?$/;
 
@@ -79,14 +85,17 @@ const normalize = (word) => word.toLowerCase().replace(/[^\p{L}\p{N}_]/gu, '');
  * every such run compares equal to every other, which is a match on no
  * evidence. `trim`, not `length`, is what tests that, because joining k empty
  * words yields k-1 spaces rather than an empty string.
+ *
+ * `accepts` may veto a matching overlap on other evidence than the words, and
+ * a shorter one is then looked for.
  */
-function overlapSize(accumulatedWords, cueWords) {
+function overlapSize(accumulatedWords, cueWords, accepts = () => true) {
   const maxCheck = Math.min(accumulatedWords.length, cueWords.length);
 
   for (let k = maxCheck; k > 0; k -= 1) {
     const tail = accumulatedWords.slice(-k).map(normalize).join(' ');
     const head = cueWords.slice(0, k).map(normalize).join(' ');
-    if (tail === head && tail.trim().length > 0) return k;
+    if (tail === head && tail.trim().length > 0 && accepts(k)) return k;
   }
 
   return 0;
@@ -99,27 +108,39 @@ function overlapSize(accumulatedWords, cueWords) {
  *
  * A turn start inside the dropped overlap is the marker line of a rolling
  * repeat, so it goes with the overlap; one at or past the overlap is kept, as a
- * position in the merged stream.
+ * position in the merged stream. Rolling repetition repeats whole lines,
+ * markers and all, so an overlap may only swallow a turn start if it ends where
+ * a cue line ends and the stream already has a turn start in the same place.
+ * Any other match is words that happen to recur — `>> Yeah.` then `>> Yeah,
+ * sure.` — and taking it would merge two turns and lose a word.
  *
- * @param {Array<{ text: string, turnStarts: number[] }>} cues stripped cues
+ * @param {Array<{ text: string, turnStarts: number[], lineStarts: number[] }>}
+ *   cues stripped cues
  * @param {{ dedup: boolean }} options
  * @returns {{ words: string[], turnStarts: number[] }} `turnStarts` ascending,
  *   and repeated where a turn held no words
  */
 function mergeCues(cues, { dedup }) {
   const words = [];
-  const turnStarts = [];
+  const streamTurnStarts = [];
 
-  for (const { text, turnStarts: starts } of cues) {
+  for (const { text, turnStarts: cueTurnStarts, lineStarts } of cues) {
     const cueWords = text.split(/\s+/).filter(Boolean);
-    const overlap = dedup ? overlapSize(words, cueWords) : 0;
-    for (const start of starts) {
-      if (start >= overlap) turnStarts.push(words.length + start - overlap);
+    const repeatsWholeMarkerLines = (k) => {
+      const endsALine = k === cueWords.length || lineStarts.includes(k);
+      return cueTurnStarts.every(
+        (start) => start >= k || (endsALine && streamTurnStarts.includes(words.length - k + start)),
+      );
+    };
+
+    const overlap = dedup ? overlapSize(words, cueWords, repeatsWholeMarkerLines) : 0;
+    for (const start of cueTurnStarts) {
+      if (start >= overlap) streamTurnStarts.push(words.length + start - overlap);
     }
     words.push(...cueWords.slice(overlap));
   }
 
-  return { words, turnStarts };
+  return { words, turnStarts: streamTurnStarts };
 }
 
 /**
@@ -167,6 +188,19 @@ function toParagraphs(words) {
 }
 
 /**
+ * The layout used for the one asked for: `auto` applies the turn threshold,
+ * and `prose` or `dialog` is honoured as asked.
+ *
+ * @param {'auto'|'prose'|'dialog'} requested
+ * @param {number} turnCount
+ * @returns {'prose'|'dialog'}
+ */
+function chooseLayout(requested, turnCount) {
+  if (requested !== 'auto') return requested;
+  return turnCount >= DIALOG_MIN_TURNS ? 'dialog' : 'prose';
+}
+
+/**
  * The whole pipeline.
  *
  * A named track (ADR-0009) takes its notation from the auto table, so `>>`,
@@ -182,10 +216,12 @@ function toParagraphs(words) {
  * @param {string} rawText the subtitle track exactly as downloaded
  * @param {{ trackKey?: string, layout?: 'auto'|'prose'|'dialog' }} [options]
  *   `trackKey` is the track's key, such as `en-JkeT_87f4cc`; absent when not
- *   known, which is not a named track. `layout` is the one asked for.
+ *   known, which is not a named track. `layout` is the one asked for, one of
+ *   `LAYOUTS`; `auto` when absent.
  * @returns {{ trackKind: 'auto'|'manual', layout: 'prose'|'dialog',
- *             turns: string[][] }} the layout actually used, and each turn's
- *   paragraphs; prose is a single turn
+ *             marksTurns: boolean, turns: string[][] }} the layout actually
+ *   used; whether the track carries any speaker-change notation at all; and
+ *   each turn's paragraphs, prose being a single turn
  */
 export function cleanTrack(rawText, { trackKey, layout = 'auto' } = {}) {
   // Classify first: the rule reads raw cue text, and every later branch needs
@@ -210,9 +246,15 @@ export function cleanTrack(rawText, { trackKey, layout = 'auto' } = {}) {
 
   const { words, turnStarts } = mergeCues(spoken, { dedup: trackKind === 'auto' });
   const turns = toTurns(words, turnStarts);
+  const chosen = chooseLayout(layout, turns.length);
 
-  const used = layout === 'auto' ? (turns.length >= DIALOG_MIN_TURNS ? 'dialog' : 'prose') : layout;
-  if (used === 'dialog') return { trackKind, layout: used, turns: turns.map(toParagraphs) };
+  // Prose is the whole stream as one turn, cut at no turn start.
+  const laidOut = chosen === 'dialog' ? turns : toTurns(words, []);
 
-  return { trackKind, layout: used, turns: words.length > 0 ? [toParagraphs(words)] : [] };
+  return {
+    trackKind,
+    layout: chosen,
+    marksTurns: turnStarts.length > 0,
+    turns: laidOut.map(toParagraphs),
+  };
 }
