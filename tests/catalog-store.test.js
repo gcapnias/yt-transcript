@@ -6,18 +6,13 @@ import path from 'node:path';
 import { renderCatalog } from '../src/catalog.js';
 import { CATALOG_FILENAME, readExistingUrls, rebuildCatalog } from '../src/catalog-store.js';
 import { withTempDir } from '../src/temp-dir.js';
+import { put } from './transcripts-dir.js';
 
 /** A transcript as the writer produces one. Only the catalog's keys vary. */
 const transcript = (title, uploadDate = '2026-09-10', videoId = 'o3CX_Y59_74') =>
   `---\ntitle: "${title}"\nurl: https://www.youtube.com/watch?v=${videoId}\n`
   + `channel: "freeCodeCamp.org"\nduration: "41:18"\nupload_date: ${uploadDate}\n`
   + `fetched: 2026-09-16T14:03:05Z\nsubtitles: auto\n---\n\nProse.\n`;
-
-/** Puts a file at a path relative to the transcripts directory, folder and all. */
-async function put(dir, relative, text) {
-  await fs.mkdir(path.dirname(path.join(dir, relative)), { recursive: true });
-  await fs.writeFile(path.join(dir, relative), text, 'utf8');
-}
 
 test('a rebuild is a full rescan: a hand-deleted transcript loses exactly its row', async () => {
   await withTempDir(async (dir) => {

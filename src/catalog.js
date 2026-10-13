@@ -39,6 +39,17 @@ const COLUMNS = [
 const REQUIRED_KEYS = ['title', 'url', 'channel', 'duration', 'upload_date', 'fetched', 'subtitles'];
 
 /**
+ * Whether a file's path puts it in a channel folder. The one place that rule
+ * lives: paths are relative to `transcripts/` and `/`-separated, which is how
+ * `readTranscriptFiles` produces them, so a folder shows as a `/`.
+ *
+ * @param {string} filePath
+ */
+export function isInChannelFolder(filePath) {
+  return filePath.includes('/');
+}
+
+/**
  * Renders the catalog.
  *
  * @param {Array<{ path: string, text: string }>} files every `.md` in the
@@ -69,7 +80,7 @@ export function renderCatalog(files) {
 
     // Still listed, so it is not dropped from the catalog nor fetched again;
     // the warning is how it gets filed where it belongs (ADR-0008).
-    if (!file.path.includes('/')) {
+    if (!isInChannelFolder(file.path)) {
       warnings.push(`${file.path} is outside a channel folder. Move it into its channel folder.`);
     }
 

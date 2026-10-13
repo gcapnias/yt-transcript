@@ -25,6 +25,7 @@ import {
   X_TRACK_ID,
 } from './fixtures.js';
 import { recordedFailure } from './recorded-outcomes.js';
+import { listFiles as writtenFiles, put } from './transcripts-dir.js';
 
 const URL = 'https://www.youtube.com/watch?v=o3CX_Y59_74';
 const VIDEO_ID = 'o3CX_Y59_74';
@@ -43,15 +44,6 @@ const METADATA = {
   duration: '1:00',
   uploadDate: '20260910',
 };
-
-/** The transcripts a fetch wrote, as paths relative to the directory, folders included. */
-async function writtenFiles(dir) {
-  const entries = await fs.readdir(dir, { recursive: true, withFileTypes: true });
-  return entries
-    .filter((entry) => entry.isFile())
-    .map((entry) => path.relative(dir, path.join(entry.parentPath, entry.name)).split(path.sep).join('/'))
-    .sort();
-}
 
 /**
  * Replays recorded process outcomes in place of spawning `yt-dlp`, so the exit
@@ -163,6 +155,24 @@ test('a rate-limited fetch climbs the ladder, then leaves nothing behind', async
     assert.equal(recorded.calls.length, RETRY_DELAYS_MS.length + 1);
     assert.equal(retries.length, RETRY_DELAYS_MS.length);
     assert.deepEqual(await fs.readdir(dir), [], 'a failed fetch wrote a transcript');
+  });
+});
+
+test('a failed fetch of a video already on disk leaves its existing transcript alone', async () => {
+  await withTranscriptsDir(async (dir) => {
+    const existing = `---\ntitle: "A Talk"\nurl: ${URL}\n---\n\nOlder prose.\n`;
+    await put(dir, 'old-handle/a-talk.md', existing);
+    const recorded = recordedFetch([{ failure: NO_SUBTITLES }]);
+
+    await assert.rejects(
+      fetchTranscript(
+        { url: URL, videoId: VIDEO_ID, lang: 'en' },
+        { fetchTrack: recorded.fetchTrack, dir },
+      ),
+    );
+
+    assert.deepEqual(await writtenFiles(dir), ['old-handle/a-talk.md']);
+    assert.equal(await fs.readFile(path.join(dir, 'old-handle', 'a-talk.md'), 'utf8'), existing);
   });
 });
 

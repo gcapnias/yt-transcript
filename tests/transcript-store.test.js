@@ -5,6 +5,7 @@ import path from 'node:path';
 
 import { withTempDir } from '../src/temp-dir.js';
 import { readTranscriptUrl, writeTranscript } from '../src/transcript-store.js';
+import { listFiles as listing } from './transcripts-dir.js';
 
 const transcript = (videoId, slug, marker, channelFolder = 'a-channel') => ({
   slug,
@@ -14,19 +15,6 @@ const transcript = (videoId, slug, marker, channelFolder = 'a-channel') => ({
   channelFolder,
   contents: `---\ntitle: "A talk"\nurl: https://www.youtube.com/watch?v=${videoId}\n---\n\n${marker}\n`,
 });
-
-/** Every `.md` under the directory, as `folder/name` paths, sorted. */
-async function listing(dir) {
-  const found = [];
-  for (const folder of await fs.readdir(dir, { withFileTypes: true })) {
-    if (!folder.isDirectory()) {
-      found.push(folder.name);
-      continue;
-    }
-    for (const name of await fs.readdir(path.join(dir, folder.name))) found.push(`${folder.name}/${name}`);
-  }
-  return found.sort();
-}
 
 test('a transcript is written under its slug, in its channel folder', async () => {
   await withTempDir(async (dir) => {

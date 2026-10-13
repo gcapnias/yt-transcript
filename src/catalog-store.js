@@ -50,9 +50,10 @@ export async function rebuildCatalog({ dir = TRANSCRIPTS_DIR } = {}) {
  * The `url`s `transcripts/` already holds — what a batch subtracts from its
  * expansion.
  *
- * Reads the directory, channel folders included, the same way a rebuild does, so a batch cannot disagree
- * with the catalog about what is already there. Skipping is batch-only: this
- * is never consulted for a single video URL, which still overwrites.
+ * Reads the directory, channel folders included, the same way a rebuild does,
+ * so a batch cannot disagree with the catalog about what is already there.
+ * Skipping is batch-only: this is never consulted for a single video URL,
+ * which still overwrites.
  *
  * @param {{ dir?: string }} [options]
  * @returns {Promise<string[]>}

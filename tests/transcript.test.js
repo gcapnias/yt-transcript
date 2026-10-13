@@ -180,6 +180,18 @@ test('frontmatter carries exactly the seven keys, in order, with the settled quo
   );
 });
 
+test('the handle and channel id choose the folder and never reach the frontmatter', () => {
+  const plain = render(track(['Hello there.'], { auto: true }));
+  const withHandle = render(track(['Hello there.'], { auto: true }), {
+    metadata: { ...METADATA, uploaderId: '@freecodecamp', channelId: 'UCaaaaaaaaaaaaaaaaaaaaaa' },
+  });
+
+  assert.equal(withHandle.channelFolder, 'freecodecamp');
+  // Byte for byte what the same metadata rendered before folders existed.
+  assert.equal(withHandle.contents, plain.contents);
+  assert.doesNotMatch(withHandle.contents, /uploader|channel_id|UCaaaa|@freecodecamp/);
+});
+
 test('a title containing a quote or a backslash is escaped, not re-quoted', () => {
   const { contents } = render(track(['Hello.']), {
     metadata: { ...METADATA, title: 'He said "hi" \\ bye', channel: 'a "b" c' },

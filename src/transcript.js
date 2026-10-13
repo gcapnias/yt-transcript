@@ -38,7 +38,8 @@ import { YOUTUBE } from './site.js';
  * `url` is the frontmatter `url`, for an X post the one built from metadata.
  *
  * @returns {{ slug: string, filename: string, contents: string,
- *             url: string, collisionId: string, channelFolder: string, trackKind: 'auto'|'manual',
+ *             url: string, collisionId: string, channelFolder: string,
+ *             trackKind: 'auto'|'manual',
  *             video: { title: string, channel: string, duration: string,
  *                      uploaded: string } }}
  */

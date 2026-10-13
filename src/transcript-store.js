@@ -42,8 +42,9 @@ export function readTranscriptUrl(text) {
 
 /**
  * Every `.md` at the top level of the directory and one level down in each
- * subfolder, as `{ path, text }` with `path` relative to the directory and
- * `/`-separated, so it can be a link as it stands. Nothing deeper is read.
+ * channel folder, as `{ path, text }` with `path` relative to the directory
+ * and `/`-separated, so it can be a link as it stands (`isInChannelFolder`
+ * reads that convention back). Nothing deeper is read.
  *
  * The one reader behind a rebuild, a batch's skip set and a write's search for
  * the other copies of a video, so none of them can disagree about what is on

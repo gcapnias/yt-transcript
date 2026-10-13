@@ -99,15 +99,17 @@ export async function preflight({ binary = YT_DLP } = {}) {
  * `yt-dlp` reported them; reformatting is the transcript's business.
  *
  * @param {string} stdout
- * `uploaderId` and `channelId` name the channel folder and are printed for both
- * sites. Of the rest, the last eight are printed for an X post only, and are empty strings
- * (`playlistIndex` `null`) for a YouTube video. `playlistIndex` is `null` on
- * an X post too unless the whole post was fetched.
+ * `uploaderId` and `channelId` name the channel folder and are printed for
+ * both sites. The fields after them, from `description` on, are printed for an
+ * X post only, and are empty strings (`playlistIndex` `null`) for a YouTube
+ * video. `playlistIndex` is `null` on an X post too unless the whole post was
+ * fetched.
  *
- * @returns {{ title: string, channel: string, duration: string, uploadDate: string,
- *             description: string, uploader: string, uploaderId: string,
- *             displayId: string, extractorKey: string, webpageUrl: string,
- *             mediaId: string, playlistIndex: number|null, channelId: string }|null}
+ * @returns {{ title: string, channel: string, duration: string,
+ *             uploadDate: string, uploaderId: string, channelId: string,
+ *             description: string, uploader: string, displayId: string,
+ *             extractorKey: string, webpageUrl: string, mediaId: string,
+ *             playlistIndex: number|null }|null}
  */
 export function parseMetadata(stdout) {
   const line = stdout
@@ -128,11 +130,13 @@ export function parseMetadata(stdout) {
     channel: parsed.channel ?? '',
     duration: parsed.duration_string ?? '',
     uploadDate: parsed.upload_date ?? '',
+    // On YouTube the channel's handle (`@name`), on X its handle without the
+    // `@`. With `channelId`, what the channel folder is named from.
+    uploaderId: parsed.uploader_id ?? '',
+    channelId: parsed.channel_id ?? '',
     // Printed for an X post only; empty on YouTube, which never asks for them.
     description: parsed.description ?? '',
     uploader: parsed.uploader ?? '',
-    uploaderId: parsed.uploader_id ?? '',
-    channelId: parsed.channel_id ?? '',
     displayId: parsed.display_id ?? '',
     extractorKey: parsed.extractor_key ?? '',
     webpageUrl: parsed.webpage_url ?? '',
