@@ -26,12 +26,12 @@ const FETCHED_AT = new Date('2026-09-16T14:03:05.123Z');
 export function track(cues, { auto = false } = {}) {
   const stamp = (n) => `00:00:${String(n).padStart(2, '0')}.000`;
   const settings = auto ? ' align:start position:0%' : '';
-  const written = cues.map((lines, index) => {
+  const vttCues = cues.map((lines, index) => {
     const text = [lines].flat().join('\n');
     const body = auto ? text.replace(/(\s)(\S+)$/, '$1<00:00:00.500><c>$2</c>') : text;
     return `${stamp(index)} --> ${stamp(index + 1)}${settings}\n${body}`;
   });
-  return `WEBVTT\nKind: captions\nLanguage: en\n\n${written.join('\n\n')}\n`;
+  return `WEBVTT\nKind: captions\nLanguage: en\n\n${vttCues.join('\n\n')}\n`;
 }
 
 /** Renders a track as the video at `URL`, with `overrides` on any input. */
@@ -46,5 +46,5 @@ export function render(trackText, overrides = {}) {
   });
 }
 
-/** A transcript's body: everything after the frontmatter, trailing newline and all. */
+/** A transcript's body: all after the frontmatter, trailing newline included. */
 export const body = (contents) => contents.split(/\n---\n\n/)[1];

@@ -74,7 +74,7 @@ const TURN_MARK = '\u0001';
 const LINE_MARK = '\u0002';
 const MARKS = /[\u0001\u0002]/g;
 
-/** The marks a run of text holds, space-separated so they read back out as tokens. */
+/** The marks a run of text holds, spaced apart so they read back out as tokens. */
 const marksIn = (text) => (text.match(MARKS) ?? []).join(' ');
 
 /**

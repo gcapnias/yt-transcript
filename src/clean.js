@@ -89,7 +89,7 @@ const normalize = (word) => word.toLowerCase().replace(/[^\p{L}\p{N}_]/gu, '');
  * `accepts` may veto a matching overlap on other evidence than the words, and
  * a shorter one is then looked for.
  */
-function overlapSize(accumulatedWords, cueWords, accepts = () => true) {
+function overlapSize(accumulatedWords, cueWords, accepts) {
   const maxCheck = Math.min(accumulatedWords.length, cueWords.length);
 
   for (let k = maxCheck; k > 0; k -= 1) {
@@ -110,8 +110,10 @@ function overlapSize(accumulatedWords, cueWords, accepts = () => true) {
  * repeat, so it goes with the overlap; one at or past the overlap is kept, as a
  * position in the merged stream. Rolling repetition repeats whole lines,
  * markers and all, so an overlap may only swallow a turn start if it ends where
- * a cue line ends and the stream already has a turn start in the same place.
- * Any other match is words that happen to recur — `>> Yeah.` then `>> Yeah,
+ * a cue line ends and the stream's turn starts from the overlap on are the
+ * cue's own: each swallowed one is already in the stream, and the stream has
+ * none the cue does not repeat, such as the start a `>> [applause]` left at its
+ * end. Any other match is words that happen to recur — `>> Yeah.` then `>> Yeah,
  * sure.` — and taking it would merge two turns and lose a word.
  *
  * @param {Array<{ text: string, turnStarts: number[], lineStarts: number[] }>}
@@ -127,9 +129,16 @@ function mergeCues(cues, { dedup }) {
   for (const { text, turnStarts: cueTurnStarts, lineStarts } of cues) {
     const cueWords = text.split(/\s+/).filter(Boolean);
     const repeatsWholeMarkerLines = (k) => {
-      const endsALine = k === cueWords.length || lineStarts.includes(k);
-      return cueTurnStarts.every(
-        (start) => start >= k || (endsALine && streamTurnStarts.includes(words.length - k + start)),
+      const swallowed = cueTurnStarts.filter((start) => start < k);
+      if (swallowed.length === 0) return true;
+      if (k < cueWords.length && !lineStarts.includes(k)) return false;
+      // Positions counted from where the overlap begins, on both sides.
+      const repeated = streamTurnStarts
+        .filter((at) => at >= words.length - k)
+        .map((at) => at - (words.length - k));
+      return (
+        swallowed.every((start) => repeated.includes(start)) &&
+        repeated.every((at) => at < k || cueTurnStarts.includes(k))
       );
     };
 

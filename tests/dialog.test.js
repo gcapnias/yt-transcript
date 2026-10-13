@@ -114,7 +114,8 @@ test('a turn opening on the word the last turn ended on keeps its boundary and w
 });
 
 test('the same exchange in rolling cues still counts each marker line once', () => {
-  // Each cue repeats the last line of the one before, as YouTube's rolling window does.
+  // Each cue repeats the last line of the one before, as YouTube's rolling
+  // window does.
   const cues = [
     ['>> So what do you think?'],
     ['>> So what do you think?', '>> Yeah.'],
@@ -130,6 +131,12 @@ test('the same exchange in rolling cues still counts each marker line once', () 
     '— Yeah, sure.',
     '— Great.',
   ]);
+});
+
+test('a turn repeating the one before a sound-event-only turn is still a turn', () => {
+  const cues = ['>> Thank you.', '>> [applause]', '>> Thank you.', '>> Bye.'];
+  const { contents } = render(track(cues, { auto: true }), { layout: 'dialog' });
+  assert.deepEqual(paragraphsOf(contents), ['— Thank you.', '— Thank you.', '— Bye.']);
 });
 
 test('a turn that repeats the last word of a turn-less stretch is still a turn', () => {
@@ -245,16 +252,16 @@ test('--layout dialog on a track with no notation is one turn, with a warning na
 });
 
 test('--layout dialog does not warn about a track whose only marker opens it', () => {
-  const { contents, warnings } = render(track(['>> Hello there.', 'General Kenobi.'], { auto: true }), {
-    layout: 'dialog',
-  });
+  const trackText = track(['>> Hello there.', 'General Kenobi.'], { auto: true });
+  const { contents, warnings } = render(trackText, { layout: 'dialog' });
 
   assert.deepEqual(paragraphsOf(contents), ['— Hello there. General Kenobi.']);
   assert.deepEqual(warnings, []);
 });
 
 test('--layout dialog does not warn about a track with no speech at all', () => {
-  const { warnings } = render(track(['[music]', '[applause]'], { auto: true }), { layout: 'dialog' });
+  const trackText = track(['[music]', '[applause]'], { auto: true });
+  const { warnings } = render(trackText, { layout: 'dialog' });
   assert.deepEqual(warnings, []);
 });
 
