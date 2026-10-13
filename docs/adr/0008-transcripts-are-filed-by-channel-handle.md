@@ -49,5 +49,6 @@ already makes, at fetch time.
   each channel's handle; re-filing them again would need another.
 - Every write scans all folders for its `url`. That is cheap at this size, and a batch already
   scans once.
-- The existing transcripts are moved once with `git mv`, in the change that introduces the
-  folders. The tool carries no migration logic.
+- The existing transcripts are moved once, on disk, when the folders are introduced: `transcripts/`
+  is gitignored, so there is no history to carry and `git mv` does not apply. The flat files are
+  kept in a zip in `transcripts/` before the move. The tool carries no migration logic.
