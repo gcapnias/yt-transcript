@@ -18,7 +18,7 @@ from what is there; it warns about any transcript left outside a channel folder.
 
 ## Prerequisites
 
-- **Node `>=22.18.0 <23 || >=24.2.0`** — versions where `import.meta.main` exists; see [#2](https://github.com/gcapnias/yt-transcript/issues/2)
+- **Node `>=22.18.0 <23 || >=24.2.0`** — versions where `import.meta.main` exists; see [#2](https://github.com/gcapnias/yt-transcript/issues/2). Needed only to run from source, not for the [standalone executable](#standalone-executable)
 - **`yt-dlp`** on `PATH` — every fetch is a `yt-dlp` spawn; nothing is bundled
 
 ## Usage
@@ -110,6 +110,29 @@ any, which is broader than this needs. The first run also prints a
 back to `.gitignore` to decide what to ship.
 
 Both forms need `yt-dlp` on `PATH`; npx does not bundle it.
+
+## Standalone executable
+
+Build a single executable from the same source, to drop on a `PATH` or hand to someone
+without a clone:
+
+```bash
+npm run build
+```
+
+The binary lands in `dist/` as `yt-transcript.exe` on Windows and `yt-transcript`
+elsewhere, built for the machine that runs the build. It runs exactly like `npx .`:
+same arguments, flags, output, exit codes and files, relative to the directory it is
+run from.
+
+```bash
+dist/yt-transcript o3CX_Y59_74
+```
+
+Like `npx .`, it needs `yt-dlp` on `PATH` to fetch videos, but it does not need Node,
+whose version requirement applies only to running from source. [Bun](https://bun.sh)
+is needed only to build it (tested with Bun 1.4.3), and the binary is large, about
+96 MB, because it embeds Bun's runtime. Running the source under Bun is not supported.
 
 ## Meetings
 

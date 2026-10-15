@@ -8,6 +8,7 @@
     "yt-transcript": "./bin/yt-transcript.js"
   },
   "scripts": {
+    "build": "bun build --compile ./bin/yt-transcript.js --outfile dist/yt-transcript",
     "test": "node --test \"tests/**/*.test.js\""
   },
   "engines": {
