@@ -17,7 +17,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
-import { readFrontmatter } from './catalog.js';
+import { isMeetingFrontmatter, readFrontmatter } from './catalog.js';
 
 /** Transcripts sit one level down, in a channel folder: see ADR-0008. */
 export const TRANSCRIPTS_DIR = 'transcripts';
@@ -97,8 +97,9 @@ export async function readTranscriptFiles(dir) {
  * removed.
  *
  * @param {{ slug: string, filename: string, contents: string, url?: string,
- *           title?: string, collisionId: string, channelFolder: string }} transcript
- *   `url` is absent for a meeting, which brings its `title` instead
+ *           title?: string, isMeeting?: boolean, collisionId: string,
+ *           channelFolder: string }} transcript
+ *   a meeting (`isMeeting`) has no `url` and brings its `title` instead
  * @param {{ dir?: string }} [options]
  * @returns {Promise<string>} the path written
  */
@@ -108,7 +109,7 @@ export async function writeTranscript(transcript, { dir = TRANSCRIPTS_DIR } = {}
 
   const file = path.join(folder, await resolveFilename(transcript, folder));
   await fs.writeFile(file, transcript.contents, 'utf8');
-  if (transcript.url !== undefined) await removeOtherCopies(transcript.url, file, dir);
+  if (!transcript.isMeeting) await removeOtherCopies(transcript.url, file, dir);
   return file;
 }
 
@@ -130,9 +131,9 @@ async function resolveFilename(transcript, folder) {
 
   // A meeting is the same meeting when the file there is one too, under the
   // same title. A video's transcript, or another title, is not.
-  if (transcript.url === undefined) {
+  if (transcript.isMeeting) {
     const { values } = readFrontmatter(existing) ?? {};
-    return values && !('url' in values) && values.title === transcript.title
+    return values && isMeetingFrontmatter(values) && values.title === transcript.title
       ? transcript.filename
       : `${transcript.slug}-${transcript.collisionId}.md`;
   }

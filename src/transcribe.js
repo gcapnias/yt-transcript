@@ -24,7 +24,8 @@ export class MeetingFileNotFoundError extends Error {
  * @param {{ path: string, layout?: 'auto'|'prose'|'dialog'|'meeting' }} input
  *   `path` is the `.vtt`'s absolute path, as `parseTarget` gives it
  * @param {{ dir?: string, now?: () => Date }} [options] `now` is the clock the
- *   `fetched` key reads; `dir` is where transcripts live
+ *   transcribing is dated by (the frontmatter key is called `fetched`); `dir`
+ *   is where transcripts live
  * @returns {Promise<{ transcript: ReturnType<typeof renderMeetingTranscript>, file: string }>}
  * @throws {MeetingFileNotFoundError} before anything is written
  */
@@ -47,7 +48,7 @@ export async function transcribeMeeting({ path: trackPath, layout }, { dir, now 
     fileName: path.basename(trackPath),
     modifiedAt,
     layout,
-    fetchedAt: now(),
+    transcribedAt: now(),
   });
 
   const file = await writeTranscript(transcript, { dir });

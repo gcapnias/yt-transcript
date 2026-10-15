@@ -51,36 +51,51 @@ function wordsOf(text) {
 }
 
 /**
- * One cue's speech, as one segment per speaker, in the order of their voice
- * tags. A cue usually has one tag, but when people join or leave a meeting
- * Teams puts several in one cue, and each speaker is credited with the text
- * inside their own tag. Text outside any tag has no speaker, and adjacent
- * stretches by the same speaker are one segment.
+ * Adds a speaker's words to the end of a list of `{ speaker, words }`: onto the
+ * last entry when it is the same speaker's, else as an entry of its own. One
+ * rule for the three places that join speech, which differ only in whether
+ * words with no speaker join each other: `joinsUnnamed`.
+ *
+ * @param {Array<{ speaker: string|null, words: string[] }>} entries
+ * @param {{ speaker: string|null, words: string[] }} next
+ */
+function addSpeech(entries, { speaker, words }, { joinsUnnamed }) {
+  const last = entries[entries.length - 1];
+  if (last && last.speaker === speaker && (speaker !== null || joinsUnnamed)) {
+    last.words.push(...words);
+  } else {
+    entries.push({ speaker, words: [...words] });
+  }
+}
+
+/**
+ * One cue's credits, in the order of their voice tags: the words each speaker
+ * is credited with. A cue usually has one tag, but when people join or leave a
+ * meeting Teams puts several in one cue, and each speaker is credited with the
+ * text inside their own tag. Text outside any tag has no speaker, and adjacent
+ * stretches by the same speaker are one credit.
  *
  * @returns {Array<{ speaker: string|null, words: string[] }>}
  */
 function readCue(cue) {
   const text = cue.lines.join('\n');
-  const segments = [];
+  const credits = [];
   let speaker = null;
   let from = 0;
 
-  const take = (to) => {
+  const credit = (to) => {
     const words = wordsOf(text.slice(from, to));
-    if (words.length === 0) return;
-    const last = segments[segments.length - 1];
-    if (last && last.speaker === speaker) last.words.push(...words);
-    else segments.push({ speaker, words });
+    if (words.length > 0) addSpeech(credits, { speaker, words }, { joinsUnnamed: true });
   };
 
   for (const boundary of text.matchAll(VOICE_BOUNDARY)) {
-    take(boundary.index);
+    credit(boundary.index);
     speaker = boundary[1] === undefined ? null : collapse(decodeEntities(boundary[1])) || null;
     from = boundary.index + boundary[0].length;
   }
-  take(text.length);
+  credit(text.length);
 
-  return segments;
+  return credits;
 }
 
 /**
@@ -99,20 +114,18 @@ function rebuildUtterances(cues) {
     const match = UTTERANCE_ID.exec(cue.id ?? '');
     const key = match ? match[1] : `cue ${position}`;
     if (!utterances.has(key)) utterances.set(key, []);
-    utterances.get(key).push({ part: match ? Number(match[2]) : 0, position, segments: readCue(cue) });
+    utterances.get(key).push({ part: match ? Number(match[2]) : 0, position, credits: readCue(cue) });
   }
 
   // An utterance whose cues name several speakers comes out as one entry per
   // speaker, in order; the entries of one speaker next to each other are one.
   return [...utterances.values()].flatMap((parts) => {
     parts.sort((a, b) => a.part - b.part || a.position - b.position);
-    const runs = [];
-    for (const segment of parts.flatMap((part) => part.segments)) {
-      const last = runs[runs.length - 1];
-      if (last && last.speaker === segment.speaker) last.words.push(...segment.words);
-      else runs.push({ speaker: segment.speaker, words: [...segment.words] });
+    const entries = [];
+    for (const credit of parts.flatMap((part) => part.credits)) {
+      addSpeech(entries, credit, { joinsUnnamed: true });
     }
-    return runs;
+    return entries;
   });
 }
 
@@ -124,11 +137,7 @@ function rebuildUtterances(cues) {
 function toTurns(utterances) {
   const turns = [];
 
-  for (const { speaker, words } of utterances) {
-    const last = turns[turns.length - 1];
-    if (speaker && last?.speaker === speaker) last.words.push(...words);
-    else turns.push({ speaker, words: [...words] });
-  }
+  for (const utterance of utterances) addSpeech(turns, utterance, { joinsUnnamed: false });
 
   return turns;
 }
@@ -181,7 +190,10 @@ export function cleanMeeting(rawText, { layout = 'auto' } = {}) {
     chosen === 'prose'
       ? [{ speaker: null, words: utterances.flatMap((utterance) => utterance.words) }]
       : toTurns(utterances);
-  const sentenceEnd = chosen === 'meeting' ? MEETING_SENTENCE_END : undefined;
+
+  // What the meeting layout alone does: name the speakers, and count `;` as a
+  // sentence end. The other layouts do neither.
+  const named = chosen === 'meeting';
 
   return {
     layout: chosen,
@@ -189,8 +201,8 @@ export function cleanMeeting(rawText, { layout = 'auto' } = {}) {
     turns: turns
       .filter((turn) => turn.words.length > 0)
       .map(({ speaker, words }) => ({
-        speaker: chosen === 'meeting' ? speaker : null,
-        paragraphs: toParagraphs(words, sentenceEnd),
+        speaker: named ? speaker : null,
+        paragraphs: toParagraphs(words, named ? MEETING_SENTENCE_END : undefined),
       })),
   };
 }

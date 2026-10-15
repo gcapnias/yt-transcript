@@ -36,6 +36,32 @@ function compactLocalDate(date) {
 }
 
 /**
+ * The shape both renderers end in: the body laid out from the turns, joined to
+ * the frontmatter, and the rest of the result carried through untouched. The
+ * one place the dash rule lives.
+ *
+ * No H1 and no timestamps: the title is in the frontmatter, and repeating it is
+ * redundant for the agent that consumes the file. In a dialog or a meeting each
+ * turn's first paragraph opens with an em dash, and in a meeting a named turn
+ * follows it with the speaker's name in bold. Prose has no turns to open.
+ *
+ * @param {{ slug: string, frontmatter: string, layout: 'prose'|'dialog'|'meeting',
+ *           turns: Array<{ speaker: string|null, paragraphs: string[] }> }} parts
+ *   the rest of `parts` is the result's own fields
+ */
+function composeTranscript({ slug, frontmatter, turns, layout, ...rest }) {
+  const body = turns
+    .flatMap(({ speaker, paragraphs }) => {
+      if (layout === 'prose') return paragraphs;
+      const opening = speaker === null ? TURN_DASH : `${TURN_DASH}**${speaker}:** `;
+      return [`${opening}${paragraphs[0]}`, ...paragraphs.slice(1)];
+    })
+    .join('\n\n');
+
+  return { slug, filename: `${slug}.md`, contents: `${frontmatter}\n\n${body}\n`, layout, ...rest };
+}
+
+/**
  * @param {object} input
  * @param {string} input.trackText the subtitle track exactly as downloaded
  * @param {string} input.url for a YouTube video, the canonical
@@ -103,15 +129,6 @@ export function renderTranscript({
     layout,
   });
 
-  // No H1 and no timestamps: the title is in the frontmatter, and repeating it
-  // is redundant for the agent that consumes the file. In a dialog each turn's
-  // first paragraph opens with an em dash; no speaker is ever named.
-  const body = turns
-    .flatMap((paragraphs) =>
-      layout === 'dialog' ? [`${TURN_DASH}${paragraphs[0]}`, ...paragraphs.slice(1)] : paragraphs,
-    )
-    .join('\n\n');
-
   // Forcing a dialog onto a track with no speaker-change notation is honoured,
   // but the human asked for turns and got one, so they are told which video. A
   // track whose only marker opens it does carry notation, and an empty track
@@ -121,16 +138,18 @@ export function renderTranscript({
       ? [`--layout dialog: ${url} marks no speaker changes, so its dialog is a single turn.`]
       : [];
 
-  return {
+  return composeTranscript({
     slug,
-    filename: `${slug}.md`,
-    contents: `${frontmatter}\n\n${body}\n`,
+    frontmatter,
+    // In a video's dialog no speaker is ever named.
+    turns: turns.map((paragraphs) => ({ speaker: null, paragraphs })),
+    layout,
+    isMeeting: false,
     url,
     collisionId,
     // Where the store files it (ADR-0008); never written into the frontmatter.
     channelFolder,
     trackKind,
-    layout,
     warnings,
     // What the run tells the human it just fetched. Carried out here rather
     // than re-read from the file or re-formatted by the CLI, so the terminal
@@ -141,7 +160,7 @@ export function renderTranscript({
       duration: metadata?.duration ?? '',
       uploaded: formatUploadDate(metadata?.uploadDate ?? ''),
     },
-  };
+  });
 }
 
 /**
@@ -153,23 +172,24 @@ export function renderTranscript({
  * file name, the date is when the file was saved, there is no url and no
  * channel, and the track is recorded as auto because it is speech recognition.
  * Pure, as `renderTranscript` is: the caller reads the file and its mtime, and
- * passes `fetchedAt`.
+ * passes `transcribedAt`, when the transcribing happened.
  *
  * @param {object} input
  * @param {string} input.trackText the meeting's track exactly as exported
  * @param {string} input.fileName the file's name, directory left off
  * @param {Date} input.modifiedAt the file's modification time
  * @param {'auto'|'prose'|'dialog'|'meeting'} [input.layout] the layout asked for
- * @param {Date} [input.fetchedAt]
+ * @param {Date} [input.transcribedAt]
  *
  * `collisionId` in the result is what a slug collision suffixes: a short hash
  * of the title, which differs exactly when the meetings do. `url` is
- * `undefined`: a meeting is identified by its title (see `writeTranscript`).
+ * `undefined` and `isMeeting` is true: a meeting is identified by its title
+ * (see `writeTranscript`).
  *
  * @returns {{ slug: string, filename: string, contents: string, title: string,
- *             url: undefined, collisionId: string, channelFolder: 'meetings',
- *             trackKind: 'auto', layout: 'prose'|'dialog'|'meeting',
- *             warnings: string[],
+ *             isMeeting: true, url: undefined, collisionId: string,
+ *             channelFolder: 'meetings', trackKind: 'auto',
+ *             layout: 'prose'|'dialog'|'meeting', warnings: string[],
  *             video: { title: string, channel: string, duration: string,
  *                      uploaded: string } }}
  */
@@ -178,7 +198,7 @@ export function renderMeetingTranscript({
   fileName,
   modifiedAt,
   layout: requestedLayout,
-  fetchedAt = new Date(),
+  transcribedAt = new Date(),
 }) {
   const { layout, duration, turns } = cleanMeeting(trackText, { layout: requestedLayout });
   const title = fileName.replace(VTT_EXTENSION, '');
@@ -190,32 +210,27 @@ export function renderMeetingTranscript({
     channel: '',
     ...(duration !== null && { duration }),
     uploadDate,
-    fetchedAt,
+    // The frontmatter key is `fetched`, and for a meeting it records when the
+    // file was transcribed: the key's name is the contract, not the concept.
+    fetchedAt: transcribedAt,
     subtitles: 'auto',
     layout,
   });
 
-  // A named turn opens `— **Name:** `, an unnamed one `— `; later paragraphs of
-  // a turn are bare, as in a dialog. Prose has no turns to open.
-  const body = turns
-    .flatMap(({ speaker, paragraphs }) => {
-      if (layout === 'prose') return paragraphs;
-      const opening = speaker === null ? TURN_DASH : `${TURN_DASH}**${speaker}:** `;
-      return [`${opening}${paragraphs[0]}`, ...paragraphs.slice(1)];
-    })
-    .join('\n\n');
-
-  return {
+  return composeTranscript({
     slug,
-    filename: `${slug}.md`,
-    contents: `${frontmatter}\n\n${body}\n`,
+    frontmatter,
+    turns,
+    layout,
     title,
+    isMeeting: true,
     url: undefined,
     collisionId: createHash('sha1').update(title).digest('hex').slice(0, 8),
     channelFolder: MEETINGS_FOLDER,
     trackKind: 'auto',
-    layout,
     warnings: [],
+    // Named `video` because the CLI's report and every video's result read that
+    // key; for a meeting it is what the run tells the human about the meeting.
     video: { title, channel: '', duration: duration ?? '', uploaded: formatUploadDate(uploadDate) },
-  };
+  });
 }

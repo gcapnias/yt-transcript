@@ -4,9 +4,9 @@
  *
  * Seven keys, in one order, then `layout`, which is newer than the rest and the
  * only one a transcript may lack. A meeting has no `url` and may have no
- * `duration` (ADR-0010), so both are written only when given. Every value format below was settled against
- * a YAML parser rather than by eye — see the spec's Transcript contract section
- * before widening any of it.
+ * `duration` (ADR-0010), so both are written only when given. Every value
+ * format below was settled against a YAML parser rather than by eye — see the
+ * spec's Transcript contract section before widening any of it.
  */
 
 /**

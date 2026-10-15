@@ -176,6 +176,7 @@ test('a .vtt argument transcribes without ever reaching yt-dlp, and rebuilds the
       return {
         file: 'transcripts/meetings/weekly-sync.md',
         transcript: {
+          isMeeting: true,
           layout: 'prose',
           trackKind: 'auto',
           warnings: [],

@@ -118,7 +118,7 @@ export async function main(argv, io = {}, deps = {}) {
   const rebuild = deps.rebuildCatalog ?? rebuildCatalog;
   const expand = deps.expandPlaylist ?? expandPlaylist;
   const readUrls = deps.readExistingUrls ?? readExistingUrls;
-  const transcribeOne = deps.transcribeMeeting ?? transcribeMeeting;
+  const transcribe = deps.transcribeMeeting ?? transcribeMeeting;
 
   if (argv[0] === CATALOG_COMMAND) {
     if (argv.length > 1) {
@@ -160,7 +160,7 @@ export async function main(argv, io = {}, deps = {}) {
   // no yt-dlp and no network (ADR-0010). `--lang`, `--playlist` and `--force`
   // mean nothing to it and are ignored.
   if (target.kind === 'file') {
-    return transcribe({ target, options, io: { out, err }, deps: { transcribe: transcribeOne, rebuild } });
+    return meeting({ target, options, io: { out, err }, deps: { transcribe, rebuild } });
   }
 
   if (options.layout === 'meeting') {
@@ -206,31 +206,7 @@ export async function main(argv, io = {}, deps = {}) {
       { onRetry: (retry) => err(describeRetry({ url: target.url, ...retry })) },
     );
 
-    report(out, transcript, file, passedOver);
-    for (const warning of transcript.warnings ?? []) err(warning);
-
-    // The rebuild is a full rescan rather than an appended row, so it runs
-    // after the write and reflects the whole directory. A batch (ytdlp-xmu.6)
-    // calls `rebuildCatalog` once at its end instead of once per video.
-    try {
-      const { warnings } = await rebuild();
-      for (const warning of warnings) err(warning);
-    } catch (error) {
-      // The spec does not cover a rebuild that fails on I/O, so this is a
-      // reading rather than a rule: the rebuild is a *required* trigger, not a
-      // nicety, and a command with two required effects that manages one has
-      // not succeeded. Exit 1 covering several conditions distinguished only
-      // by the message is already this tool's shape — rate-limited and
-      // permanently unfetchable share it too.
-      //
-      // The transcript is written and already reported. Losing that fact in a
-      // stack trace would be the worse failure, so name both and say what
-      // fixes it.
-      reportRebuildFailure(err, error, 'The transcript was written');
-      return 1;
-    }
-
-    return 0;
+    return await finishOne({ transcript, file, passedOver, io: { out, err }, rebuild });
   } catch (error) {
     // Rate-limited and permanently unfetchable share exit 1. There is no
     // second exit code: the two are the same observable, and inventing a code
@@ -264,7 +240,7 @@ export async function main(argv, io = {}, deps = {}) {
 function report(out, transcript, file, passedOver = []) {
   out(file);
   // A meeting has no url, so its line opens with the layout instead of one.
-  const subject = transcript.url ?? `${transcript.layout} layout`;
+  const subject = transcript.isMeeting ? `${transcript.layout} layout` : transcript.url;
   out(`  ${subject}  (${transcript.trackKind} subtitle track)`);
   if (passedOver.length > 0) {
     const tracks = passedOver.map(({ kind, key }) => `${kind} ${key}`).join(', ');
@@ -296,35 +272,57 @@ function reportRebuildFailure(err, error, written) {
 }
 
 /**
- * The meeting command: read the `.vtt`, write the transcript, rebuild the
- * catalog, report. The same two required effects as a single fetch, so a
- * failed rebuild fails the command the same way (see `main`).
+ * What follows a single written transcript, a video's or a meeting's: report
+ * it, pass on its warnings, and rebuild the catalog.
+ *
+ * The rebuild is a full rescan rather than an appended row, so it runs after
+ * the write and reflects the whole directory. A batch (ytdlp-xmu.6) calls
+ * `rebuildCatalog` once at its end instead of once per video.
  *
  * @returns {Promise<number>} the process exit code
  */
-async function transcribe({ target, options, io: { out, err }, deps }) {
-  let result;
-  try {
-    result = await deps.transcribe({ path: target.path, layout: options.layout });
-  } catch (error) {
-    if (!(error instanceof MeetingFileNotFoundError)) throw error;
-    err(error.message);
-    return 1;
-  }
-
-  const { transcript, file } = result;
-  report(out, transcript, file);
+async function finishOne({ transcript, file, passedOver, io: { out, err }, rebuild }) {
+  report(out, transcript, file, passedOver);
   for (const warning of transcript.warnings ?? []) err(warning);
 
   try {
-    const { warnings } = await deps.rebuild();
+    const { warnings } = await rebuild();
     for (const warning of warnings) err(warning);
   } catch (error) {
+    // The spec does not cover a rebuild that fails on I/O, so this is a
+    // reading rather than a rule: the rebuild is a *required* trigger, not a
+    // nicety, and a command with two required effects that manages one has
+    // not succeeded. Exit 1 covering several conditions distinguished only
+    // by the message is already this tool's shape — rate-limited and
+    // permanently unfetchable share it too.
+    //
+    // The transcript is written and already reported. Losing that fact in a
+    // stack trace would be the worse failure, so name both and say what
+    // fixes it.
     reportRebuildFailure(err, error, 'The transcript was written');
     return 1;
   }
 
   return 0;
+}
+
+/**
+ * The meeting command: read the `.vtt`, write the transcript, then the same
+ * two required effects as a single fetch (see `finishOne`).
+ *
+ * @returns {Promise<number>} the process exit code
+ */
+async function meeting({ target, options, io, deps: { transcribe, rebuild } }) {
+  let result;
+  try {
+    result = await transcribe({ path: target.path, layout: options.layout });
+  } catch (error) {
+    if (!(error instanceof MeetingFileNotFoundError)) throw error;
+    io.err(error.message);
+    return 1;
+  }
+
+  return finishOne({ ...result, io, rebuild });
 }
 
 /**

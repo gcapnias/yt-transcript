@@ -40,6 +40,10 @@ _Avoid_: Caption, line, segment, subtitle
 One continuous piece of speech by one speaker in a meeting's track, which the track may split across several cues with other speakers' cues between them. A single cue may also carry several speakers, when people join or leave; each is credited with the text inside their own voice tag, in the order of the tags. Like cues, utterances are an intermediate and never appear in a transcript.
 _Avoid_: Segment, phrase, part
 
+**Credit**:
+The words of one cue that a voice tag attributes to one speaker. A cue usually holds one credit; when people join or leave a meeting it holds several, in the order of the tags. Credits are an intermediate: those of an utterance's cues are put back together into the utterance, and they never appear in a transcript.
+_Avoid_: Segment, span, voice
+
 **Artifact**:
 Anything a subtitle track carries that is not spoken content: a provenance credit, speaker-change notation, or a sound event. Artifacts are removed while cleaning, so they never reach a transcript; in a dialog, speaker-change notation is still removed as text, but first marks where one turn ends and the next begins. Notation is track-kind-specific, except that a named track writes its artifacts the way an auto track does, though it is manual in every other respect; a transcriber's annotation on speech — an uncertain name, on-screen text — is not an artifact and survives verbatim.
 _Avoid_: Noise, junk, markup, tag

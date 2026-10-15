@@ -46,6 +46,17 @@ const COLUMNS = [
 const REQUIRED_KEYS = ['title', 'channel', 'upload_date', 'fetched', 'subtitles'];
 
 /**
+ * Whether a transcript's frontmatter is a meeting's (ADR-0010): the one thing
+ * on disk that tells, since a meeting has no `url` and every video has one.
+ * The in-memory counterpart is `isMeeting` on a rendered transcript.
+ *
+ * @param {Record<string, string>} values as `readFrontmatter` returns them
+ */
+export function isMeetingFrontmatter(values) {
+  return !('url' in values);
+}
+
+/**
  * Whether a file's path puts it in a channel folder. The one place that rule
  * lives: paths are relative to `transcripts/` and `/`-separated, which is how
  * `readTranscriptFiles` produces them, so a folder shows as a `/`.
@@ -146,7 +157,7 @@ export function scanTranscriptUrls(files) {
     const frontmatter = parseFrontmatter(file.text);
     if (frontmatter === null || frontmatter.error) continue;
     // A meeting has none, and is never in a batch's way.
-    if ('url' in frontmatter.values) urls.push(frontmatter.values.url);
+    if (!isMeetingFrontmatter(frontmatter.values)) urls.push(frontmatter.values.url);
   }
   return urls;
 }

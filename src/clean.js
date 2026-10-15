@@ -38,8 +38,12 @@ export const LAYOUTS = ['auto', 'prose', 'dialog', 'meeting'];
 const SENTENCE_END = /[.!?]["')\]]?$/;
 
 /**
- * Removes inline markup: `<c>` word-timing tags, their closers, and the
- * `<00:00:01.200>` timestamps between them.
+ * Removes every inline tag, `<` to `>`: a video track's `<c>` word-timing
+ * tags, their closers and the `<00:00:01.200>` timestamps between them, and a
+ * meeting track's `<v Name>` voice tags and `</v>` closers. Exported for
+ * `./meeting.js`, which reads the speaker out of a voice tag before it calls
+ * this and so never loses it; `cleanTrack` calls it first, as no video track
+ * has a tag worth keeping.
  */
 export function stripTags(text) {
   return text.replace(/<[^>]*>/g, '');
@@ -51,7 +55,9 @@ export function stripTags(text) {
  * stripping then eats along with everything up to the next `>`.
  *
  * Not cosmetic — `>>`, the auto speaker marker, is `&gt;&gt;` on disk, so this
- * is what lets `./artifacts.js` write one rule per notation.
+ * is what lets `./artifacts.js` write one rule per notation. A meeting's text
+ * and speaker names are decoded the same way, by `./meeting.js`, which
+ * exports it from here rather than keep a second entity table.
  */
 export function decodeEntities(text) {
   return text
@@ -176,10 +182,12 @@ function toTurns(words, turnStarts) {
 /**
  * Breaks the word stream at the next sentence end once a paragraph has reached
  * `PARAGRAPH_MIN_WORDS` (ADR-0007). It is given one turn's words at a time, so
- * a paragraph never spans two turns. `sentenceEnd` is what ends a sentence; a
- * meeting widens it (ADR-0010).
+ * a paragraph never spans two turns. Exported for `./meeting.js`, whose turns
+ * are paragraphed by the same rule, with a wider sentence end (ADR-0010).
  *
  * @param {string[]} words
+ * @param {RegExp} [sentenceEnd] what a word must match to end a sentence; the
+ *   video rule, `SENTENCE_END`, when absent
  * @returns {string[]} paragraphs
  */
 export function toParagraphs(words, sentenceEnd = SENTENCE_END) {
