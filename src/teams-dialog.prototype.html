@@ -1,0 +1,344 @@
+<!doctype html>
+<!--
+  PROTOTYPE — throwaway. Feasibility spike for issue #15: can a Microsoft Teams
+  meeting .vtt be rebuilt into a dialog of named turns?
+  Open by double-click; pick a .vtt with the file chooser. Nothing from any
+  meeting is stored in this file — keep it that way, the repo is public.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>PROTOTYPE · Teams meeting → dialog</title>
+<style>
+  :root { --accent: #3157d5; --muted: #6b7280; --line: #e5e7eb; --soft: #f5f7ff; }
+  * { box-sizing: border-box; }
+  body { font: 15px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif; color: #111827; margin: 0; background: #fafafa; }
+  main { max-width: 1100px; margin: 0 auto; padding: 32px 24px 80px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  h2 { font-size: 15px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 32px 0 10px; }
+  .tag { display: inline-block; font-size: 11px; font-weight: 600; letter-spacing: .08em; color: #fff; background: #b45309; padding: 2px 6px; border-radius: 3px; vertical-align: middle; margin-right: 8px; }
+  .intro { color: #374151; max-width: 800px; }
+  .card { background: #fff; border: 1px solid var(--line); border-radius: 8px; padding: 16px 18px; }
+  button { font: inherit; border: 1px solid var(--line); background: #fff; border-radius: 6px; padding: 6px 12px; cursor: pointer; }
+  button:hover { border-color: var(--accent); }
+  button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  button:disabled { opacity: .45; cursor: default; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px 18px; }
+  .stat .k { font-size: 12px; color: var(--muted); }
+  .stat .v { font-size: 18px; font-weight: 600; }
+  .stat.changed .v { color: var(--accent); }
+  .ok { color: #047857; } .bad { color: #b91c1c; }
+  .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin-bottom: 12px; }
+  .tabs button { border: none; border-bottom: 2px solid transparent; border-radius: 0; background: none; padding: 8px 12px; }
+  .tabs button.on { color: var(--accent); border-bottom-color: var(--accent); background: none; }
+  .steps { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+  .steps button { text-align: left; }
+  .steps button.done { color: var(--muted); text-decoration: line-through; }
+  .turn { padding: 10px 0; border-bottom: 1px solid var(--line); }
+  .turn.interleaved { background: var(--soft); margin: 0 -18px; padding: 10px 18px; }
+  .turn .who { font-weight: 600; }
+  .turn .time { color: var(--muted); font-size: 12px; margin-left: 6px; }
+  .turn .flag { font-size: 11px; color: var(--accent); margin-left: 6px; }
+  details { margin-top: 6px; font-size: 13px; }
+  summary { cursor: pointer; color: var(--muted); }
+  table { border-collapse: collapse; width: 100%; margin-top: 6px; }
+  td { border-top: 1px solid var(--line); padding: 3px 6px; vertical-align: top; }
+  td.mono { font-family: ui-monospace, Consolas, monospace; font-size: 12px; color: var(--muted); white-space: nowrap; }
+  tr.mine td { background: #fff; } tr.other td { background: #fff7ed; }
+  .note { color: var(--muted); font-size: 13px; }
+  .empty { color: var(--muted); padding: 24px 0; text-align: center; }
+</style>
+</head>
+<body>
+<main>
+  <h1><span class="tag">PROTOTYPE</span>Teams meeting transcript → dialog</h1>
+  <p class="intro">
+    <strong>The question (issue #15):</strong> a Teams meeting export names the speaker on every cue,
+    but splits each thing someone says into numbered parts, and other people's words can land between
+    those parts. Can we put each utterance back together, group it into turns by speaker, and get a
+    dialog that reads correctly? Load a meeting file, read the result, and open the raw cues behind any
+    turn to compare. The file never leaves this page.
+  </p>
+
+  <div class="card row">
+    <button class="primary" id="pick">Choose a meeting .vtt…</button>
+    <input type="file" id="file" accept=".vtt,text/vtt" hidden>
+    <span class="note" id="filename">No meeting loaded.</span>
+  </div>
+
+  <h2>What you're looking at</h2>
+  <div class="card stats" id="stats"></div>
+
+  <h2>Try it yourself</h2>
+  <div class="card row" id="controls"></div>
+
+  <h2>Guided walkthroughs</h2>
+  <div class="card">
+    <div class="tabs" id="tabs"></div>
+    <div id="scenario"></div>
+  </div>
+
+  <h2>The dialog</h2>
+  <div class="card" id="dialog"><div class="empty">Load a meeting to see its dialog.</div></div>
+</main>
+
+<!-- ============================================================
+     The logic under test: pure functions, no DOM. Liftable.
+     ============================================================ -->
+<script>
+const TeamsDialog = (() => {
+  const seconds = (stamp) => {
+    const [h, m, s] = stamp.split(':');
+    return Number(h) * 3600 + Number(m) * 60 + Number(s);
+  };
+  const words = (text) => text.split(/\s+/).filter(Boolean);
+
+  /** WebVTT text -> cues in file order. Teams ids look like `<uuid>/<utterance>-<part>`. */
+  function parseCues(raw) {
+    const blocks = raw.replace(/^﻿/, '').replace(/\r/g, '').split(/\n{2,}/);
+    const cues = [];
+    for (const block of blocks) {
+      const lines = block.split('\n').filter((line) => line !== '');
+      const timing = lines.findIndex((line) => line.includes('-->'));
+      if (timing < 0) continue;
+      const id = timing > 0 ? lines[timing - 1] : '';
+      const [start, end] = lines[timing].split('-->').map((s) => seconds(s.trim().split(' ')[0]));
+      const body = lines.slice(timing + 1).join('\n');
+      const voice = body.match(/<v\s+([^>]*)>/);
+      const text = body.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
+      const ids = id.match(/\/(\d+)-(\d+)$/);
+      cues.push({
+        position: cues.length, id, start, end, text,
+        speaker: voice ? voice[1].trim() : null,
+        // A cue without a Teams id stands alone as its own utterance.
+        utterance: ids ? ids[1] : `solo-${cues.length}`,
+        part: ids ? Number(ids[2]) : 0,
+      });
+    }
+    return cues;
+  }
+
+  /**
+   * Rejoins each utterance's parts, wherever they sit in the file, and orders
+   * utterances by where their first part appears. Never by the utterance
+   * number: it is not time order.
+   */
+  function rebuildUtterances(cues) {
+    const byId = new Map();
+    for (const cue of cues) {
+      if (!byId.has(cue.utterance)) byId.set(cue.utterance, []);
+      byId.get(cue.utterance).push(cue);
+    }
+    return [...byId.values()]
+      .map((parts) => {
+        parts.sort((a, b) => a.part - b.part);
+        const positions = parts.map((p) => p.position);
+        const first = Math.min(...positions), last = Math.max(...positions);
+        return {
+          speaker: parts[0].speaker,
+          start: parts[0].start,
+          position: first,
+          text: parts.map((p) => p.text).join(' '),
+          cuePositions: positions,
+          // Other speakers' cues sit between this utterance's parts.
+          interrupted: last - first + 1 > parts.length,
+        };
+      })
+      .sort((a, b) => a.position - b.position);
+  }
+
+  /** Utterances -> turns: consecutive utterances by one speaker become one turn. */
+  function toTurns(utterances, { mergeSameSpeaker = true } = {}) {
+    const turns = [];
+    for (const u of utterances) {
+      const previous = turns.at(-1);
+      if (mergeSameSpeaker && previous && previous.speaker === u.speaker) {
+        previous.utterances.push(u);
+      } else {
+        turns.push({ speaker: u.speaker, start: u.start, utterances: [u] });
+      }
+    }
+    return turns.map((t) => ({
+      ...t,
+      text: t.utterances.map((u) => u.text).join(' '),
+      interrupted: t.utterances.some((u) => u.interrupted),
+      cuePositions: t.utterances.flatMap((u) => u.cuePositions),
+    }));
+  }
+
+  /** Turns -> Markdown, in the tool's dialog style (each turn opens with an em dash). */
+  function toMarkdown(turns, { names = true } = {}) {
+    return turns
+      .map((t) => (names && t.speaker ? `— **${t.speaker}:** ${t.text}` : `— ${t.text}`))
+      .join('\n\n');
+  }
+
+  function summarize(cues, utterances, turns) {
+    return {
+      cues: cues.length,
+      utterances: utterances.length,
+      turns: turns.length,
+      speakers: new Set(cues.map((c) => c.speaker)).size,
+      cuesWithoutSpeaker: cues.filter((c) => !c.speaker).length,
+      interruptedUtterances: utterances.filter((u) => u.interrupted).length,
+      wordsIn: cues.reduce((n, c) => n + words(c.text).length, 0),
+      wordsOut: turns.reduce((n, t) => n + words(t.text).length, 0),
+    };
+  }
+
+  return { parseCues, rebuildUtterances, toTurns, toMarkdown, summarize };
+})();
+</script>
+
+<!-- ============================================================
+     Throwaway page shell.
+     ============================================================ -->
+<script>
+const state = {
+  fileName: null, cues: [], options: { names: true, mergeSameSpeaker: true, onlyInterrupted: false },
+  openTurn: null, previousStats: null,
+};
+
+function derive() {
+  const utterances = TeamsDialog.rebuildUtterances(state.cues);
+  const turns = TeamsDialog.toTurns(utterances, state.options);
+  return { utterances, turns, stats: TeamsDialog.summarize(state.cues, utterances, turns) };
+}
+
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+const clock = (s) => {
+  const m = Math.floor(s / 60), sec = Math.floor(s % 60);
+  return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+};
+
+// ---- actions (what buttons do) -------------------------------------------
+const actions = {
+  load(text, name) { state.cues = TeamsDialog.parseCues(text); state.fileName = name; state.openTurn = null; },
+  toggle(option) { state.options[option] = !state.options[option]; state.openTurn = null; },
+  set(option, value) { state.options[option] = value; state.openTurn = null; },
+  openNextInterrupted() {
+    const { turns } = derive();
+    const list = turns.map((t, i) => (t.interrupted ? i : -1)).filter((i) => i >= 0)
+      .sort((a, b) => wordsCutIn(turns[b]) - wordsCutIn(turns[a]));
+    if (!list.length) return;
+    state.openTurn = list[(list.indexOf(state.openTurn) + 1) % list.length];
+  },
+  reset() { state.options = { names: true, mergeSameSpeaker: true, onlyInterrupted: false }; state.openTurn = null; },
+};
+
+function dispatch(name, ...args) {
+  state.previousStats = state.cues.length ? derive().stats : null;
+  actions[name](...args);
+  render();
+}
+
+// ---- rendering ------------------------------------------------------------
+function renderStats(stats) {
+  const before = state.previousStats || {};
+  const items = [
+    ['Cues in the file', stats.cues, 'cues'],
+    ['Utterances after rejoining parts', stats.utterances, 'utterances'],
+    ['Turns in the dialog', stats.turns, 'turns'],
+    ['Speakers', stats.speakers, 'speakers'],
+    ['Utterances split by someone else', stats.interruptedUtterances, 'interruptedUtterances'],
+    ['Cues with no speaker named', stats.cuesWithoutSpeaker, 'cuesWithoutSpeaker'],
+  ];
+  const same = stats.wordsIn === stats.wordsOut;
+  $('stats').innerHTML = items.map(([k, v, key]) =>
+    `<div class="stat ${before[key] !== undefined && before[key] !== v ? 'changed' : ''}"><div class="k">${k}</div><div class="v">${v}</div></div>`
+  ).join('') + `<div class="stat"><div class="k">Words in → words out</div><div class="v ${same ? 'ok' : 'bad'}">${stats.wordsIn} → ${stats.wordsOut} ${same ? '✓ nothing lost' : '✗ mismatch'}</div></div>`;
+}
+
+function renderControls() {
+  const o = state.options, off = !state.cues.length ? 'disabled' : '';
+  $('controls').innerHTML = `
+    <button ${off} class="${o.names ? 'on' : ''}" onclick="dispatch('toggle','names')">Show speaker names</button>
+    <button ${off} class="${o.mergeSameSpeaker ? 'on' : ''}" onclick="dispatch('toggle','mergeSameSpeaker')">Join back-to-back utterances by one speaker</button>
+    <button ${off} class="${o.onlyInterrupted ? 'on' : ''}" onclick="dispatch('toggle','onlyInterrupted')">Only turns that were split by someone else</button>
+    <button ${off} onclick="dispatch('openNextInterrupted')">Open the next split turn</button>
+    <button ${off} onclick="copyMarkdown()">Copy as Markdown</button>
+    <button ${off} onclick="dispatch('reset')">Reset</button>`;
+}
+
+function rawRows(turn) {
+  // Every cue from the turn's first to its last, so the cues that interrupted it show too.
+  const lo = Math.min(...turn.cuePositions), hi = Math.max(...turn.cuePositions);
+  const mine = new Set(turn.cuePositions);
+  return state.cues.slice(lo, hi + 1).map((c) =>
+    `<tr class="${mine.has(c.position) ? 'mine' : 'other'}"><td class="mono">${clock(c.start)}</td><td class="mono">${esc(c.id.split('/').pop())}</td><td><b>${esc(c.speaker ?? '?')}</b></td><td>${esc(c.text)}</td></tr>`
+  ).join('');
+}
+
+function wordsCutIn(turn) {
+  const lo = Math.min(...turn.cuePositions), hi = Math.max(...turn.cuePositions), mine = new Set(turn.cuePositions);
+  return state.cues.slice(lo, hi + 1).filter((c) => !mine.has(c.position))
+    .reduce((n, c) => n + c.text.split(/\s+/).filter(Boolean).length, 0);
+}
+
+function renderDialog(turns) {
+  if (!state.cues.length) { $('dialog').innerHTML = '<div class="empty">Load a meeting to see its dialog.</div>'; return; }
+  const shown = turns.map((t, i) => [t, i]).filter(([t]) => !state.options.onlyInterrupted || t.interrupted);
+  // Biggest interruptions first: those are where moving them could put an answer before its question.
+  if (state.options.onlyInterrupted) shown.sort(([a], [b]) => wordsCutIn(b) - wordsCutIn(a));
+  if (!shown.length) { $('dialog').innerHTML = '<div class="empty">No turns match.</div>'; return; }
+  $('dialog').innerHTML = shown.map(([t, i]) => `
+    <div class="turn ${t.interrupted ? 'interleaved' : ''}" id="turn-${i}">
+      — ${state.options.names ? `<span class="who">${esc(t.speaker ?? '?')}:</span>` : ''}
+      <span class="time">${clock(t.start)}</span>
+      ${t.interrupted ? `<span class="flag">rebuilt across an interruption of ${wordsCutIn(t)} words</span>` : ''}
+      <div>${esc(t.text)}</div>
+      <details ${state.openTurn === i ? 'open' : ''}><summary>Raw cues behind this turn (${t.cuePositions.length}; cues from others in between are shaded)</summary>
+        <table>${rawRows(t)}</table></details>
+    </div>`).join('');
+  if (state.openTurn !== null) $(`turn-${state.openTurn}`)?.scrollIntoView({ block: 'center' });
+}
+
+// ---- guided walkthroughs ----------------------------------------------------
+const needFile = { label: 'Load a meeting file (skip if one is loaded)', run: () => state.cues.length ? null : $('pick').click() };
+const scenarios = [
+  { title: 'Read the meeting', text: 'The everyday case. Every utterance is rebuilt from its parts, back-to-back utterances by one person are joined into one turn, and each turn is labelled with its speaker. Read a few minutes against your memory of the meeting. Do the turns follow the conversation? Check that words in equals words out.',
+    steps: [needFile, { label: 'Show the dialog with names', run: () => dispatch('reset') }] },
+  { title: 'Someone cuts in', text: 'Teams splits a long sentence into parts, and a short "Yes." from someone else can land between them. Rejoining moves the interruption to after the whole sentence. ADR-0007 already rejected folding interjections into the other person\'s turn. Open the raw cues: does the rebuilt order read naturally, or did something important get pushed out of place?',
+    steps: [needFile, { label: 'Show only turns that were split', run: () => { dispatch('reset'); dispatch('set', 'onlyInterrupted', true); } },
+      { label: 'Open the first one and compare with the raw cues', run: () => dispatch('openNextInterrupted') },
+      { label: 'Open the next one', run: () => dispatch('openNextInterrupted') },
+      { label: 'And the next', run: () => dispatch('openNextInterrupted') }] },
+  { title: 'One person keeps talking', text: 'Teams starts a new utterance at every pause, so one person talking at length becomes many utterances in a row. Watch the turn count as the joining is switched off and back on.',
+    steps: [needFile, { label: 'Switch joining off: each utterance is its own turn', run: () => { dispatch('reset'); dispatch('set', 'mergeSameSpeaker', false); } },
+      { label: 'Switch it back on', run: () => dispatch('set', 'mergeSameSpeaker', true) }] },
+  { title: 'Without names', text: 'Today\'s dialogs open each turn with an em dash and name no one, because YouTube tracks don\'t say who is speaking. Teams does. Compare the two and decide whether names belong in the transcript (open question 5 on the issue).',
+    steps: [needFile, { label: 'Hide names (today\'s style)', run: () => { dispatch('reset'); dispatch('set', 'names', false); } },
+      { label: 'Show names again', run: () => dispatch('set', 'names', true) }] },
+];
+let activeScenario = 0, stepIndex = 0;
+
+function renderScenario() {
+  $('tabs').innerHTML = scenarios.map((s, i) => `<button class="${i === activeScenario ? 'on' : ''}" onclick="startScenario(${i})">${esc(s.title)}</button>`).join('');
+  const s = scenarios[activeScenario];
+  $('scenario').innerHTML = `<p>${esc(s.text)}</p><div class="steps">${s.steps.map((step, i) =>
+    `<button ${i !== stepIndex ? 'disabled' : ''} class="${i < stepIndex ? 'done' : ''}" onclick="runStep(${i})">${i + 1}. ${esc(step.label)}</button>`).join('')}</div>`;
+}
+function startScenario(i) { activeScenario = i; stepIndex = 0; if (state.cues.length) dispatch('reset'); else render(); }
+function runStep(i) { scenarios[activeScenario].steps[i].run(); stepIndex = Math.min(i + 1, scenarios[activeScenario].steps.length); render(); }
+
+// ---- wiring -------------------------------------------------------------------
+function render() {
+  const { turns, stats } = derive();
+  $('filename').textContent = state.fileName ? `Loaded: ${state.fileName}` : 'No meeting loaded.';
+  renderStats(stats); renderControls(); renderScenario(); renderDialog(turns);
+}
+function copyMarkdown() { navigator.clipboard.writeText(TeamsDialog.toMarkdown(derive().turns, state.options)); }
+
+$('pick').onclick = () => $('file').click();
+$('file').onchange = async (e) => {
+  const f = e.target.files[0]; if (!f) return;
+  dispatch('load', await f.text(), f.name);
+  e.target.value = '';
+};
+render();
+</script>
+</body>
+</html>
