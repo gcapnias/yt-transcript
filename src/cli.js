@@ -232,8 +232,8 @@ export async function main(argv, io = {}, deps = {}) {
  * to the one used, so a person who wanted one can say which (ADR-0009). It is
  * absent when none did.
  *
- * Single-video only. A batch reports per-video progress and a roll-call
- * instead, and a block per video would bury both.
+ * The one renderer for single-video, meeting and batch fetches; a second copy
+ * would drift.
  *
  * @param {import('./ytdlp.js').PassedOverTrack[]} [passedOver]
  */
@@ -363,6 +363,12 @@ async function batch({ target, options, io: { out, err }, deps }) {
     lang: options.lang,
     layout: options.layout,
     sleep,
+    // The block of each video that was written goes to stdout under its
+    // progress line, so a long batch still says what each video was and where
+    // it landed. Failures, warnings and retries stay on stderr, so `2>/dev/null`
+    // leaves a clean record of what was written and `2>&1` interleaves the
+    // failures in as they happen. A video's warnings follow its block.
+    onFetched: ({ transcript, file, passedOver }) => report(out, transcript, file, passedOver),
     onWarning: (warning) => err(warning),
     onProgress: ({ url, position, total }) => out(`[${position}/${total}] ${url}`),
     onRetry: (retry) => err(describeRetry(retry)),

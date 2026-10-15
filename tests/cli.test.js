@@ -208,18 +208,24 @@ test('nothing is added when no track was passed over', async () => {
   }
 });
 
-test('a batch never prints the hint', async () => {
+test('a batch prints the hint too, the same as a single-video fetch', async () => {
   const { deps } = batchDeps({
+    expandPlaylist: async () => VIDEOS.slice(0, 1),
     fetchTranscript: async ({ url, videoId }) => ({
       file: `transcripts/${videoId}.md`,
       transcript: { url, trackKind: 'manual' },
       passedOver: [{ kind: 'manual', key: 'en-JkeT_87f4cc' }],
     }),
   });
-  const { out, err, io } = capture();
+  const { out, io } = capture();
 
   assert.equal(await main([PLAYLIST], io, deps), 0);
-  assert.ok(!`${out.join('\n')}${err.join('\n')}`.includes('also on this video'));
+  assert.ok(
+    out.includes(
+      '  also on this video: manual en-JkeT_87f4cc; re-run with --lang <key> to use one',
+    ),
+    out.join('\n'),
+  );
 });
 
 test('the usage text says the default English also takes named tracks, last', async () => {
@@ -641,4 +647,136 @@ test('the usage and the unrecognised-input error both say X posts are accepted',
 
   await main([], io);
   assert.match(err.join('\n'), /X post/);
+});
+
+// The report of a batch (#16): each successful video prints the one block a
+// single-video fetch prints, under its progress line.
+
+const detailed = (url, videoId) => ({
+  file: `transcripts/chan/${videoId}.md`,
+  transcript: {
+    url,
+    trackKind: 'auto',
+    video: { title: `Title ${videoId}`, channel: 'Chan', duration: '14:56', uploaded: '2026-10-15' },
+    warnings: [`warning for ${videoId}`],
+  },
+  passedOver: [{ kind: 'manual', key: 'en-abc' }],
+});
+
+/** Stdout and stderr lines in one timeline, to assert what follows what. */
+function timeline() {
+  const events = [];
+  return {
+    events,
+    io: {
+      out: (line) => events.push(['out', line]),
+      err: (line) => events.push(['err', line]),
+    },
+  };
+}
+
+test("a batch prints a video's block under its progress line, byte for byte as a single fetch does", async () => {
+  const single = capture();
+  await main(['4JofSJIrjwU'], single.io, {
+    preflight: async () => '2026.09.01',
+    fetchTranscript: async ({ url, videoId }) => detailed(url, videoId),
+    rebuildCatalog: async () => ({ file: 'transcripts/README.md', count: 1, warnings: [] }),
+  });
+
+  const { deps } = batchDeps({
+    expandPlaylist: async () => VIDEOS.slice(0, 1),
+    fetchTranscript: async ({ url, videoId }) => detailed(url, videoId),
+  });
+  const { out, io } = capture();
+  assert.equal(await main([PLAYLIST], io, deps), 0);
+
+  const progress = out.indexOf(`[1/1] ${VIDEOS[0]}`);
+  assert.ok(progress >= 0, out.join('\n'));
+  const block = out.slice(progress + 1, progress + 1 + single.out.length);
+  assert.deepEqual(block, single.out);
+  assert.match(out[progress + 1 + single.out.length], /1 fetched, 0 skipped, 0 failed/);
+});
+
+test('a failed batch video prints no block, and its failure still goes to stderr', async () => {
+  const { deps } = batchDeps({
+    fetchTranscript: async ({ url, videoId }) => {
+      if (url === VIDEOS[1]) throw recordedFailure({ failure: NO_SUBTITLES, url });
+      return detailed(url, videoId);
+    },
+  });
+  const { events, io } = timeline();
+
+  assert.equal(await main([PLAYLIST], io, deps), 1);
+
+  const outs = events.filter(([stream]) => stream === 'out').map(([, line]) => line);
+  assert.ok(outs.some((line) => line.includes('Title 4JofSJIrjwU')));
+  assert.ok(!outs.some((line) => line.includes('Title F3lL98Pj90o')));
+  assert.ok(!outs.some((line) => line.includes('transcripts/chan/F3lL98Pj90o.md')));
+  assert.ok(events.some(([stream, line]) => stream === 'err' && line.includes('F3lL98Pj90o')));
+});
+
+test("a video's warnings follow its own block, before the next progress line", async () => {
+  const { deps } = batchDeps({
+    expandPlaylist: async () => VIDEOS.slice(0, 2),
+    fetchTranscript: async ({ url, videoId }) => detailed(url, videoId),
+  });
+  const { events, io } = timeline();
+
+  assert.equal(await main([PLAYLIST], io, deps), 0);
+
+  const at = (stream, text) =>
+    events.findIndex(([s, line]) => s === stream && line.includes(text));
+  assert.ok(at('out', 'Title 4JofSJIrjwU') < at('err', 'warning for 4JofSJIrjwU'));
+  assert.ok(at('err', 'warning for 4JofSJIrjwU') < at('out', `[2/2] ${VIDEOS[1]}`));
+  assert.ok(at('out', 'Title F3lL98Pj90o') < at('err', 'warning for F3lL98Pj90o'));
+});
+
+test('an error while reporting a written transcript is not a failed fetch', async () => {
+  const { deps } = batchDeps({ expandPlaylist: async () => VIDEOS.slice(0, 2) });
+  const out = [];
+  const err = [];
+  const io = {
+    out: (line) => {
+      if (line.startsWith('transcripts/')) throw new Error('stdout closed');
+      out.push(line);
+    },
+    err: (line) => void err.push(line),
+  };
+
+  assert.equal(await main([PLAYLIST], io, deps), 0);
+  assert.match(out.join('\n'), /2 fetched, 0 skipped, 0 failed/);
+  assert.ok(!err.join('\n').includes('Failed:'));
+  assert.ok(
+    err.includes('transcripts/4JofSJIrjwU.md was written, but reporting it failed: stdout closed'),
+    err.join('\n'),
+  );
+});
+
+test("a video's several warnings follow its block in the transcript's order, in a batch and alone", async () => {
+  const fetchTranscript = async ({ url, videoId }) => {
+    const result = detailed(url, videoId);
+    result.transcript.warnings = ['first warning', 'second warning', 'third warning'];
+    return result;
+  };
+
+  const alone = timeline();
+  await main(['4JofSJIrjwU'], alone.io, {
+    preflight: async () => '2026.09.01',
+    fetchTranscript,
+    rebuildCatalog: async () => ({ file: 'transcripts/README.md', count: 1, warnings: [] }),
+  });
+  const { deps } = batchDeps({ expandPlaylist: async () => VIDEOS.slice(0, 1), fetchTranscript });
+  const batched = timeline();
+  assert.equal(await main([PLAYLIST], batched.io, deps), 0);
+
+  for (const { events } of [alone, batched]) {
+    const lastBlockLine = events.findLastIndex(([s, line]) => s === 'out' && line.includes('uploaded'));
+    const warnings = events.filter(([s, line]) => s === 'err' && line.endsWith(' warning'));
+    assert.deepEqual(
+      warnings.map(([, line]) => line),
+      ['first warning', 'second warning', 'third warning'],
+    );
+    assert.ok(events.indexOf(warnings[0]) > lastBlockLine);
+    assert.deepEqual(events.slice(events.indexOf(warnings[0]), events.indexOf(warnings[0]) + 3), warnings);
+  }
 });

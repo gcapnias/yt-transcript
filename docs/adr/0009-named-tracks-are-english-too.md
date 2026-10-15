@@ -16,8 +16,9 @@ is manual in every respect but one: it writes its artifacts the way an auto trac
 leading `>>` or `>>>` marks a speaker change and a `[…]` sound event is removed. The auto speaker
 marker is widened to `>>` or `>>>` as well.
 
-- **When a manual track or a named track is passed over for another, a single-video fetch says
-  so,** naming each and the `--lang` that would select it. A named track is listed whatever its
+- **When a manual track or a named track is passed over for another, a fetch says so,** naming
+  each and the `--lang` that would select it. That holds for every fetched video, single or in a
+  batch (#16 extended it to batches, which first dropped it). A named track is listed whatever its
   kind, so a CC1 that lost to an auto `en` is still findable. Any other `--lang` is matched exactly, so
   `--lang en-JkeT_87f4cc` already works; the hint only makes it findable.
 - **Kind still outranks everything.** CC1 carries `<c>` timing tags and reads as auto, so DTVCC1,
