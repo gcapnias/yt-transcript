@@ -32,16 +32,18 @@ const COLUMNS = [
 ];
 
 /**
- * Every transcript this tool has ever written carries all seven of these keys,
+ * Every transcript this tool has ever written carries all five of these keys,
  * so "incomplete" has no other referent: a file missing one did not come from
- * this tool, and re-downloading it is the honest advice.
+ * this tool, and re-downloading it is the honest advice. `url` and `duration`
+ * are not among them: a video's transcript carries both, but a meeting has no
+ * url, and no duration when its file has no cues (ADR-0010).
  *
  * `layout`, the eighth key, is deliberately not here: it is newer than the
  * rest, and every transcript written before it lacks it. Requiring it would
  * warn about all of them and ask for a re-download that changes nothing but
  * the key.
  */
-const REQUIRED_KEYS = ['title', 'url', 'channel', 'duration', 'upload_date', 'fetched', 'subtitles'];
+const REQUIRED_KEYS = ['title', 'channel', 'upload_date', 'fetched', 'subtitles'];
 
 /**
  * Whether a file's path puts it in a channel folder. The one place that rule
@@ -143,14 +145,15 @@ export function scanTranscriptUrls(files) {
   for (const file of files) {
     const frontmatter = parseFrontmatter(file.text);
     if (frontmatter === null || frontmatter.error) continue;
-    urls.push(frontmatter.values.url);
+    // A meeting has none, and is never in a batch's way.
+    if ('url' in frontmatter.values) urls.push(frontmatter.values.url);
   }
   return urls;
 }
 
 function renderRow(row) {
   const cells = COLUMNS.map((column) =>
-    column.key === 'title' ? `[${cell(row.title)}](${row.path})` : cell(row[column.key]),
+    column.key === 'title' ? `[${cell(row.title)}](${row.path})` : cell(row[column.key] ?? ''),
   );
   return `| ${cells.join(' | ')} |`;
 }

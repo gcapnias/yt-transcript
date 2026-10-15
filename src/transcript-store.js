@@ -7,6 +7,11 @@
  * and bumps `fetched`, while two different videos that happen to share a title
  * produce two files rather than one destroying the other. A video has one
  * transcript: writing it removes any other file carrying its `url`.
+ *
+ * A meeting has no `url` (ADR-0010), so it is identified by its title, which is
+ * its file's name: the same title overwrites, and a different title that slugs
+ * to the same filename is suffixed with the collision id. A meeting never
+ * removes another transcript, and no video overwrites one.
  */
 
 import fs from 'node:fs/promises';
@@ -91,8 +96,9 @@ export async function readTranscriptFiles(dir) {
  * moves, rather than leaving a stale copy. If the write fails, nothing is
  * removed.
  *
- * @param {{ slug: string, filename: string, contents: string, url: string,
- *           collisionId: string, channelFolder: string }} transcript
+ * @param {{ slug: string, filename: string, contents: string, url?: string,
+ *           title?: string, collisionId: string, channelFolder: string }} transcript
+ *   `url` is absent for a meeting, which brings its `title` instead
  * @param {{ dir?: string }} [options]
  * @returns {Promise<string>} the path written
  */
@@ -102,7 +108,7 @@ export async function writeTranscript(transcript, { dir = TRANSCRIPTS_DIR } = {}
 
   const file = path.join(folder, await resolveFilename(transcript, folder));
   await fs.writeFile(file, transcript.contents, 'utf8');
-  await removeOtherCopies(transcript.url, file, dir);
+  if (transcript.url !== undefined) await removeOtherCopies(transcript.url, file, dir);
   return file;
 }
 
@@ -120,6 +126,15 @@ async function resolveFilename(transcript, folder) {
   } catch (error) {
     if (error.code !== 'ENOENT') throw error;
     return transcript.filename;
+  }
+
+  // A meeting is the same meeting when the file there is one too, under the
+  // same title. A video's transcript, or another title, is not.
+  if (transcript.url === undefined) {
+    const { values } = readFrontmatter(existing) ?? {};
+    return values && !('url' in values) && values.title === transcript.title
+      ? transcript.filename
+      : `${transcript.slug}-${transcript.collisionId}.md`;
   }
 
   // The same video, or a file we cannot read an identity out of: overwrite.

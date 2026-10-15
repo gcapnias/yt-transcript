@@ -10,7 +10,11 @@
  * carries the url to *fetch* and nothing a transcript is identified by.
  */
 
+import path from 'node:path';
+
 const VIDEO_ID = /^[A-Za-z0-9_-]{11}$/;
+/** A meeting's track: anything ending in `.vtt` is a local file (ADR-0010). */
+const LOCAL_TRACK = /\.vtt$/i;
 /** A shape guard, not a playlist-id format: rejects empty and junk `list=` values. */
 const LIST_ID_SHAPE = /^[A-Za-z0-9_-]+$/;
 const HANDLE = /^@[A-Za-z0-9_.-]+$/;
@@ -122,16 +126,23 @@ function channel(segments) {
 }
 
 /**
- * @param {string} input a URL, a bare video id, or a bare `@handle`
+ * @param {string} input a URL, a bare video id, a bare `@handle`, or a path
+ *   ending in `.vtt`
  * @param {{ playlist?: boolean }} [options] `playlist: true` forces the batch
  *   reading of a URL that names both a video and a playlist
  * @returns {{ kind: 'video'|'playlist'|'channel', url: string, videoId: string|null }
- *   | { kind: 'post', url: string, videoId: null, videoNumber: number }}
+ *   | { kind: 'post', url: string, videoId: null, videoNumber: number }
+ *   | { kind: 'file', path: string }} a `file` is a meeting's `.vtt`, with its
+ *   absolute path and no url
  */
 export function parseTarget(input, options = {}) {
   const forcePlaylist = options.playlist === true;
   const trimmed = String(input ?? '').trim();
   if (!trimmed) throw new TargetParseError(input);
+
+  // First of all, and without asking whether the file exists: a mistyped path
+  // must fail as "file not found", not as a URL that is not a video (ADR-0010).
+  if (LOCAL_TRACK.test(trimmed)) return { kind: 'file', path: path.resolve(trimmed) };
 
   // Checked before the bare video id, since a handle is never a video id.
   if (HANDLE.test(trimmed)) return channel([trimmed]);

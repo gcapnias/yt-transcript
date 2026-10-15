@@ -5,10 +5,11 @@ import { LAYOUTS } from './clean.js';
 import { fetchTranscript } from './fetch.js';
 import { describeRetry } from './fetch-outcome.js';
 import { parseTarget, TargetParseError } from './target.js';
+import { MeetingFileNotFoundError, transcribeMeeting } from './transcribe.js';
 import { preflight, expandPlaylist, ExpansionError, FetchError, YtDlpMissingError } from './ytdlp.js';
 
-const USAGE = `Usage: yt-transcript <url|id> [--lang <code>] [--layout auto|prose|dialog]
-                     [--playlist] [--force]
+const USAGE = `Usage: yt-transcript <url|id|file.vtt> [--lang <code>]
+                     [--layout auto|prose|dialog|meeting] [--playlist] [--force]
        yt-transcript catalog
 
   <url|id>      a YouTube video URL, a bare video id, a youtu.be or /shorts
@@ -17,14 +18,22 @@ const USAGE = `Usage: yt-transcript <url|id> [--lang <code>] [--layout auto|pros
                 /i/status/<id>, or a t.co link), which fetches one video:
                 its first, or the media item a trailing /video/N or
                 /photo/N selects
+  <file.vtt>    a meeting's local .vtt file, such as a Microsoft Teams
+                transcript export, instead of a URL. It is transcribed with
+                no download, into transcripts/meetings, as a meeting: turns
+                named by speaker (— **Name:** text). A file that names no
+                speakers is a dialog. --lang, --playlist and --force are
+                ignored
   --lang <code> subtitle language (default: en). en accepts en, en-orig,
                 en-US, en-GB or a named track (en-JkeT_87f4cc), preferring
                 a manual track, then that order, named tracks last; any
                 other code is matched exactly
-  --layout <l>  auto|prose|dialog (default: auto). auto lays a track out as
-                a dialog, one turn per speaker change, when it has 10 or
-                more turns, and as prose otherwise. prose and dialog force
-                one; in a batch it applies to every video
+  --layout <l>  auto|prose|dialog|meeting (default: auto). auto lays a track
+                out as a dialog, one turn per speaker change, when it has 10
+                or more turns, and as prose otherwise. prose and dialog force
+                one; in a batch it applies to every video. meeting is for a
+                .vtt file only, and is what auto picks for one that names
+                speakers; prose drops the names
   --playlist    read a watch?v=...&list=... URL as the playlist, not the video
   --force       in a batch, ignore the skip set and re-fetch everything. A
                 single video is re-fetched either way.
@@ -109,6 +118,7 @@ export async function main(argv, io = {}, deps = {}) {
   const rebuild = deps.rebuildCatalog ?? rebuildCatalog;
   const expand = deps.expandPlaylist ?? expandPlaylist;
   const readUrls = deps.readExistingUrls ?? readExistingUrls;
+  const transcribeOne = deps.transcribeMeeting ?? transcribeMeeting;
 
   if (argv[0] === CATALOG_COMMAND) {
     if (argv.length > 1) {
@@ -143,6 +153,18 @@ export async function main(argv, io = {}, deps = {}) {
   } catch (error) {
     if (!(error instanceof TargetParseError)) throw error;
     err(error.message);
+    return 1;
+  }
+
+  // A meeting is transcribed from the file and goes no further: no preflight,
+  // no yt-dlp and no network (ADR-0010). `--lang`, `--playlist` and `--force`
+  // mean nothing to it and are ignored.
+  if (target.kind === 'file') {
+    return transcribe({ target, options, io: { out, err }, deps: { transcribe: transcribeOne, rebuild } });
+  }
+
+  if (options.layout === 'meeting') {
+    err('--layout meeting only applies to a meeting: give a .vtt file.');
     return 1;
   }
 
@@ -241,7 +263,9 @@ export async function main(argv, io = {}, deps = {}) {
  */
 function report(out, transcript, file, passedOver = []) {
   out(file);
-  out(`  ${transcript.url}  (${transcript.trackKind} subtitle track)`);
+  // A meeting has no url, so its line opens with the layout instead of one.
+  const subject = transcript.url ?? `${transcript.layout} layout`;
+  out(`  ${subject}  (${transcript.trackKind} subtitle track)`);
   if (passedOver.length > 0) {
     const tracks = passedOver.map(({ kind, key }) => `${kind} ${key}`).join(', ');
     out(`  also on this video: ${tracks}; re-run with --lang <key> to use one`);
@@ -269,6 +293,38 @@ function report(out, transcript, file, passedOver = []) {
 function reportRebuildFailure(err, error, written) {
   err(`${written}, but the catalog could not be rebuilt: ${error.message}`);
   err('Run `yt-transcript catalog` to rebuild it.');
+}
+
+/**
+ * The meeting command: read the `.vtt`, write the transcript, rebuild the
+ * catalog, report. The same two required effects as a single fetch, so a
+ * failed rebuild fails the command the same way (see `main`).
+ *
+ * @returns {Promise<number>} the process exit code
+ */
+async function transcribe({ target, options, io: { out, err }, deps }) {
+  let result;
+  try {
+    result = await deps.transcribe({ path: target.path, layout: options.layout });
+  } catch (error) {
+    if (!(error instanceof MeetingFileNotFoundError)) throw error;
+    err(error.message);
+    return 1;
+  }
+
+  const { transcript, file } = result;
+  report(out, transcript, file);
+  for (const warning of transcript.warnings ?? []) err(warning);
+
+  try {
+    const { warnings } = await deps.rebuild();
+    for (const warning of warnings) err(warning);
+  } catch (error) {
+    reportRebuildFailure(err, error, 'The transcript was written');
+    return 1;
+  }
+
+  return 0;
 }
 
 /**

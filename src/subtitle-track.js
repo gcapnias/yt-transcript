@@ -117,13 +117,16 @@ function toBlocks(rawText) {
  * and the cleaning pipeline discards them anyway.
  *
  * @param {string} rawText
- * @returns {{ startMs: number, endMs: number, lines: string[] }[]}
+ * @param {{ ids?: boolean }} [options] `ids` reads each cue's identifier line,
+ *   when it has one, into `id`: a meeting's cue ids rebuild its utterances
+ * @returns {{ startMs: number, endMs: number, lines: string[], id?: string }[]}
  */
-export function parseCues(rawText) {
+export function parseCues(rawText, { ids = false } = {}) {
   const cues = [];
 
   for (const block of toBlocks(rawText)) {
     let current = null;
+    let identifier = null;
 
     for (const rawLine of block) {
       const line = rawLine.trim();
@@ -131,9 +134,14 @@ export function parseCues(rawText) {
 
       if (timing) {
         current = { startMs: toMilliseconds(timing[1]), endMs: toMilliseconds(timing[2]), lines: [] };
+        // Opt-in, and only on a cue that has one, so a video's track parses
+        // exactly as it did before identifiers were ever read.
+        if (ids && identifier !== null) current.id = identifier;
         cues.push(current);
         continue;
       }
+
+      if (!current) identifier = line;
 
       // Before the block's timing line sits its identifier, and a block with
       // no timing line at all is a header or a NOTE. Neither is speech.

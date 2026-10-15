@@ -12,12 +12,28 @@
  * touched. Writing is `transcript-store.js`.
  */
 
+import { createHash } from 'node:crypto';
+
 import { cleanTrack } from './clean.js';
 import { formatUploadDate, renderFrontmatter } from './frontmatter.js';
+import { cleanMeeting } from './meeting.js';
 import { YOUTUBE } from './site.js';
+import { transcriptSlug } from './slug.js';
 
 /** What opens a turn's first paragraph: an em dash and a space (ADR-0007). */
 const TURN_DASH = '— ';
+
+/** Where every meeting is filed, beside the channel folders (ADR-0010). */
+export const MEETINGS_FOLDER = 'meetings';
+
+/** The `.vtt` a meeting's title is the file name without. */
+const VTT_EXTENSION = /\.vtt$/i;
+
+/** A date in the machine's own calendar, as yt-dlp writes one: `20260915`. */
+function compactLocalDate(date) {
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}`;
+}
 
 /**
  * @param {object} input
@@ -125,5 +141,81 @@ export function renderTranscript({
       duration: metadata?.duration ?? '',
       uploaded: formatUploadDate(metadata?.uploadDate ?? ''),
     },
+  };
+}
+
+/**
+ * The meeting counterpart of `renderTranscript` (ADR-0010):
+ *
+ *   (the local .vtt's text and name, its modification time) -> { filename, contents }
+ *
+ * A meeting has no site, so nothing here is identified by one: the title is the
+ * file name, the date is when the file was saved, there is no url and no
+ * channel, and the track is recorded as auto because it is speech recognition.
+ * Pure, as `renderTranscript` is: the caller reads the file and its mtime, and
+ * passes `fetchedAt`.
+ *
+ * @param {object} input
+ * @param {string} input.trackText the meeting's track exactly as exported
+ * @param {string} input.fileName the file's name, directory left off
+ * @param {Date} input.modifiedAt the file's modification time
+ * @param {'auto'|'prose'|'dialog'|'meeting'} [input.layout] the layout asked for
+ * @param {Date} [input.fetchedAt]
+ *
+ * `collisionId` in the result is what a slug collision suffixes: a short hash
+ * of the title, which differs exactly when the meetings do. `url` is
+ * `undefined`: a meeting is identified by its title (see `writeTranscript`).
+ *
+ * @returns {{ slug: string, filename: string, contents: string, title: string,
+ *             url: undefined, collisionId: string, channelFolder: 'meetings',
+ *             trackKind: 'auto', layout: 'prose'|'dialog'|'meeting',
+ *             warnings: string[],
+ *             video: { title: string, channel: string, duration: string,
+ *                      uploaded: string } }}
+ */
+export function renderMeetingTranscript({
+  trackText,
+  fileName,
+  modifiedAt,
+  layout: requestedLayout,
+  fetchedAt = new Date(),
+}) {
+  const { layout, duration, turns } = cleanMeeting(trackText, { layout: requestedLayout });
+  const title = fileName.replace(VTT_EXTENSION, '');
+  const uploadDate = compactLocalDate(modifiedAt);
+  const slug = transcriptSlug(title, `meeting-${uploadDate}`);
+
+  const frontmatter = renderFrontmatter({
+    title,
+    channel: '',
+    ...(duration !== null && { duration }),
+    uploadDate,
+    fetchedAt,
+    subtitles: 'auto',
+    layout,
+  });
+
+  // A named turn opens `— **Name:** `, an unnamed one `— `; later paragraphs of
+  // a turn are bare, as in a dialog. Prose has no turns to open.
+  const body = turns
+    .flatMap(({ speaker, paragraphs }) => {
+      if (layout === 'prose') return paragraphs;
+      const opening = speaker === null ? TURN_DASH : `${TURN_DASH}**${speaker}:** `;
+      return [`${opening}${paragraphs[0]}`, ...paragraphs.slice(1)];
+    })
+    .join('\n\n');
+
+  return {
+    slug,
+    filename: `${slug}.md`,
+    contents: `${frontmatter}\n\n${body}\n`,
+    title,
+    url: undefined,
+    collisionId: createHash('sha1').update(title).digest('hex').slice(0, 8),
+    channelFolder: MEETINGS_FOLDER,
+    trackKind: 'auto',
+    layout,
+    warnings: [],
+    video: { title, channel: '', duration: duration ?? '', uploaded: formatUploadDate(uploadDate) },
   };
 }
