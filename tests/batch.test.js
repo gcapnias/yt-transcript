@@ -177,6 +177,97 @@ test('each failure is reported in full as it happens, not only counted at the en
   assert.match(reported[0], /may succeed/);
 });
 
+test('each successful fetch hands its transcript, file and passed-over tracks to onFetched', async () => {
+  const handed = [];
+  const { sleep } = clock();
+  const passedOver = [{ kind: 'manual', key: 'en-abc' }];
+
+  await runBatch([A, B], {
+    fetchOne: async ({ url, videoId }) => ({
+      file: `transcripts/${videoId}.md`,
+      transcript: { url, trackKind: 'manual' },
+      passedOver,
+    }),
+    sleep,
+    onFetched: (entry) => handed.push(entry),
+  });
+
+  assert.deepEqual(handed, [
+    {
+      url: A,
+      file: 'transcripts/4JofSJIrjwU.md',
+      transcript: { url: A, trackKind: 'manual' },
+      passedOver,
+    },
+    {
+      url: B,
+      file: 'transcripts/F3lL98Pj90o.md',
+      transcript: { url: B, trackKind: 'manual' },
+      passedOver,
+    },
+  ]);
+});
+
+test('a failed fetch is never handed to onFetched', async () => {
+  const handed = [];
+  const { sleep } = clock();
+
+  await runBatch([A], {
+    fetchOne: async ({ url }) => {
+      throw recordedFailure({ failure: RATE_LIMITED, url });
+    },
+    sleep,
+    onFetched: (entry) => handed.push(entry),
+  });
+
+  assert.deepEqual(handed, []);
+});
+
+test("a video's warnings come after its onFetched, before the next video", async () => {
+  const events = [];
+  const { sleep } = clock();
+
+  await runBatch([A, B], {
+    fetchOne: async ({ url, videoId }) => ({
+      file: `transcripts/${videoId}.md`,
+      transcript: { url, trackKind: 'auto', warnings: [`warn ${videoId}`] },
+    }),
+    sleep,
+    onProgress: ({ position }) => events.push(`progress ${position}`),
+    onFetched: ({ url }) => events.push(`fetched ${url}`),
+    onWarning: (warning) => events.push(warning),
+  });
+
+  assert.deepEqual(events, [
+    'progress 1',
+    `fetched ${A}`,
+    'warn 4JofSJIrjwU',
+    'progress 2',
+    `fetched ${B}`,
+    'warn F3lL98Pj90o',
+  ]);
+});
+
+test('an onFetched that throws does not turn a written transcript into a failure', async () => {
+  const warned = [];
+  const { sleep } = clock();
+
+  const result = await runBatch([A, B], {
+    fetchOne: recordingFetch(),
+    sleep,
+    onFetched: () => {
+      throw new Error('stdout closed');
+    },
+    onWarning: (warning) => warned.push(warning),
+    onFailure: () => assert.fail('a report error was recorded as a failed fetch'),
+  });
+
+  assert.equal(result.failures.length, 0);
+  assert.equal(result.fetched.length, 2);
+  assert.equal(warned.length, 2);
+  assert.match(warned[0], /transcripts\/4JofSJIrjwU\.md.*stdout closed/);
+});
+
 test('the summary counts all three outcomes and names every failure', () => {
   const { summary, failureLines } = describeBatch({
     fetched: [{ url: A, file: 'transcripts/a.md' }],
