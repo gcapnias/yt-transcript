@@ -18,7 +18,7 @@ from what is there; it warns about any transcript left outside a channel folder.
 
 ## Prerequisites
 
-- **Node `>=22.18.0 <23 || >=24.2.0`** — versions where `import.meta.main` exists; see [#2](https://github.com/gcapnias/yt-transcript/issues/2)
+- **Node `>=22.18.0 <23 || >=24.2.0`** — versions where `import.meta.main` exists; see [#2](https://github.com/gcapnias/yt-transcript/issues/2). Needed only to run from source, not for the [standalone executable](#standalone-executable)
 - **`yt-dlp`** on `PATH` — every fetch is a `yt-dlp` spawn; nothing is bundled
 
 ## Usage
@@ -129,10 +129,10 @@ run from.
 dist/yt-transcript o3CX_Y59_74
 ```
 
-It needs only `yt-dlp` on `PATH`; it does not need Node, whose version requirement
-applies only to running from source. [Bun](https://bun.sh) is needed only to build it
-(tested with Bun 1.4.3), and the binary is large, about 96 MB, because it embeds
-Bun's runtime. Running the source under Bun is not supported.
+Like `npx .`, it needs `yt-dlp` on `PATH` to fetch videos, but it does not need Node,
+whose version requirement applies only to running from source. [Bun](https://bun.sh)
+is needed only to build it (tested with Bun 1.4.3), and the binary is large, about
+96 MB, because it embeds Bun's runtime. Running the source under Bun is not supported.
 
 ## Meetings
 
