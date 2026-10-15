@@ -17,6 +17,8 @@ transcript is filed in a `meetings` folder beside the channel folders and listed
 - **Consecutive utterances by one named speaker form one turn.** An utterance with no named
   speaker is an unnamed turn of its own. A meeting whose track names no one is laid out as a
   dialog, like a video whose track marks changes of speaker. Every turn is kept, as in ADR-0007.
+  `--layout prose` drops the names into one run of paragraphs, and `--layout dialog` keeps the
+  turns but not the names. `--layout meeting` is refused for a video, before yt-dlp runs.
 - **No rolling-repetition dedup runs on a meeting.** A repeated word in a meeting was spoken
   twice. Artifact stripping runs as for an auto track; on both samples it removed nothing.
 - **A meeting's track is auto**: it is speech recognition, and the glossary has only two kinds.
@@ -57,13 +59,26 @@ transcript is filed in a `meetings` folder beside the channel folders and listed
   Rejected: meetings are their own collection, not videos missing a channel.
 - **Recognize a local file only when it exists**, and send anything else to the URL parser.
   Rejected: a mistyped path would fail with a URL error instead of "file not found".
+- **Settle a slug collision exactly as in a channel folder.** Rejected: that rule tells two
+  transcripts apart by `url`, which a meeting lacks, so the title stands in for it.
+- **Tell a meeting from a video by its missing `url` alone.** Rejected: a video transcript that
+  lost its `url` would be excused instead of flagged for re-download. The folder decides too.
+- **Credit a cue with several voice tags to its first speaker.** Rejected: the maintainer
+  confirmed Teams writes such cues when people join or leave, and each speaker must be kept.
 
 ## Consequences
 
-- The transcript contract widens: a transcript may lack `url` and `duration`, and its `channel`
-  may be empty. The catalog reads such a transcript without error.
+- The transcript contract widens, for meetings only: a transcript in `meetings` may lack `url`
+  and `duration`, and its `channel` may be empty. The catalog reads such a transcript without
+  error, and holds every video transcript to all seven keys as before.
 - `upload_date` is when the file was saved, which for a downloaded export is the download, not
   the meeting.
+- Because the title is the identity, renaming an export and transcribing it again makes a second
+  transcript beside the first rather than replacing it. Two exports whose names have no Latin
+  letters, saved the same day, share the `meeting-<YYYYMMDD>` slug and are told apart by the hash.
+- "Every word appears exactly once" holds only for speech that is not artifact notation. A
+  speaker heard saying a literal `>>` or a bracketed `[music]` would lose it to artifact
+  stripping. That is accepted; neither sample had any.
 - Speaker names are written verbatim, so meeting transcripts carry personal names. The repo is
   public, so test fixtures must be synthetic.
 - A channel whose handle is `@meetings` would share the `meetings` folder. `unknown-channel`
