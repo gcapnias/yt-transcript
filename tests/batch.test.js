@@ -264,8 +264,31 @@ test('an onFetched that throws does not turn a written transcript into a failure
 
   assert.equal(result.failures.length, 0);
   assert.equal(result.fetched.length, 2);
-  assert.equal(warned.length, 2);
-  assert.match(warned[0], /transcripts\/4JofSJIrjwU\.md.*stdout closed/);
+  assert.deepEqual(warned, [
+    'transcripts/4JofSJIrjwU.md was written, but reporting it failed: stdout closed',
+    'transcripts/F3lL98Pj90o.md was written, but reporting it failed: stdout closed',
+  ]);
+});
+
+test('an onWarning that throws is not swallowed, and is not a failed fetch either', async () => {
+  const { sleep } = clock();
+  const failed = [];
+
+  await assert.rejects(
+    runBatch([A], {
+      fetchOne: async ({ url, videoId }) => ({
+        file: `transcripts/${videoId}.md`,
+        transcript: { url, trackKind: 'auto', warnings: ['careful'] },
+      }),
+      sleep,
+      onWarning: () => {
+        throw new Error('stderr closed');
+      },
+      onFailure: (entry) => failed.push(entry),
+    }),
+    /stderr closed/,
+  );
+  assert.deepEqual(failed, []);
 });
 
 test('the summary counts all three outcomes and names every failure', () => {

@@ -68,33 +68,12 @@ export async function runBatch(urls, deps) {
 
     onProgress?.({ url, position: index + 1, total: urls.length });
 
+    let result;
     try {
-      const { file, transcript, passedOver } = await fetchOne(
+      result = await fetchOne(
         { url, videoId: parseTarget(url).videoId, lang, layout },
         { onRetry: onRetry && ((retry) => onRetry({ url, ...retry })) },
       );
-      fetched.push({ url, file });
-
-      // The transcript is on disk and counted. Whatever reporting it does
-      // from here is the caller's output failing, not the fetch failing, so
-      // it is fenced off from the `catch` below that records failures.
-      // Each step is fenced on its own, so a block that could not print does
-      // not also swallow the warnings that follow it.
-      const reporting = (step) => {
-        try {
-          step();
-        } catch (reportError) {
-          // Said on the warning stream and never rethrown: a thrown report
-          // would discard every transcript the run had still to fetch.
-          try {
-            onWarning?.(`${file} was written, but reporting it failed: ${reportError.message}`);
-          } catch {
-            // The warning channel is the one that broke; there is nowhere left.
-          }
-        }
-      };
-      reporting(() => onFetched?.({ url, transcript, file, passedOver }));
-      for (const warning of transcript?.warnings ?? []) reporting(() => onWarning?.(warning));
     } catch (error) {
       // `failure` is the classification a FetchError carries. Anything else
       // reaching here is still collected rather than thrown past the loop:
@@ -108,10 +87,35 @@ export async function runBatch(urls, deps) {
       // a rate-limited one must say a later run *may* succeed — so a batch
       // must not be the path on which that wording is lost.
       onFailure?.(entry);
+      continue;
+    }
+
+    // The transcript is on disk and counted. Reporting it happens outside the
+    // `try` above, so output that fails can never be recorded as a failed fetch.
+    fetched.push({ url, file: result.file });
+    guardReport(result.file, onWarning, () => onFetched?.({ url, ...result }));
+    for (const warning of result.transcript?.warnings ?? []) {
+      guardReport(result.file, onWarning, () => onWarning?.(warning));
     }
   }
 
   return { fetched, failures };
+}
+
+/**
+ * Runs one reporting step for a transcript that is already written. If it
+ * throws, the batch says so once on the warning stream and carries on, because
+ * a thrown report would discard every transcript the batch had still to fetch.
+ * Each step is guarded on its own, so a block that could not print does not
+ * also swallow the warnings that follow it. A throwing `onWarning` is not
+ * caught here: there is no quieter channel left to tell anyone.
+ */
+function guardReport(file, onWarning, step) {
+  try {
+    step();
+  } catch (error) {
+    onWarning?.(`${file} was written, but reporting it failed: ${error.message}`);
+  }
 }
 
 /**

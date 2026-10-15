@@ -652,7 +652,7 @@ test('the usage and the unrecognised-input error both say X posts are accepted',
 // The report of a batch (#16): each successful video prints the one block a
 // single-video fetch prints, under its progress line.
 
-const DETAILED = (url, videoId) => ({
+const detailed = (url, videoId) => ({
   file: `transcripts/chan/${videoId}.md`,
   transcript: {
     url,
@@ -679,13 +679,13 @@ test("a batch prints a video's block under its progress line, byte for byte as a
   const single = capture();
   await main(['4JofSJIrjwU'], single.io, {
     preflight: async () => '2026.09.01',
-    fetchTranscript: async ({ url, videoId }) => DETAILED(url, videoId),
+    fetchTranscript: async ({ url, videoId }) => detailed(url, videoId),
     rebuildCatalog: async () => ({ file: 'transcripts/README.md', count: 1, warnings: [] }),
   });
 
   const { deps } = batchDeps({
     expandPlaylist: async () => VIDEOS.slice(0, 1),
-    fetchTranscript: async ({ url, videoId }) => DETAILED(url, videoId),
+    fetchTranscript: async ({ url, videoId }) => detailed(url, videoId),
   });
   const { out, io } = capture();
   assert.equal(await main([PLAYLIST], io, deps), 0);
@@ -701,7 +701,7 @@ test('a failed batch video prints no block, and its failure still goes to stderr
   const { deps } = batchDeps({
     fetchTranscript: async ({ url, videoId }) => {
       if (url === VIDEOS[1]) throw recordedFailure({ failure: NO_SUBTITLES, url });
-      return DETAILED(url, videoId);
+      return detailed(url, videoId);
     },
   });
   const { events, io } = timeline();
@@ -718,7 +718,7 @@ test('a failed batch video prints no block, and its failure still goes to stderr
 test("a video's warnings follow its own block, before the next progress line", async () => {
   const { deps } = batchDeps({
     expandPlaylist: async () => VIDEOS.slice(0, 2),
-    fetchTranscript: async ({ url, videoId }) => DETAILED(url, videoId),
+    fetchTranscript: async ({ url, videoId }) => detailed(url, videoId),
   });
   const { events, io } = timeline();
 
@@ -746,4 +746,37 @@ test('an error while reporting a written transcript is not a failed fetch', asyn
   assert.equal(await main([PLAYLIST], io, deps), 0);
   assert.match(out.join('\n'), /2 fetched, 0 skipped, 0 failed/);
   assert.ok(!err.join('\n').includes('Failed:'));
+  assert.ok(
+    err.includes('transcripts/4JofSJIrjwU.md was written, but reporting it failed: stdout closed'),
+    err.join('\n'),
+  );
+});
+
+test("a video's several warnings follow its block in the transcript's order, in a batch and alone", async () => {
+  const fetchTranscript = async ({ url, videoId }) => {
+    const result = detailed(url, videoId);
+    result.transcript.warnings = ['first warning', 'second warning', 'third warning'];
+    return result;
+  };
+
+  const alone = timeline();
+  await main(['4JofSJIrjwU'], alone.io, {
+    preflight: async () => '2026.09.01',
+    fetchTranscript,
+    rebuildCatalog: async () => ({ file: 'transcripts/README.md', count: 1, warnings: [] }),
+  });
+  const { deps } = batchDeps({ expandPlaylist: async () => VIDEOS.slice(0, 1), fetchTranscript });
+  const batched = timeline();
+  assert.equal(await main([PLAYLIST], batched.io, deps), 0);
+
+  for (const { events } of [alone, batched]) {
+    const lastBlockLine = events.findLastIndex(([s, line]) => s === 'out' && line.includes('uploaded'));
+    const warnings = events.filter(([s, line]) => s === 'err' && line.endsWith(' warning'));
+    assert.deepEqual(
+      warnings.map(([, line]) => line),
+      ['first warning', 'second warning', 'third warning'],
+    );
+    assert.ok(events.indexOf(warnings[0]) > lastBlockLine);
+    assert.deepEqual(events.slice(events.indexOf(warnings[0]), events.indexOf(warnings[0]) + 3), warnings);
+  }
 });
