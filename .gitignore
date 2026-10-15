@@ -143,19 +143,26 @@ dist
 
 # End of https://www.toptal.com/developers/gitignore/api/node
 
-### Workspace folders (see CLAUDE.md) ###
-# Temporary space for ad-hoc operations; nothing here survives across sessions.
-.scratch/*
-!.scratch/.gitkeep
-# Output space for the firecrawl agent.
-.firecrawl/*
-!.firecrawl/.gitkeep
+# Agents folder
+.agents/skills/**
+.agents/worktrees/**
 
-### beads tracker: transient SQLite lock artifacts not covered by .beads/.gitignore ###
-.beads/*.db-lock-*
+# Claude Code
+.claude/skills/**
+.claude/worktrees/**
+.claude/settings.local.json
 
-# Generated transcripts and their catalog
-transcripts/
+# Codex
+.codex/config.toml
 
-# Skills are restored from skills-lock.json, not tracked
-.claude/skills/
+# Firecrawl, Playwright CLI, Scratch and Worktrees directories
+.firecrawl/**
+.playwright-cli/**
+.scratch/**
+.worktrees/**
+
+.beads/**
+transcripts/**
+
+# Keep .gitkeep files in the repository
+!**/.gitkeep

@@ -3,7 +3,14 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { AUTO_IDS, FIXTURES_DIR, fixtureName, MANUAL_IDS } from './fixtures.js';
+import {
+  AUTO_IDS,
+  AUTO_ORIG_ID,
+  FIXTURES_DIR,
+  fixtureName,
+  MANUAL_IDS,
+  namedFixtureName,
+} from './fixtures.js';
 
 // These are the entire evidence base for every track-kind-dependent rule, and
 // nothing in the repository can restore them once the root clutter is deleted.
@@ -28,8 +35,15 @@ test('auto and manual fixtures stay distinguishable by directory', () => {
       .filter((name) => name.endsWith('.vtt'))
       .sort();
 
-  assert.deepEqual(listing('auto'), AUTO_IDS.map(fixtureName).sort());
+  assert.deepEqual(listing('auto'), [...AUTO_IDS, AUTO_ORIG_ID].map(fixtureName).sort());
   assert.deepEqual(listing('manual'), MANUAL_IDS.map(fixtureName).sort());
+});
+
+test('the two named tracks are present, non-empty, and keyed as yt-dlp keyed them', () => {
+  for (const key of ['en-JkeT_87f4cc', 'en-uYU-mmqFLq8']) {
+    const file = path.join(FIXTURES_DIR, 'named', namedFixtureName(key));
+    assert.ok(fs.statSync(file).size > 0, `empty or missing named fixture: ${key}`);
+  }
 });
 
 test('the regional-variant fixture keeps its language in its name', () => {

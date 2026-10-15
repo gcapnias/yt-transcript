@@ -66,6 +66,7 @@ test('the expansion and the transcripts on disk agree on what a url looks like',
         uploadDate: '20260910',
         fetchedAt: new Date('2026-09-16T14:03:05.123Z'),
         subtitles: 'auto',
+        layout: 'prose',
       })}\n\nProse.\n`,
     },
   ]);

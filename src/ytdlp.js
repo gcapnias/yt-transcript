@@ -5,7 +5,7 @@ import path from 'node:path';
 import { sanitizeChildEnv } from './child-env.js';
 import { describeFailure } from './fetch-outcome.js';
 import { xPost, YOUTUBE } from './site.js';
-import { classifyTrack } from './subtitle-track.js';
+import { classifyTrack, isNamedTrack, trackKeyFromFileName } from './subtitle-track.js';
 import { parseTarget, TargetParseError } from './target.js';
 
 /** The binary name looked up on PATH. Overridable so tests need not uninstall it. */
@@ -99,14 +99,17 @@ export async function preflight({ binary = YT_DLP } = {}) {
  * `yt-dlp` reported them; reformatting is the transcript's business.
  *
  * @param {string} stdout
- * The last eight fields are printed for an X post only, and are empty strings
- * (`playlistIndex` `null`) for a YouTube video. `playlistIndex` is `null` on
- * an X post too unless the whole post was fetched.
+ * `uploaderId` and `channelId` name the channel folder and are printed for
+ * both sites. The fields after them, from `description` on, are printed for an
+ * X post only, and are empty strings (`playlistIndex` `null`) for a YouTube
+ * video. `playlistIndex` is `null` on an X post too unless the whole post was
+ * fetched.
  *
- * @returns {{ title: string, channel: string, duration: string, uploadDate: string,
- *             description: string, uploader: string, uploaderId: string,
- *             displayId: string, extractorKey: string, webpageUrl: string,
- *             mediaId: string, playlistIndex: number|null }|null}
+ * @returns {{ title: string, channel: string, duration: string,
+ *             uploadDate: string, uploaderId: string, channelId: string,
+ *             description: string, uploader: string, displayId: string,
+ *             extractorKey: string, webpageUrl: string, mediaId: string,
+ *             playlistIndex: number|null }|null}
  */
 export function parseMetadata(stdout) {
   const line = stdout
@@ -127,10 +130,13 @@ export function parseMetadata(stdout) {
     channel: parsed.channel ?? '',
     duration: parsed.duration_string ?? '',
     uploadDate: parsed.upload_date ?? '',
+    // On YouTube the channel's handle (`@name`), on X its handle without the
+    // `@`. With `channelId`, what the channel folder is named from.
+    uploaderId: parsed.uploader_id ?? '',
+    channelId: parsed.channel_id ?? '',
     // Printed for an X post only; empty on YouTube, which never asks for them.
     description: parsed.description ?? '',
     uploader: parsed.uploader ?? '',
-    uploaderId: parsed.uploader_id ?? '',
     displayId: parsed.display_id ?? '',
     extractorKey: parsed.extractor_key ?? '',
     webpageUrl: parsed.webpage_url ?? '',
@@ -145,7 +151,14 @@ export function parseMetadata(stdout) {
  * English as the default `--lang en` accepts it, in the order a track of one
  * kind is preferred (ADR-0006). Any other language is matched exactly.
  */
-const ENGLISH_VARIANTS =['en', 'en-US', 'en-GB'];
+const ENGLISH_VARIANTS = ['en', 'en-orig', 'en-US', 'en-GB'];
+
+/**
+ * The pattern that also asks for a named track (ADR-0009), last: it ranks
+ * after every variant. No comma inside it, because `--sub-langs` splits on
+ * commas, and the `{11}` is YouTube's observed id length, not a guarantee.
+ */
+const NAMED_TRACK_PATTERN = 'en-[A-Za-z0-9_-]{11}';
 
 /**
  * What `--sub-langs` asks for. Widening `en` needs `--ignore-errors`: without
@@ -155,7 +168,7 @@ const ENGLISH_VARIANTS =['en', 'en-US', 'en-GB'];
  */
 function subLangArgs(lang) {
   if (lang !== 'en') return ['--sub-langs', lang];
-  return ['--sub-langs', ENGLISH_VARIANTS.join(','), '--ignore-errors'];
+  return ['--sub-langs', [...ENGLISH_VARIANTS, NAMED_TRACK_PATTERN].join(','), '--ignore-errors'];
 }
 
 /**
@@ -186,19 +199,29 @@ export function fetchArgs({ url, lang, destDir, site = YOUTUBE }) {
 }
 
 /**
+ * A track that lost to the one chosen.
+ *
+ * @typedef {object} PassedOverTrack
+ * @property {'auto'|'manual'} kind
+ * @property {string} key the track's key, such as `en-JkeT_87f4cc`
+ */
+
+/**
  * One blind invocation per video: downloads the subtitle track into `destDir`
  * and emits the metadata on stdout. No pre-flight query and no `.info.json`
  * is ever written. The one second round-trip is an X post's, when the fetch
  * cannot say which of the post's videos it was (`listPostVideos`).
  *
- * @returns {Promise<{ metadata: object, trackPath: string }>}
+ * @returns {Promise<{ metadata: object, trackPath: string,
+ *                     passedOver: PassedOverTrack[] }>}
  */
 export async function fetchSubtitleTrack({ url, lang = 'en', destDir, site = YOUTUBE, binary = YT_DLP }) {
   const { exitCode, stdout, stderr } = await run(binary, fetchArgs({ url, lang, destDir, site }));
 
   // One invocation, one verdict. The retry ladder lives a level up, in
   // `fetch.js`, so every retry is a fresh invocation into a fresh directory.
-  const trackPath = await findSubtitleTrack(destDir);
+  const found = await findSubtitleTrack(destDir);
+  const trackPath = found?.trackPath ?? null;
   const metadata = parseMetadata(stdout);
   const failure = fetchFailure({
     exitCode,
@@ -211,7 +234,7 @@ export async function fetchSubtitleTrack({ url, lang = 'en', destDir, site = YOU
   });
   if (failure) throw failure;
 
-  return { metadata, trackPath };
+  return { metadata, trackPath, passedOver: found?.passedOver ?? [] };
 }
 
 /**
@@ -400,9 +423,16 @@ export async function expandPlaylist({ url, binary = YT_DLP }) {
  * `--sub-format` is passed, so treating a non-vtt track as "no subtitles"
  * would report the wrong failure.
  *
- * The default English can land up to three tracks, and the best is returned
- * (ADR-0006): manual over auto, then `en`, `en-US`, `en-GB`. The ranking never
- * rests on listing order, which puts `X.en-US.vtt` before `X.en.vtt`.
+ * The default English can land several tracks, and the best is returned
+ * (ADR-0006, ADR-0009): manual over auto, then `en`, `en-orig`, `en-US`,
+ * `en-GB`, then a named track. The ranking never rests on listing order,
+ * which puts `X.en-US.vtt` before `X.en.vtt`.
+ *
+ * Alongside it comes what lost to it and a person might have wanted: every
+ * manual track and every named one, whatever its kind, best first. An unnamed
+ * auto track is never listed.
+ *
+ * @returns {Promise<{ trackPath: string, passedOver: PassedOverTrack[] }|null>}
  */
 export async function findSubtitleTrack(destDir) {
   const entries = await fs.readdir(destDir, { withFileTypes: true });
@@ -415,21 +445,26 @@ export async function findSubtitleTrack(destDir) {
     if (size === 0) continue;
 
     const kind = classifyTrack(await fs.readFile(trackPath, 'utf8'));
-    candidates.push({ trackPath, rank: trackRank(entry.name, kind) });
+    const key = trackKeyFromFileName(entry.name);
+    candidates.push({ trackPath, kind, key, rank: trackRank(key, kind, entry.name) });
   }
+  if (candidates.length === 0) return null;
 
   candidates.sort((a, b) => compareRanks(a.rank, b.rank) || a.trackPath.localeCompare(b.trackPath));
-  return candidates[0]?.trackPath ?? null;
+  const [best, ...rest] = candidates;
+  const passedOver = rest
+    .filter(({ kind, key }) => kind === 'manual' || isNamedTrack(key))
+    .map(({ kind, key }) => ({ kind, key }));
+  return { trackPath: best.trackPath, passedOver };
 }
 
 /**
- * A track's place in the preference order, lowest first. The language is the
- * file name's second-to-last segment (`<id>.<lang>.<ext>`; neither a video id
- * nor a media id holds a dot). A language outside the English variants is one
- * asked for exactly, and the only one in the directory.
+ * A track's place in the preference order, lowest first. A named track comes
+ * after the English variants, as does a language outside them, which is one
+ * asked for exactly and the only one in the directory.
  */
-function trackRank(name, kind) {
-  const variant = ENGLISH_VARIANTS.indexOf(name.split('.').at(-2));
+function trackRank(key, kind, name) {
+  const variant = ENGLISH_VARIANTS.indexOf(key);
 
   return [
     kind === 'manual' ? 0 : 1,

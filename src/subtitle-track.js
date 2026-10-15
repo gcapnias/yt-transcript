@@ -40,6 +40,36 @@ export function classifyTrack(rawText) {
   return AUTO_SIGNAL.test(rawText) ? 'auto' : 'manual';
 }
 
+/**
+ * A named track's key: a 2-3 letter language, no region, then exactly eleven
+ * characters of YouTube's track id (ADR-0009). The id holds `-` and `_`, so
+ * the key can hold more hyphens than the language and id show.
+ */
+const NAMED_TRACK = /^[A-Za-z]{2,3}-[A-Za-z0-9_-]{11}$/;
+
+/**
+ * Whether a track's key is a named track's, such as `en-JkeT_87f4cc`. True
+ * however the track was asked for; `en`, `en-orig`, `en-US` and `en-GB` are
+ * not named, nor is a translation keyed `en-` plus a longer track key.
+ *
+ * @param {string} key a track's key, as `trackKeyFromFileName` reads it
+ */
+export function isNamedTrack(key) {
+  return NAMED_TRACK.test(key);
+}
+
+/**
+ * A track's key, read from the file name `yt-dlp` gave it: everything between
+ * the id and the extension (`<id>.<key>.<ext>`). Neither a video id nor a
+ * media id holds a dot, and a key never does either: `yt-dlp` writes its dots
+ * as hyphens.
+ *
+ * @param {string} fileName
+ */
+export function trackKeyFromFileName(fileName) {
+  return fileName.slice(fileName.indexOf('.') + 1, fileName.lastIndexOf('.'));
+}
+
 /** Milliseconds, as an integer, so cue arithmetic never rounds. */
 function toMilliseconds(timestamp) {
   const [clock, fraction = '0'] = timestamp.replace(',', '.').split('.');
@@ -87,13 +117,16 @@ function toBlocks(rawText) {
  * and the cleaning pipeline discards them anyway.
  *
  * @param {string} rawText
- * @returns {{ startMs: number, endMs: number, lines: string[] }[]}
+ * @param {{ ids?: boolean }} [options] `ids` reads each cue's identifier line,
+ *   when it has one, into `id`: a meeting's cue ids rebuild its utterances
+ * @returns {{ startMs: number, endMs: number, lines: string[], id?: string }[]}
  */
-export function parseCues(rawText) {
+export function parseCues(rawText, { ids = false } = {}) {
   const cues = [];
 
   for (const block of toBlocks(rawText)) {
     let current = null;
+    let identifier = null;
 
     for (const rawLine of block) {
       const line = rawLine.trim();
@@ -101,9 +134,14 @@ export function parseCues(rawText) {
 
       if (timing) {
         current = { startMs: toMilliseconds(timing[1]), endMs: toMilliseconds(timing[2]), lines: [] };
+        // Opt-in, and only on a cue that has one, so a video's track parses
+        // exactly as it did before identifiers were ever read.
+        if (ids && identifier !== null) current.id = identifier;
         cues.push(current);
         continue;
       }
+
+      if (!current) identifier = line;
 
       // Before the block's timing line sits its identifier, and a block with
       // no timing line at all is a header or a NOTE. Neither is speech.

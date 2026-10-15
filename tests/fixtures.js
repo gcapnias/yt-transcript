@@ -26,6 +26,14 @@ export const AUTO_IDS = [
   'o3CX_Y59_74',
 ];
 
+/**
+ * The one `en-orig` track (ADR-0006, #12): the untranslated recognition of a
+ * dubbed video whose stacked `en` is refused with a 429. Recorded from `yt-dlp`
+ * 2026.08.19 with `--sub-langs en-orig`, trimmed to its first cues. Kept out of
+ * `AUTO_IDS`, which is the cleaning rules' acceptance set.
+ */
+export const AUTO_ORIG_ID = 'MN9dGgmLyso';
+
 /** The six manual tracks, the only ones in the repository. */
 export const MANUAL_IDS = [
   '8nHBGFKLHZQ',
@@ -41,7 +49,7 @@ export const MANUAL_IDS = [
  * `en` track, only `en-US` (ADR-0006); it was recorded from `yt-dlp`
  * 2026.08.19 with `--lang en-US`.
  */
-const TRACK_LANGUAGES = { QIHnmqYU614: 'en-US' };
+const TRACK_LANGUAGES = { QIHnmqYU614: 'en-US', MN9dGgmLyso: 'en-orig' };
 
 /**
  * What `yt-dlp` 2026.08.19 wrote to stderr on `QIHnmqYU614`, asked for
@@ -50,6 +58,33 @@ const TRACK_LANGUAGES = { QIHnmqYU614: 'en-US' };
  */
 export const SUBTITLE_429_WARNING =
   "WARNING: Unable to download video subtitles for 'en': HTTP Error 429: Too Many Requests\n";
+
+/**
+ * The two named tracks of `ilmBGeGldrI`, a live recording (ADR-0009, #14), in
+ * `named/`. Recorded 2026-10-11 from `yt-dlp` 2026.08.19 with
+ * `yt-dlp --js-runtimes node --skip-download --write-sub --sub-langs
+ * en-JkeT_87f4cc,en-uYU-mmqFLq8 --sub-format vtt -o '%(id)s'
+ * https://www.youtube.com/watch?v=ilmBGeGldrI`, then trimmed (the files are
+ * otherwise byte-for-byte what it wrote, LF line endings):
+ *
+ * - `DTVCC1` ("English - DTVCC1", key `en-JkeT_87f4cc`): the first
+ *   478 lines, which are cues from 00:19:35.849 to 00:24:56.599. It holds
+ *   a `>>>` and a `>>` speaker marker and one `[ Applause ]` event.
+ * - `CC1` ("English - CC1", key `en-uYU-mmqFLq8`): the first 60
+ *   lines, which are cues from 00:19:35.774 to 00:19:52.891. It opens with a
+ *   `>>>` speaker marker.
+ */
+export const NAMED_VIDEO_ID = 'ilmBGeGldrI';
+
+/** The file name `yt-dlp` gave a recorded named track, from its key. */
+export function namedFixtureName(key) {
+  return `${NAMED_VIDEO_ID}.${key}.vtt`;
+}
+
+/** @param {string} key `en-JkeT_87f4cc` (DTVCC1) or `en-uYU-mmqFLq8` (CC1) */
+export function readNamedFixture(key) {
+  return fs.readFileSync(path.join(FIXTURES_DIR, 'named', namedFixtureName(key)), 'utf8');
+}
 
 /**
  * The file name `yt-dlp` gave a recorded track: `<id>.<lang>.vtt`.

@@ -1,10 +1,12 @@
 /**
  * The frontmatter: the YAML block opening a transcript, describing the video
- * it came from.
+ * it came from, or the meeting.
  *
- * Exactly seven keys, in one order, closed. Every value format below was
- * settled against a YAML parser rather than by eye — see the spec's Transcript
- * contract section before widening any of it.
+ * Seven keys, in one order, then `layout`, which is newer than the rest and the
+ * only one a transcript may lack. A meeting has no `url` and may have no
+ * `duration` (ADR-0010), so both are written only when given. Every value
+ * format below was settled against a YAML parser rather than by eye — see the
+ * spec's Transcript contract section before widening any of it.
  */
 
 /**
@@ -41,8 +43,9 @@ function formatFetched(date) {
 }
 
 /**
- * @param {{ title: string, url: string, channel: string, duration: string,
- *           uploadDate: string, fetchedAt: Date, subtitles: 'auto'|'manual' }} video
+ * @param {{ title: string, url?: string, channel: string, duration?: string,
+ *           uploadDate: string, fetchedAt: Date, subtitles: 'auto'|'manual',
+ *           layout: 'prose'|'dialog'|'meeting' }} video
  * @returns {string} the block, closing `---` included, with no trailing newline
  */
 export function renderFrontmatter(video) {
@@ -50,15 +53,19 @@ export function renderFrontmatter(video) {
     '---',
     `title: ${quoted(video.title)}`,
     // Normalised to one shape on disk, so one regex reads it back.
-    `url: ${video.url}`,
+    ...(video.url === undefined ? [] : [`url: ${video.url}`]),
     `channel: ${quoted(video.channel)}`,
     // Always quoted: bare `41:18` is not a string — YAML 1.1 parsers read
     // colon-separated digits as sexagesimal and yield 2478. Carried through
-    // exactly as `yt-dlp` reported it; no duration arithmetic is written here.
-    `duration: ${quoted(video.duration)}`,
+    // exactly as `yt-dlp` reported it, or as a meeting's last cue end shaped
+    // like it. Left out when `undefined`, which only a meeting with no cues is.
+    ...(video.duration === undefined ? [] : [`duration: ${quoted(video.duration)}`]),
     `upload_date: ${formatUploadDate(video.uploadDate)}`,
     `fetched: ${formatFetched(video.fetchedAt)}`,
     `subtitles: ${video.subtitles}`,
+    // The layout used, not the one asked for. Written on every new transcript,
+    // but the catalog never requires it: transcripts older than it have none.
+    `layout: ${video.layout}`,
     '---',
   ].join('\n');
 }

@@ -10,7 +10,7 @@
  * to list the post to find it (`reportedRank`, `rankInListing`).
  */
 
-import { transcriptSlug } from './slug.js';
+import { channelFolder, transcriptSlug } from './slug.js';
 
 /** Links, `t.co` ones included, are removed from the post text. */
 const LINK = /https?:\/\/\S+/g;
@@ -76,11 +76,11 @@ export function rankInListing(mediaId, listing) {
 
 /**
  * @param {{ description: string, uploader: string, uploaderId: string,
- *           displayId: string }} metadata
+ *           displayId: string, channelId?: string }} metadata
  * @param {number} videoNumber the fetched video's rank among the post's videos,
  *   settled by the fetch (`reportedRank`, else `rankInListing`)
- * @returns {{ title: string, url: string, channel: string, collisionId: string,
- *             slug: string }}
+ * @returns {{ title: string, url: string, channel: string, channelFolder: string,
+ *             collisionId: string, slug: string }}
  */
 export function postIdentity(metadata, videoNumber) {
   const { uploader, uploaderId, displayId } = metadata;
@@ -93,6 +93,7 @@ export function postIdentity(metadata, videoNumber) {
     title: text || `@${uploaderId} post ${displayId}`,
     url: `https://x.com/i/status/${displayId}${videoSuffix(videoNumber, '/video/')}`,
     channel: uploader ? `${uploader} (@${uploaderId})` : `@${uploaderId}`,
+    channelFolder: channelFolder({ handle: uploaderId, channelId: metadata.channelId }),
     // What the filename collision rule suffixes, where YouTube uses the video
     // id: the post, never the video's own id (CONTEXT.md, Post).
     collisionId: `${displayId}${videoSuffix(videoNumber, '-')}`,

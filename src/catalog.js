@@ -9,7 +9,7 @@
  * the filesystem; `catalog-store.js` does the reading and the writing.
  *
  * **Derivability is the standing test for any future column**: computable from
- * the seven frontmatter keys plus the file path, or it does not belong. `url`
+ * the frontmatter keys plus the file path, or it does not belong. `url`
  * and `fetched` are deliberately not surfaced **in the table** — `fetched`
  * would churn a row on every re-fetch.
  *
@@ -22,6 +22,8 @@
  * check reads frontmatter too, and it must read it identically.
  */
 
+import { MEETINGS_FOLDER } from './slug.js';
+
 /** The five settled columns, in order. Each reads one frontmatter key. */
 const COLUMNS = [
   { heading: 'Title', key: 'title' },
@@ -32,18 +34,52 @@ const COLUMNS = [
 ];
 
 /**
- * The frontmatter contract is closed at exactly seven keys, so "incomplete"
- * has no other referent: a file missing one did not come from this tool, and
- * re-downloading it is the honest advice.
+ * Every transcript this tool has ever written carries all seven of these keys,
+ * so "incomplete" has no other referent: a file missing one did not come from
+ * this tool, and re-downloading it is the honest advice. A meeting is the one
+ * exception, for the two keys in `MEETING_OPTIONAL_KEYS` (ADR-0010).
+ *
+ * `layout`, the eighth key, is deliberately not here: it is newer than the
+ * rest, and every transcript written before it lacks it. Requiring it would
+ * warn about all of them and ask for a re-download that changes nothing but
+ * the key.
  */
 const REQUIRED_KEYS = ['title', 'url', 'channel', 'duration', 'upload_date', 'fetched', 'subtitles'];
+
+/** A meeting has no url, and no duration when its file has no cues (ADR-0010). */
+const MEETING_OPTIONAL_KEYS = ['url', 'duration'];
+
+/**
+ * Whether a transcript on disk is a meeting's (ADR-0010). Its folder and the
+ * lack of a `url` together tell: a video's transcript missing its `url` is an
+ * incomplete one, not a meeting, so the missing key alone proves nothing. The
+ * in-memory counterpart is `isMeeting` on a rendered transcript.
+ *
+ * @param {string} filePath relative to the transcripts directory, `/`-separated
+ * @param {Record<string, string>} values as `readFrontmatter` returns them
+ */
+export function isMeetingFile(filePath, values) {
+  return filePath.startsWith(`${MEETINGS_FOLDER}/`) && !('url' in values);
+}
+
+/**
+ * Whether a file's path puts it in a channel folder. The one place that rule
+ * lives: paths are relative to `transcripts/` and `/`-separated, which is how
+ * `readTranscriptFiles` produces them, so a folder shows as a `/`.
+ *
+ * @param {string} filePath
+ */
+export function isInChannelFolder(filePath) {
+  return filePath.includes('/');
+}
 
 /**
  * Renders the catalog.
  *
  * @param {Array<{ path: string, text: string }>} files every `.md` in the
- *   transcripts directory, the catalog itself included — it is excluded by the
- *   scan rule below, with no filename special case.
+ *   transcripts directory and its channel folders, the catalog itself included
+ *   — it is excluded by the scan rule below, with no filename special case.
+ *   `path` is relative to the transcripts directory and is the row's link.
  * @returns {{ markdown: string, warnings: string[], count: number }} the spec's
  *   seam names the two keys it covers, and every test exercises exactly those;
  *   `count` is the row count handed back rather than re-parsed out of the
@@ -54,7 +90,7 @@ export function renderCatalog(files) {
   const warnings = [];
 
   for (const file of files) {
-    const frontmatter = parseFrontmatter(file.text);
+    const frontmatter = parseFrontmatter(file);
 
     // Three outcomes, and the middle one is the whole point of the scan rule:
     // no frontmatter block at all means "not a transcript", which is how the
@@ -64,6 +100,12 @@ export function renderCatalog(files) {
     if (frontmatter.error) {
       warnings.push(`Skipped ${file.path}: ${frontmatter.error}. Re-download it to restore it.`);
       continue;
+    }
+
+    // Still listed, so it is not dropped from the catalog nor fetched again;
+    // the warning is how it gets filed where it belongs (ADR-0008).
+    if (!isInChannelFolder(file.path)) {
+      warnings.push(`${file.path} is outside a channel folder. Move it into its channel folder.`);
     }
 
     rows.push({ path: file.path, ...frontmatter.values });
@@ -118,16 +160,17 @@ export function renderCatalog(files) {
 export function scanTranscriptUrls(files) {
   const urls = [];
   for (const file of files) {
-    const frontmatter = parseFrontmatter(file.text);
+    const frontmatter = parseFrontmatter(file);
     if (frontmatter === null || frontmatter.error) continue;
-    urls.push(frontmatter.values.url);
+    // A meeting has none, and is never in a batch's way.
+    if (!isMeetingFile(file.path, frontmatter.values)) urls.push(frontmatter.values.url);
   }
   return urls;
 }
 
 function renderRow(row) {
   const cells = COLUMNS.map((column) =>
-    column.key === 'title' ? `[${cell(row.title)}](${row.path})` : cell(row[column.key]),
+    column.key === 'title' ? `[${cell(row.title)}](${row.path})` : cell(row[column.key] ?? ''),
   );
   return `| ${cells.join(' | ')} |`;
 }
@@ -203,16 +246,18 @@ export function readFrontmatter(text) {
 /**
  * `readFrontmatter` plus the catalog's completeness judgement.
  *
- * The frontmatter contract is closed at seven keys, so a file missing one did
- * not come from this tool and earns the warning that says so.
+ * Every transcript this tool writes carries the seven required keys, so a file
+ * missing one did not come from this tool and earns the warning that says so;
+ * a meeting is excused the two in `MEETING_OPTIONAL_KEYS`.
  *
  * @returns {null | { error: string } | { values: Record<string, string> }}
  */
-function parseFrontmatter(text) {
+function parseFrontmatter({ path: filePath, text }) {
   const frontmatter = readFrontmatter(text);
   if (frontmatter === null || frontmatter.error) return frontmatter;
 
-  const missing = REQUIRED_KEYS.filter((key) => !(key in frontmatter.values));
+  const exempt = isMeetingFile(filePath, frontmatter.values) ? MEETING_OPTIONAL_KEYS : [];
+  const missing = REQUIRED_KEYS.filter((key) => !(key in frontmatter.values) && !exempt.includes(key));
   if (missing.length > 0) {
     return { error: `its frontmatter is missing ${missing.join(', ')}` };
   }
