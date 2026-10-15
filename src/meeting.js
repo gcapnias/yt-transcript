@@ -20,13 +20,6 @@ import { stripArtifacts } from './artifacts.js';
 import { decodeEntities, stripTags, toParagraphs } from './clean.js';
 import { parseCues } from './subtitle-track.js';
 
-/**
- * A WebVTT voice tag's opening, `<v Name>`, allowing classes (`<v.loud Name>`).
- * The name runs to the closing `>`, so it may hold spaces and any other
- * punctuation.
- */
-const VOICE_TAG = /<v(?:\.[^\s>]*)*\s+([^>]*)>/i;
-
 /** Teams' cue id: `<uuid>/<utterance>-<part>`. The uuid and utterance together name the utterance. */
 const UTTERANCE_ID = /^(.+\/\d+)-(\d+)$/;
 
@@ -40,24 +33,62 @@ const MEETING_SENTENCE_END = /[.!?;]["')\]]?$/;
 const collapse = (text) => text.replace(/\s+/g, ' ').trim();
 
 /**
- * One cue's speaker and words. The speaker comes from the first voice tag,
- * before every tag is stripped; a cue without one has none. Artifacts come out
- * as for an auto track, cue by cue.
+ * Either end of a WebVTT voice tag: what changes who is speaking inside a cue.
+ * An opening, `<v Name>`, allows classes (`<v.loud Name>`) and captures the
+ * name, which runs to the closing `>` and may hold spaces and any other
+ * punctuation. The closing, `</v>`, leaves no one speaking.
  */
-function readCue(cue) {
-  const speaker = collapse(decodeEntities(VOICE_TAG.exec(cue.lines.join(' '))?.[1] ?? '')) || null;
-  const lines = cue.lines
+const VOICE_BOUNDARY = /<v(?:\.[^\s>]*)*\s+([^>]*)>|<\/v>/gi;
+
+/** The words of a stretch of cue text, tags stripped and artifacts out as for an auto track. */
+function wordsOf(text) {
+  const lines = text
+    .split('\n')
     .map((line) => collapse(decodeEntities(stripTags(line))))
     .filter(Boolean);
-  const [{ text = '' } = {}] = stripArtifacts([lines], 'auto');
+  const [{ text: spoken = '' } = {}] = stripArtifacts([lines], 'auto');
+  return spoken.split(' ').filter(Boolean);
+}
 
-  return { speaker, words: text.split(' ').filter(Boolean) };
+/**
+ * One cue's speech, as one segment per speaker, in the order of their voice
+ * tags. A cue usually has one tag, but when people join or leave a meeting
+ * Teams puts several in one cue, and each speaker is credited with the text
+ * inside their own tag. Text outside any tag has no speaker, and adjacent
+ * stretches by the same speaker are one segment.
+ *
+ * @returns {Array<{ speaker: string|null, words: string[] }>}
+ */
+function readCue(cue) {
+  const text = cue.lines.join('\n');
+  const segments = [];
+  let speaker = null;
+  let from = 0;
+
+  const take = (to) => {
+    const words = wordsOf(text.slice(from, to));
+    if (words.length === 0) return;
+    const last = segments[segments.length - 1];
+    if (last && last.speaker === speaker) last.words.push(...words);
+    else segments.push({ speaker, words });
+  };
+
+  for (const boundary of text.matchAll(VOICE_BOUNDARY)) {
+    take(boundary.index);
+    speaker = boundary[1] === undefined ? null : collapse(decodeEntities(boundary[1])) || null;
+    from = boundary.index + boundary[0].length;
+  }
+  take(text.length);
+
+  return segments;
 }
 
 /**
  * Rejoins each utterance's parts in part order, wherever in the file they
  * sit, and orders the utterances by where their first cue appears. A cue with
  * no such id is an utterance of its own. An utterance with no words is not one.
+ * An utterance whose cues credit several speakers comes out as one entry per
+ * speaker, in tag order.
  *
  * @returns {Array<{ speaker: string|null, words: string[] }>}
  */
@@ -68,18 +99,21 @@ function rebuildUtterances(cues) {
     const match = UTTERANCE_ID.exec(cue.id ?? '');
     const key = match ? match[1] : `cue ${position}`;
     if (!utterances.has(key)) utterances.set(key, []);
-    utterances.get(key).push({ part: match ? Number(match[2]) : 0, position, ...readCue(cue) });
+    utterances.get(key).push({ part: match ? Number(match[2]) : 0, position, segments: readCue(cue) });
   }
 
-  return [...utterances.values()]
-    .map((parts) => {
-      parts.sort((a, b) => a.part - b.part || a.position - b.position);
-      return {
-        speaker: parts.find((part) => part.speaker)?.speaker ?? null,
-        words: parts.flatMap((part) => part.words),
-      };
-    })
-    .filter((utterance) => utterance.words.length > 0);
+  // An utterance whose cues name several speakers comes out as one entry per
+  // speaker, in order; the entries of one speaker next to each other are one.
+  return [...utterances.values()].flatMap((parts) => {
+    parts.sort((a, b) => a.part - b.part || a.position - b.position);
+    const runs = [];
+    for (const segment of parts.flatMap((part) => part.segments)) {
+      const last = runs[runs.length - 1];
+      if (last && last.speaker === segment.speaker) last.words.push(...segment.words);
+      else runs.push({ speaker: segment.speaker, words: [...segment.words] });
+    }
+    return runs;
+  });
 }
 
 /**

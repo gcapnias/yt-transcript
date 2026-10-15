@@ -211,3 +211,53 @@ test('the title falls back to a dated name when the file name has no Latin lette
 
   assert.equal(slug, 'meeting-20260915');
 });
+
+// ------------------------------------------------------------ several voices in one cue
+
+/** A cue written by hand, because the helper wraps its text in one voice tag. */
+const rawCue = (id, start, end, text) => ({ id, start, end, text });
+
+test('a cue with several voice tags credits each speaker, in tag order', () => {
+  const track = meetingTrack([
+    { id: '1-0', start: 0, end: 3, speaker: 'Ana Lopez', text: 'Welcome back.' },
+    rawCue('2-0', 3, 6, '<v Ben Okafor>Sorry I am late.</v>\n<v Cleo Marsh>Hi, I just joined.</v>'),
+    { id: '3-0', start: 6, end: 9, speaker: 'Cleo Marsh', text: 'Can you hear me?' },
+  ]);
+
+  assert.equal(
+    body(render(track).contents),
+    [
+      '— **Ana Lopez:** Welcome back.',
+      '— **Ben Okafor:** Sorry I am late.',
+      '— **Cleo Marsh:** Hi, I just joined. Can you hear me?',
+    ].join('\n\n') + '\n',
+  );
+});
+
+test('voice tags side by side on one line, and a speaker returning, each make their own turn', () => {
+  const track = meetingTrack([
+    rawCue('1-0', 0, 3, '<v Ana Lopez>One.</v><v Ben Okafor>Two.</v><v Ana Lopez>Three.</v>'),
+  ]);
+
+  assert.equal(
+    body(render(track).contents),
+    '— **Ana Lopez:** One.\n\n— **Ben Okafor:** Two.\n\n— **Ana Lopez:** Three.\n',
+  );
+});
+
+test('a multi-voice cue keeps every word, and a later part of its utterance still joins in', () => {
+  const track = meetingTrack([
+    rawCue('4-0', 0, 3, '<v Ana Lopez>We start and</v>\n<v Ben Okafor>me too</v>'),
+    { id: '5-0', start: 3, end: 5, speaker: 'Cleo Marsh', text: 'Noted.' },
+    { id: '4-1', start: 5, end: 7, speaker: 'Ben Okafor', text: 'then we go.' },
+  ]);
+
+  assert.equal(
+    body(render(track).contents),
+    [
+      '— **Ana Lopez:** We start and',
+      '— **Ben Okafor:** me too then we go.',
+      '— **Cleo Marsh:** Noted.',
+    ].join('\n\n') + '\n',
+  );
+});
