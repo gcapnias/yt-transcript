@@ -29,18 +29,23 @@ const DIALOG_MIN_TURNS = 10;
 
 /**
  * The layouts that can be asked for. `auto` applies the turn threshold, so it
- * is a request and never the layout a transcript records.
+ * is a request and never the layout a transcript records. `meeting` is asked
+ * for a local `.vtt` only (ADR-0010); `cleanTrack` never lays a video out as one.
  */
-export const LAYOUTS = ['auto', 'prose', 'dialog'];
+export const LAYOUTS = ['auto', 'prose', 'dialog', 'meeting'];
 
 /** A word ends a sentence, allowing one closing quote or bracket after the stop. */
 const SENTENCE_END = /[.!?]["')\]]?$/;
 
 /**
- * Removes inline markup: `<c>` word-timing tags, their closers, and the
- * `<00:00:01.200>` timestamps between them.
+ * Removes every inline tag, `<` to `>`: a video track's `<c>` word-timing
+ * tags, their closers and the `<00:00:01.200>` timestamps between them, and a
+ * meeting track's `<v Name>` voice tags and `</v>` closers. Exported for
+ * `./meeting.js`, which reads the speaker out of a voice tag before it calls
+ * this and so never loses it; `cleanTrack` calls it first, as no video track
+ * has a tag worth keeping.
  */
-function stripTags(text) {
+export function stripTags(text) {
   return text.replace(/<[^>]*>/g, '');
 }
 
@@ -50,9 +55,11 @@ function stripTags(text) {
  * stripping then eats along with everything up to the next `>`.
  *
  * Not cosmetic — `>>`, the auto speaker marker, is `&gt;&gt;` on disk, so this
- * is what lets `./artifacts.js` write one rule per notation.
+ * is what lets `./artifacts.js` write one rule per notation. A meeting's text
+ * and speaker names are decoded the same way, by `./meeting.js`, which
+ * exports it from here rather than keep a second entity table.
  */
-function decodeEntities(text) {
+export function decodeEntities(text) {
   return text
     .replace(/&amp;/g, '&')
     .replace(/&lt;/g, '<')
@@ -175,18 +182,21 @@ function toTurns(words, turnStarts) {
 /**
  * Breaks the word stream at the next sentence end once a paragraph has reached
  * `PARAGRAPH_MIN_WORDS` (ADR-0007). It is given one turn's words at a time, so
- * a paragraph never spans two turns.
+ * a paragraph never spans two turns. Exported for `./meeting.js`, whose turns
+ * are paragraphed by the same rule, with a wider sentence end (ADR-0010).
  *
  * @param {string[]} words
+ * @param {RegExp} [sentenceEnd] what a word must match to end a sentence; the
+ *   video rule, `SENTENCE_END`, when absent
  * @returns {string[]} paragraphs
  */
-function toParagraphs(words) {
+export function toParagraphs(words, sentenceEnd = SENTENCE_END) {
   const paragraphs = [];
   let current = [];
 
   for (const word of words) {
     current.push(word);
-    if (current.length >= PARAGRAPH_MIN_WORDS && SENTENCE_END.test(word)) {
+    if (current.length >= PARAGRAPH_MIN_WORDS && sentenceEnd.test(word)) {
       paragraphs.push(current.join(' '));
       current = [];
     }
@@ -264,6 +274,6 @@ export function cleanTrack(rawText, { trackKey, layout = 'auto' } = {}) {
     trackKind,
     layout: chosen,
     marksTurns: turnStarts.length > 0,
-    turns: laidOut.map(toParagraphs),
+    turns: laidOut.map((words) => toParagraphs(words)),
   };
 }

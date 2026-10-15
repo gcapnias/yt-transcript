@@ -22,6 +22,8 @@
  * check reads frontmatter too, and it must read it identically.
  */
 
+import { MEETINGS_FOLDER } from './slug.js';
+
 /** The five settled columns, in order. Each reads one frontmatter key. */
 const COLUMNS = [
   { heading: 'Title', key: 'title' },
@@ -34,7 +36,8 @@ const COLUMNS = [
 /**
  * Every transcript this tool has ever written carries all seven of these keys,
  * so "incomplete" has no other referent: a file missing one did not come from
- * this tool, and re-downloading it is the honest advice.
+ * this tool, and re-downloading it is the honest advice. A meeting is the one
+ * exception, for the two keys in `MEETING_OPTIONAL_KEYS` (ADR-0010).
  *
  * `layout`, the eighth key, is deliberately not here: it is newer than the
  * rest, and every transcript written before it lacks it. Requiring it would
@@ -42,6 +45,22 @@ const COLUMNS = [
  * the key.
  */
 const REQUIRED_KEYS = ['title', 'url', 'channel', 'duration', 'upload_date', 'fetched', 'subtitles'];
+
+/** A meeting has no url, and no duration when its file has no cues (ADR-0010). */
+const MEETING_OPTIONAL_KEYS = ['url', 'duration'];
+
+/**
+ * Whether a transcript on disk is a meeting's (ADR-0010). Its folder and the
+ * lack of a `url` together tell: a video's transcript missing its `url` is an
+ * incomplete one, not a meeting, so the missing key alone proves nothing. The
+ * in-memory counterpart is `isMeeting` on a rendered transcript.
+ *
+ * @param {string} filePath relative to the transcripts directory, `/`-separated
+ * @param {Record<string, string>} values as `readFrontmatter` returns them
+ */
+export function isMeetingFile(filePath, values) {
+  return filePath.startsWith(`${MEETINGS_FOLDER}/`) && !('url' in values);
+}
 
 /**
  * Whether a file's path puts it in a channel folder. The one place that rule
@@ -71,7 +90,7 @@ export function renderCatalog(files) {
   const warnings = [];
 
   for (const file of files) {
-    const frontmatter = parseFrontmatter(file.text);
+    const frontmatter = parseFrontmatter(file);
 
     // Three outcomes, and the middle one is the whole point of the scan rule:
     // no frontmatter block at all means "not a transcript", which is how the
@@ -141,16 +160,17 @@ export function renderCatalog(files) {
 export function scanTranscriptUrls(files) {
   const urls = [];
   for (const file of files) {
-    const frontmatter = parseFrontmatter(file.text);
+    const frontmatter = parseFrontmatter(file);
     if (frontmatter === null || frontmatter.error) continue;
-    urls.push(frontmatter.values.url);
+    // A meeting has none, and is never in a batch's way.
+    if (!isMeetingFile(file.path, frontmatter.values)) urls.push(frontmatter.values.url);
   }
   return urls;
 }
 
 function renderRow(row) {
   const cells = COLUMNS.map((column) =>
-    column.key === 'title' ? `[${cell(row.title)}](${row.path})` : cell(row[column.key]),
+    column.key === 'title' ? `[${cell(row.title)}](${row.path})` : cell(row[column.key] ?? ''),
   );
   return `| ${cells.join(' | ')} |`;
 }
@@ -227,15 +247,17 @@ export function readFrontmatter(text) {
  * `readFrontmatter` plus the catalog's completeness judgement.
  *
  * Every transcript this tool writes carries the seven required keys, so a file
- * missing one did not come from this tool and earns the warning that says so.
+ * missing one did not come from this tool and earns the warning that says so;
+ * a meeting is excused the two in `MEETING_OPTIONAL_KEYS`.
  *
  * @returns {null | { error: string } | { values: Record<string, string> }}
  */
-function parseFrontmatter(text) {
+function parseFrontmatter({ path: filePath, text }) {
   const frontmatter = readFrontmatter(text);
   if (frontmatter === null || frontmatter.error) return frontmatter;
 
-  const missing = REQUIRED_KEYS.filter((key) => !(key in frontmatter.values));
+  const exempt = isMeetingFile(filePath, frontmatter.values) ? MEETING_OPTIONAL_KEYS : [];
+  const missing = REQUIRED_KEYS.filter((key) => !(key in frontmatter.values) && !exempt.includes(key));
   if (missing.length > 0) {
     return { error: `its frontmatter is missing ${missing.join(', ')}` };
   }

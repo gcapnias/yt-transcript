@@ -23,8 +23,26 @@ transcript is filed in a `meetings` folder beside the channel folders and listed
 - **`;` ends a sentence in the meeting layout only.** Teams writes the Greek question mark as a
   plain `;`. Counting it in prose or dialog would re-paragraph English tracks.
 - **Frontmatter:** `title` is the file name without `.vtt`. `url` is omitted and `channel` is
-  empty. `duration` is estimated from the last cue's end. `upload_date` is the file's modification
-  date. `subtitles` is `auto` and `layout` is `meeting`. `--lang` is not checked.
+  empty. `duration` is the latest cue end (cues overlap, so not the last one in the file), written
+  `M:SS` under an hour and `H:MM:SS` from one, and omitted when the file has no cues. `upload_date`
+  is the file's modification time, as a date in the machine's own calendar. `subtitles` is `auto`
+  and `layout` is `meeting`, or `dialog` for a track naming no one. `--lang` is not checked.
+- **Identity is the title, not a URL.** A meeting has no `url` to identify it by, so the store
+  identifies it by its `title`: transcribing the same file again overwrites its transcript, and a
+  different title that kebab-cases to the same slug is kept under the slug plus the first eight
+  hex characters of the title's SHA-1. A meeting never removes another transcript, a video never
+  overwrites a meeting, and a meeting never overwrites a video. The slug of a title with no Latin
+  letters is `meeting-<YYYYMMDD>` of the file's date.
+- **A cue may name several speakers.** When people join or leave, Teams puts several voice tags in
+  one cue. Each speaker is credited with the text inside their own tag, in the order of the tags,
+  and consecutive utterances by one speaker still form one turn. Text outside any tag has no
+  speaker. Neither sample has such a cue.
+- **The catalog still requires all seven keys of a video's transcript, and excuses a meeting two.**
+  A transcript in the `meetings` folder with no `url` is a meeting, and is not flagged incomplete
+  for lacking `url`, or for lacking `duration` (its file had no cues). A video transcript missing
+  either, or any transcript with no `url` outside `meetings`, is still flagged for re-download. The
+  folder is part of the test because the missing key alone cannot tell a meeting from an
+  incomplete video. A meeting is never in a batch's skip set.
 
 ## Considered options
 

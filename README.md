@@ -111,6 +111,30 @@ back to `.gitignore` to decide what to ship.
 
 Both forms need `yt-dlp` on `PATH`; npx does not bundle it.
 
+## Meetings
+
+A path ending in `.vtt` is a meeting, such as a Microsoft Teams transcript export:
+
+```bash
+yt-transcript path/to/meeting.vtt
+```
+
+It is transcribed from the file, with no download, so `yt-dlp` is not needed. The
+transcript is filed in `transcripts/meetings/` and listed in the catalog. Each
+cue's speaker is read from its `<v Name>` voice tag, the parts of one utterance
+(`<uuid>/<utterance>-<part>` cue ids) are rejoined even when other speakers' cues
+sit between them, and consecutive utterances by one speaker form one turn, written
+`— **Name:** text`. A cue with no voice tag is an unnamed turn. A `.vtt` that names
+no speakers is laid out as an unnamed dialog. Nothing is deduplicated, and every
+word in the cues is in the transcript. In this layout `;` counts as a sentence end
+for paragraph breaks, because Teams writes the Greek question mark that way.
+`--layout prose` drops the names. `--lang`, `--playlist` and `--force` are ignored.
+
+The frontmatter has no `url`: `title` is the file name without `.vtt`, `channel` is
+empty, `duration` is the latest cue end, `upload_date` is the file's modification
+date, and `subtitles` is `auto`. Speaker names are written exactly as in the file;
+see [ADR-0010](docs/adr/0010-meetings-are-transcribed-into-a-meeting-layout.md).
+
 ## Flags
 
 - `--lang <code>` — subtitle language. Default `en`, which accepts `en`,
@@ -120,7 +144,8 @@ Both forms need `yt-dlp` on `PATH`; npx does not bundle it.
   tracks last. When a manual or named track loses, a single-video fetch names
   it and the `--lang` that selects it. Any other code, `en-US` included, is
   matched exactly.
-- `--layout auto|prose|dialog` — default `auto`: a track whose speaker changes
+- `--layout auto|prose|dialog|meeting` — `meeting` is for a `.vtt` only (see
+  Meetings); for a URL, default `auto`: a track whose speaker changes
   (`>>` on auto and named tracks, `- ` on other manual ones) give it 10 or more
   turns becomes a dialog, each turn opening with `— `; speech before the first
   change counts as a turn. Any other track is prose. `prose` and `dialog` force

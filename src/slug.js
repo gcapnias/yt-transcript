@@ -82,6 +82,9 @@ function cap(slug) {
 /** Where a transcript goes when its channel has neither a handle nor an id. */
 export const UNKNOWN_CHANNEL_FOLDER = 'unknown-channel';
 
+/** Where every meeting is filed, beside the channel folders (ADR-0010). */
+export const MEETINGS_FOLDER = 'meetings';
+
 /**
  * The channel folder a transcript is filed in (ADR-0008): the channel's handle,
  * kebab-cased the way a slug is — a leading `@` drops out, and any run of other

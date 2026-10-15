@@ -21,7 +21,7 @@ A single Markdown file holding one video's or one meeting's spoken content, laid
 _Avoid_: Caption file, subtitle file, article
 
 **Slug**:
-The kebab-case filename a transcript is stored under, derived from the video title, or from a meeting's file name. A slug is unique only within its channel folder: two channels may each hold a transcript under the same slug.
+The kebab-case filename a transcript is stored under, derived from the video title, or from a meeting's file name. A slug is unique only within its channel folder: two channels may each hold a transcript under the same slug. A meeting's slug is unique within the `meetings` folder, where a different title that gives the same slug is kept under the slug plus a short hash of its title, and the same title overwrites; a title with no Latin letters is filed as `meeting-` and the file's date.
 _Avoid_: Filename, title slug, permalink
 
 **Channel folder**:
@@ -29,7 +29,7 @@ The folder a transcript is filed in, named by the kebab-case form of the channel
 _Avoid_: Channel directory, subfolder, bucket, shelf
 
 **Frontmatter**:
-The YAML block opening a transcript, describing the video or meeting it came from. A meeting has no URL and no channel.
+The YAML block opening a transcript, describing the video or meeting it came from. A meeting has no URL and an empty channel; its title is its file's name without `.vtt`, its duration is its latest cue's end (left out when it has no cues), and its upload date is when the file was last modified, so it is identified by its title rather than a URL.
 _Avoid_: Header, metadata block
 
 **Cue**:
@@ -37,8 +37,12 @@ One timed unit of text in a subtitle file, whether yt-dlp downloaded it or it is
 _Avoid_: Caption, line, segment, subtitle
 
 **Utterance**:
-One continuous piece of speech by one speaker in a meeting's track, which the track may split across several cues with other speakers' cues between them. Like cues, utterances are an intermediate and never appear in a transcript.
+One continuous piece of speech by one speaker in a meeting's track, which the track may split across several cues with other speakers' cues between them. A single cue may also carry several speakers, when people join or leave; each is credited with the text inside their own voice tag, in the order of the tags. Like cues, utterances are an intermediate and never appear in a transcript.
 _Avoid_: Segment, phrase, part
+
+**Credit**:
+The words of one cue that a voice tag attributes to one speaker. A cue usually holds one credit; when people join or leave a meeting it holds several, in the order of the tags. Credits are an intermediate: those of an utterance's cues are put back together into the utterance, and they never appear in a transcript.
+_Avoid_: Segment, span, voice
 
 **Artifact**:
 Anything a subtitle track carries that is not spoken content: a provenance credit, speaker-change notation, or a sound event. Artifacts are removed while cleaning, so they never reach a transcript; in a dialog, speaker-change notation is still removed as text, but first marks where one turn ends and the next begins. Notation is track-kind-specific, except that a named track writes its artifacts the way an auto track does, though it is manual in every other respect; a transcriber's annotation on speech — an uncertain name, on-screen text — is not an artifact and survives verbatim.
