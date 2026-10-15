@@ -18,13 +18,10 @@ import { cleanTrack } from './clean.js';
 import { formatUploadDate, renderFrontmatter } from './frontmatter.js';
 import { cleanMeeting } from './meeting.js';
 import { YOUTUBE } from './site.js';
-import { transcriptSlug } from './slug.js';
+import { MEETINGS_FOLDER, transcriptSlug } from './slug.js';
 
 /** What opens a turn's first paragraph: an em dash and a space (ADR-0007). */
 const TURN_DASH = '— ';
-
-/** Where every meeting is filed, beside the channel folders (ADR-0010). */
-export const MEETINGS_FOLDER = 'meetings';
 
 /** The `.vtt` a meeting's title is the file name without. */
 const VTT_EXTENSION = /\.vtt$/i;

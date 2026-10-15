@@ -195,6 +195,30 @@ test('a .vtt argument transcribes without ever reaching yt-dlp, and rebuilds the
   assert.doesNotMatch(printed, /undefined|null/);
 });
 
+test('a .vtt goes from file to transcript to catalog through the real path, never reaching yt-dlp', async () => {
+  await withTempDir(async (dir) => {
+    const input = await meetingFile(dir, 'Weekly sync.vtt');
+    const transcripts = path.join(dir, 'transcripts');
+    const { out, err, io } = capture();
+
+    const code = await main([input], io, {
+      ...forbidden,
+      sleep: async () => assert.fail('the clock was used for a local file'),
+      // The real functions, pointed at the temporary directory so the
+      // repository's own transcripts/ is never touched.
+      transcribeMeeting: (request) => transcribeMeeting(request, { dir: transcripts }),
+      rebuildCatalog: () => rebuildCatalog({ dir: transcripts }),
+    });
+
+    assert.equal(code, 0, err.join('\n'));
+    const file = path.join(transcripts, 'meetings', 'weekly-sync.md');
+    assert.match(await fs.readFile(file, 'utf8'), /^— \*\*Ana Lopez:\*\* Shall we begin;$/m);
+    assert.match(await fs.readFile(path.join(transcripts, 'README.md'), 'utf8'), /meetings\/weekly-sync\.md/);
+    assert.ok(out.join('\n').includes(file));
+    assert.deepEqual(await listFiles(transcripts), ['README.md', 'meetings/weekly-sync.md']);
+  });
+});
+
 test('a missing .vtt exits 1 with "file not found", never touching yt-dlp or the catalog', async () => {
   const { err, io } = capture();
 

@@ -17,7 +17,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
-import { isMeetingFrontmatter, readFrontmatter } from './catalog.js';
+import { isMeetingFile, readFrontmatter } from './catalog.js';
 
 /** Transcripts sit one level down, in a channel folder: see ADR-0008. */
 export const TRANSCRIPTS_DIR = 'transcripts';
@@ -133,7 +133,8 @@ async function resolveFilename(transcript, folder) {
   // same title. A video's transcript, or another title, is not.
   if (transcript.isMeeting) {
     const { values } = readFrontmatter(existing) ?? {};
-    return values && isMeetingFrontmatter(values) && values.title === transcript.title
+    const existingPath = `${transcript.channelFolder}/${transcript.filename}`;
+    return values && isMeetingFile(existingPath, values) && values.title === transcript.title
       ? transcript.filename
       : `${transcript.slug}-${transcript.collisionId}.md`;
   }

@@ -37,9 +37,12 @@ transcript is filed in a `meetings` folder beside the channel folders and listed
   one cue. Each speaker is credited with the text inside their own tag, in the order of the tags,
   and consecutive utterances by one speaker still form one turn. Text outside any tag has no
   speaker. Neither sample has such a cue.
-- **The catalog requires `title`, `channel`, `upload_date`, `fetched` and `subtitles`.** `url` and
-  `duration` are no longer required, because a meeting lacks one and may lack the other, and a
-  transcript with no `url` is skipped by a batch's skip set.
+- **The catalog still requires all seven keys of a video's transcript, and excuses a meeting two.**
+  A transcript in the `meetings` folder with no `url` is a meeting, and is not flagged incomplete
+  for lacking `url`, or for lacking `duration` (its file had no cues). A video transcript missing
+  either, or any transcript with no `url` outside `meetings`, is still flagged for re-download. The
+  folder is part of the test because the missing key alone cannot tell a meeting from an
+  incomplete video. A meeting is never in a batch's skip set.
 
 ## Considered options
 
