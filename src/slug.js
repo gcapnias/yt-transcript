@@ -1,6 +1,6 @@
 /**
  * The slug: the kebab-case filename a transcript is stored under, derived from
- * the video title.
+ * the video title, or a meeting's file name.
  *
  * No special cases. Trimming the ends is what disposes of a `--` prefix and a
  * leading `/` without either being named.
@@ -49,9 +49,12 @@ const DIGRAPH_VOWELS = new Map([
   ['η', 'i'],
 ]);
 
-/** Tonos, oxia, varia and perispomeni: the marks that mean a vowel is stressed. */
-const ACCENT_MARKS = /[̀́͂]/;
-const DIAERESIS = '̈';
+/**
+ * The marks that mean a vowel is stressed: grave, acute and perispomeni. NFKD folds
+ * tonos and oxia into the acute, so those two need no code point of their own.
+ */
+const ACCENT_MARKS = /[\u0300\u0301\u0342]/;
+const DIAERESIS = '\u0308';
 
 /**
  * A word, for the rules that need one: a maximal run of Greek letters with
@@ -92,14 +95,14 @@ function romanizeWord(word) {
     const next = letters[i + 1];
     const afterNext = letters[i + 2];
 
-    const digraph = next?.letter === 'υ' && !ACCENT_MARKS.test(marks) && !next.marks.includes(DIAERESIS);
+    const joinsUpsilon = next?.letter === 'υ' && !ACCENT_MARKS.test(marks) && !next.marks.includes(DIAERESIS);
 
-    if (digraph && DIGRAPH_VOWELS.has(letter)) {
+    if (joinsUpsilon && DIGRAPH_VOWELS.has(letter)) {
       const voiced =
         afterNext && (VOICED_CONSONANTS.has(afterNext.letter) || GREEK_VOWELS.has(afterNext.letter));
       latin += DIGRAPH_VOWELS.get(letter) + (voiced ? 'v' : 'f');
       i += 1;
-    } else if (digraph && letter === 'ο') {
+    } else if (joinsUpsilon && letter === 'ο') {
       latin += 'ou';
       i += 1;
     } else if (letter === 'μ' && next?.letter === 'π') {
@@ -129,7 +132,7 @@ function romanizeGreek(text) {
 
 /**
  * Below this, the slug has swallowed so much of the title that it misleads,
- * and an honest video id is worth more than a plausible-looking lie.
+ * and an honest fallback is worth more than a plausible-looking lie.
  */
 const MIN_RETENTION = 0.5;
 
@@ -144,7 +147,7 @@ const TITLE_CHARACTERS = /[\p{L}\p{N}]/gu;
 /**
  * Alphanumerics kept in the slug, over letters and digits in the title. A
  * title with nothing countable in it retains nothing, which is what sends a
- * pure-punctuation title to the video id.
+ * pure-punctuation title to its fallback.
  */
 function retention(slug, title) {
   const titleCharacters = (String(title).match(TITLE_CHARACTERS) ?? []).length;
@@ -157,7 +160,7 @@ function retention(slug, title) {
  * The Latin pipeline, on text whose Greek is already romanized.
  *
  * @param {string} romanized
- * @returns {string} possibly empty, for text with no Latin or Greek alphanumerics
+ * @returns {string} possibly empty, for text with no Latin alphanumerics
  */
 function kebabCase(romanized) {
   return String(romanized)
@@ -176,7 +179,7 @@ const slugify = (title) => kebabCase(romanizeGreek(title));
 /**
  * Cuts an over-long slug at the last `-` boundary at or before the cap, so the
  * last word is never a fragment. A slug with no boundary to cut at is cut
- * hard: the cap never sends a title to the video id, it only shortens it.
+ * hard: the cap never sends a title to its fallback, it only shortens it.
  */
 function cap(slug) {
   if (slug.length <= SLUG_MAX_LENGTH) return slug;

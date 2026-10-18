@@ -8,8 +8,11 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
-import { renderMeetingTranscript } from './transcript.js';
+import { renderMeetingTranscript, UnusableMeetingNameError } from './transcript.js';
 import { writeTranscript } from './transcript-store.js';
+
+// Re-exported so the meeting command's errors are all imported from here.
+export { UnusableMeetingNameError };
 
 /** Raised when the `.vtt` a user named is not there. */
 export class MeetingFileNotFoundError extends Error {

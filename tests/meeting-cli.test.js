@@ -257,7 +257,7 @@ test('a .vtt with no usable slug exits 1 with the rename message, writing nothin
   await withTempDir(async (dir) => {
     const transcripts = path.join(dir, 'transcripts');
 
-    for (const name of ['日本会議.vtt', '日本会議 Q3.vtt']) {
+    for (const name of ['日本会議.vtt', '!!! +++.vtt', '日本会議 Q3.vtt']) {
       const { err, io } = capture();
 
       const code = await main([await meetingFile(dir, name)], io, {

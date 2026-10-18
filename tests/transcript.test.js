@@ -53,19 +53,6 @@ test('a Greek title is romanized into its slug instead of falling back to the vi
   }
 });
 
-test('a Greek title is romanized into its slug instead of falling back to the video id', () => {
-  const vectors = [
-    ['Πώς να μάθεις AI', 'pos-na-matheis-ai'],
-    ['Συνάντηση ομάδας', 'synantisi-omadas'],
-    ['Ευάγγελος – Weekly sync', 'evangelos-weekly-sync'],
-  ];
-
-  for (const [title, slug] of vectors) {
-    const transcript = render(track(['Hello.']), { metadata: { ...METADATA, title } });
-    assert.equal(transcript.filename, `${slug}.md`, `slug wrong for: ${title}`);
-  }
-});
-
 test('latin letters NFKD cannot decompose are transliterated, not turned into separators', () => {
   // Without the table each of these carries no combining mark to strip, so it
   // becomes punctuation and then a separator: `s-ren`, `pawe-`, `stra-e`.

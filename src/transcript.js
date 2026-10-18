@@ -185,7 +185,7 @@ export function renderTranscript({
  * channel, and the track is recorded as auto because it is speech recognition.
  * The slug is made from the title alone, Greek romanized (ADR-0011), so it does
  * not move when the file is saved again; a title with no usable slug is refused
- * with `UnusableMeetingNameError`, before anything is read or written.
+ * with `UnusableMeetingNameError`, before anything is written.
  * Pure, as `renderTranscript` is: the caller reads the file and its mtime, and
  * passes `transcribedAt`, when the transcribing happened.
  *

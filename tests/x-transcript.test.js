@@ -193,18 +193,7 @@ test('a Greek post text is romanized into the slug', () => {
   const greek = {
     ...recorded('kw5hine-2106578219269005639'),
     description: 'Συνάντηση ομάδας https://t.co/cTiQ5Oo5WA',
-    uploaderId: 'Alice_Weidel',
-    displayId: '1877462752526053592',
-  };
-
-  assert.equal(render(greek).slug, 'synantisi-omadas');
-});
-
-test('a Greek post text is romanized into the slug', () => {
-  const greek = {
-    ...recorded('kw5hine-2106578219269005639'),
-    description: 'Συνάντηση ομάδας https://t.co/cTiQ5Oo5WA',
-    uploaderId: 'Alice_Weidel',
+    uploaderId: 'Sample_Poster',
     displayId: '1877462752526053592',
   };
 

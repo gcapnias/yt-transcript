@@ -5,8 +5,7 @@ import { LAYOUTS } from './clean.js';
 import { fetchTranscript } from './fetch.js';
 import { describeRetry } from './fetch-outcome.js';
 import { parseTarget, TargetParseError } from './target.js';
-import { MeetingFileNotFoundError, transcribeMeeting } from './transcribe.js';
-import { UnusableMeetingNameError } from './transcript.js';
+import { MeetingFileNotFoundError, transcribeMeeting, UnusableMeetingNameError } from './transcribe.js';
 import { preflight, expandPlaylist, ExpansionError, FetchError, YtDlpMissingError } from './ytdlp.js';
 
 const USAGE = `Usage: yt-transcript <url|id|file.vtt> [--lang <code>]
