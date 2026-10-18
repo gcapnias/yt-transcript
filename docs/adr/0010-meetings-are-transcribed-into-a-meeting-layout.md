@@ -1,5 +1,9 @@
 # Meetings are transcribed from a local file into a meeting layout of named turns
 
+> Partly superseded by [ADR-0011](0011-greek-titles-are-romanized-by-iso-843.md): a meeting's
+> title is romanized from Greek and has no `meeting-<YYYYMMDD>` fallback, and writing a meeting
+> removes its other same-title copies.
+
 Microsoft Teams exports a meeting's speech recognition as a `.vtt` file. Unlike any YouTube or X
 track, it names the speaker of every cue with a WebVTT voice tag (`<v Name>…</v>`). Today's
 cleaning strips that tag along with every other, so the file comes out as prose with every speaker

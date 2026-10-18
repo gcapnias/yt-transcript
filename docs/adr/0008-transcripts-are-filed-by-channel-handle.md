@@ -1,5 +1,8 @@
 # Transcripts are filed in one folder per channel, named by its handle
 
+> Partly superseded by [ADR-0011](0011-greek-titles-are-romanized-by-iso-843.md): a Greek handle
+> is romanized, so it falls back to the channel id only when nothing usable is left.
+
 `transcripts/` was flat by decision: a directory listing was the browse experience. At 147
 transcripts from 20 channels, 89 of them from one channel, that listing no longer finds anything.
 Seen in #13.

@@ -21,11 +21,11 @@ A single Markdown file holding one video's or one meeting's spoken content, laid
 _Avoid_: Caption file, subtitle file, article
 
 **Slug**:
-The kebab-case filename a transcript is stored under, derived from the video title, or from a meeting's file name. A slug is unique only within its channel folder: two channels may each hold a transcript under the same slug, and so may two meetings in the `meetings` folder, which are then told apart by their titles.
+The kebab-case filename a transcript is stored under, derived from the video title, or from a meeting's file name. Greek letters are romanized into Latin ones, by the system Greek passports use; other non-Latin letters are dropped. A slug is unique only within its channel folder: two channels may each hold a transcript under the same slug, and so may two meetings in the `meetings` folder, which are then told apart by their titles.
 _Avoid_: Filename, title slug, permalink
 
 **Channel folder**:
-The folder a transcript is filed in, named by the kebab-case form of the channel's handle on its site (`@iamseankochel` on YouTube, `@mattpocockuk` on X), not by its display name; a channel with no usable handle falls back to its channel id, and one with neither goes into `unknown-channel`. The same handle on both sites names one folder. A meeting has no channel: its transcript is filed in the `meetings` folder, beside the channel folders. Transcripts sit exactly one level down, in their folder, never deeper and never loose beside the catalog.
+The folder a transcript is filed in, named by the kebab-case form of the channel's handle on its site (`@iamseankochel` on YouTube, `@mattpocockuk` on X), not by its display name; a Greek handle is romanized as a slug is, and a channel with no usable handle falls back to its channel id, and one with neither goes into `unknown-channel`. The same handle on both sites names one folder. A meeting has no channel: its transcript is filed in the `meetings` folder, beside the channel folders. Transcripts sit exactly one level down, in their folder, never deeper and never loose beside the catalog.
 _Avoid_: Channel directory, subfolder, bucket, shelf
 
 **Frontmatter**:
@@ -85,7 +85,7 @@ The tool acting on one video: download a subtitle track, clean it into prose or 
 _Avoid_: Download, scrape, sync, import
 
 **Meeting**:
-A conversation held outside any site, whose speech-recognition transcript the user holds as a local file: today, a Microsoft Teams export. A meeting is not a site and not a video: it has no URL and no channel, and it is transcribed, never fetched. It is identified by its title, its file's name, so transcribing the same file again replaces its transcript, while a renamed file is a different meeting.
+A conversation held outside any site, whose speech-recognition transcript the user holds as a local file: today, a Microsoft Teams export. A meeting is not a site and not a video: it has no URL and no channel, and it is transcribed, never fetched. It is identified by its title, its file's name, so transcribing the same file again replaces its transcript, wherever that was filed, while a renamed file is a different meeting. A meeting whose name has too few Latin or Greek letters to make a slug is not transcribed: the file must be renamed.
 _Avoid_: Call, session, recording, local file
 
 **Transcribe**:

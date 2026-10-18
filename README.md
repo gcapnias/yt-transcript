@@ -8,7 +8,8 @@ Each fetch downloads a subtitle track, cleans it into paragraphs or, for a
 multi-speaker track, turns, and writes one Markdown file with frontmatter describing
 the video, filed in a folder per channel:
 `transcripts/<channel folder>/<slug>.md`. The folder is the channel's handle in
-kebab-case (`@iamseankochel` on YouTube becomes `iamseankochel/`), falling back to its
+kebab-case (`@iamseankochel` on YouTube becomes `iamseankochel/`), with Greek
+letters romanized, falling back to its
 channel id, or to `unknown-channel/`; the same handle on YouTube and X is one folder
 (see [ADR-0008](docs/adr/0008-transcripts-are-filed-by-channel-handle.md)). Fetching a
 video again removes any older transcript of it elsewhere, so a renamed channel or a
@@ -76,7 +77,7 @@ fragment is ignored.
   fetch fails and nothing is written. A transcript written by v0.2.0 has the handle in
   its `url`, so fetching that post again writes a second file. `title` is the post
   text with links removed, `channel` is `Display Name (@handle)`, and `subtitles` is
-  always `auto`: X's tracks are speech recognition. When the post text is too short or not Latin to make a slug, the file
+  always `auto`: X's tracks are speech recognition. When the post text is too short, or neither Latin nor Greek, to make a slug, the file
   is named `<handle>-<post id>.md`, lowercased.
 - **Refused or failed with a message, never retried:** X Broadcasts and Spaces
   (`/i/broadcasts/…`, `/i/events/…`, `/i/spaces/…`), which carry no subtitles; a post
@@ -152,6 +153,12 @@ no speakers is laid out as an unnamed dialog. Nothing is deduplicated, and every
 word in the cues is in the transcript. In this layout `;` counts as a sentence end
 for paragraph breaks, because Teams writes the Greek question mark that way.
 `--layout prose` drops the names. `--lang`, `--playlist` and `--force` are ignored.
+
+The file name, without `.vtt`, is the meeting's identity: transcribing the same file
+again replaces its transcript. Its slug is made from that name, with Greek romanized
+(`Συνάντηση.vtt` becomes `synantisi.md`); a file whose name has too few Latin or
+Greek letters to make a slug is refused, and must be renamed (see
+[ADR-0011](docs/adr/0011-greek-titles-are-romanized-by-iso-843.md)).
 
 The frontmatter has no `url`: `title` is the file name without `.vtt`, `channel` is
 empty, `duration` is the latest cue end, `upload_date` is the file's modification
