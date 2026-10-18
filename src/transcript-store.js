@@ -9,9 +9,12 @@
  * transcript: writing it removes any other file carrying its `url`.
  *
  * A meeting has no `url` (ADR-0010), so it is identified by its title, which is
- * its file's name: the same title overwrites, and a different title that slugs
- * to the same filename is suffixed with the collision id. A meeting never
- * removes another transcript, and no video overwrites one.
+ * its file's name. Both kinds are held to one rule for every filename they try
+ * (ADR-0011): the slug, then the slug plus the collision id, then `-2`, `-3`,
+ * and the first that is free, holds the same transcript, or holds a file with
+ * no identity is taken. A video never overwrites a meeting and a meeting never
+ * overwrites a video. A meeting has one transcript: writing it removes every
+ * other meeting in the `meetings` folder with its title, and never a video.
  */
 
 import fs from 'node:fs/promises';
@@ -21,29 +24,6 @@ import { isMeetingFile, readFrontmatter } from './catalog.js';
 
 /** Transcripts sit one level down, in a channel folder: see ADR-0008. */
 export const TRANSCRIPTS_DIR = 'transcripts';
-
-/**
- * Reads the `url` out of a transcript's frontmatter — which video this file is
- * already about, and nothing else.
- *
- * The parse itself is the catalog's (`readFrontmatter`), deliberately: a
- * second reader with its own rules is how a transcript comes to be owned by
- * one module and unowned by the other. It was, and the divergence was a
- * byte-order mark — this reader missed it, dropped the file's identity, and
- * `resolveFilename` overwrote another video's transcript.
- *
- * Neither completeness nor readability is asked for here — only the `url`. A
- * file carrying one, whatever else is wrong with its block, is unmistakably
- * about that video, and the catalog's "re-download it" warning is a milder
- * answer than destroying it. Anything stricter reopens the overwrite on some
- * other malformed input.
- *
- * @param {string} text a transcript's full contents
- * @returns {string|null}
- */
-export function readTranscriptUrl(text) {
-  return readFrontmatter(text)?.values?.url ?? null;
-}
 
 /**
  * Every `.md` at the top level of the directory and one level down in each
@@ -86,15 +66,17 @@ export async function readTranscriptFiles(dir) {
 }
 
 /**
- * Writes a transcript into its channel folder, resolving a true title
- * collision within that folder by suffixing the second file with its collision
- * id: the video id, or an X post's post id. Another channel's file of the same
- * slug is not a collision.
+ * Writes a transcript into its channel folder, at the first filename that is
+ * usable for it (`resolveFilename`): the slug, then the slug suffixed with the
+ * collision id (the video id, an X post's post id, a meeting's title hash),
+ * then `-2`, `-3` and so on. Another channel's file of the same slug is not a
+ * collision.
  *
- * Once written, every *other* transcript carrying the same `url` is removed,
- * in any folder or at the top level: a renamed channel or a retitled video
- * moves, rather than leaving a stale copy. If the write fails, nothing is
- * removed.
+ * Once written, every *other* copy of the same transcript is removed: for a
+ * video, any file carrying its `url`, in any folder or at the top level, so a
+ * renamed channel or a retitled video moves rather than leaving a stale copy;
+ * for a meeting, any other meeting in the `meetings` folder with its title.
+ * If the write fails, nothing is removed.
  *
  * @param {{ slug: string, filename: string, contents: string, url?: string,
  *           title?: string, isMeeting?: boolean, collisionId: string,
@@ -104,44 +86,97 @@ export async function readTranscriptFiles(dir) {
  * @returns {Promise<string>} the path written
  */
 export async function writeTranscript(transcript, { dir = TRANSCRIPTS_DIR } = {}) {
+  const incoming = transcriptIdentity(transcript);
   const folder = path.join(dir, transcript.channelFolder);
   await fs.mkdir(folder, { recursive: true });
 
-  const file = path.join(folder, await resolveFilename(transcript, folder));
+  const file = path.join(folder, await resolveFilename(transcript, incoming, folder));
   await fs.writeFile(file, transcript.contents, 'utf8');
-  if (!transcript.isMeeting) await removeOtherCopies(transcript.url, file, dir);
+  await removeOtherCopies(incoming, file, dir);
   return file;
 }
 
-async function removeOtherCopies(url, written, dir) {
+async function removeOtherCopies(incoming, written, dir) {
   for (const { path: relative, text } of await readTranscriptFiles(dir)) {
     const file = path.join(dir, relative);
-    if (file !== written && readTranscriptUrl(text) === url) await fs.rm(file);
+    if (file !== written && sameIdentity(fileIdentity(relative, text), incoming)) await fs.rm(file);
   }
 }
 
-async function resolveFilename(transcript, folder) {
-  let existing;
-  try {
-    existing = await fs.readFile(path.join(folder, transcript.filename), 'utf8');
-  } catch (error) {
-    if (error.code !== 'ENOENT') throw error;
-    return transcript.filename;
+/**
+ * What a transcript is the transcript *of*: a video's (or an X post's) `url`,
+ * a meeting's `title`. `null` is a file with no identity, which no one owns.
+ *
+ * @typedef {{ kind: 'url', value: string } | { kind: 'title', value: string } | null} Identity
+ */
+
+/** @returns {Identity} the identity of the transcript about to be written */
+function transcriptIdentity(transcript) {
+  return transcript.isMeeting
+    ? { kind: 'title', value: transcript.title }
+    : { kind: 'url', value: transcript.url };
+}
+
+/**
+ * The identity of a file already on disk: its `url`, else, for a meeting, its
+ * title. Neither, or an empty one, is no identity (ADR-0011).
+ *
+ * The parse is the catalog's (`readFrontmatter`) and so is what makes a file a
+ * meeting (`isMeetingFile`), deliberately: a second reader with its own rules
+ * is how a transcript comes to be owned by one module and unowned by the other.
+ * It was, and the divergence was a byte-order mark: the store's own reader
+ * missed it, dropped the file's identity, and another video overwrote the
+ * transcript.
+ *
+ * Neither completeness nor readability is asked for here. A file carrying a
+ * `url`, whatever else is wrong with its block (a stray line, a missing
+ * key), is unmistakably about that video, and the catalog's "re-download it"
+ * warning is a milder answer than destroying it. Anything stricter reopens the
+ * overwrite on some other malformed input.
+ *
+ * @param {string} relative the path relative to the transcripts directory
+ * @param {string} text
+ * @returns {Identity}
+ */
+function fileIdentity(relative, text) {
+  const { values } = readFrontmatter(text) ?? {};
+  if (!values) return null;
+  if (values.url) return { kind: 'url', value: values.url };
+  if (isMeetingFile(relative, values) && values.title) return { kind: 'title', value: values.title };
+  return null;
+}
+
+function sameIdentity(a, b) {
+  return a !== null && b !== null && a.kind === b.kind && a.value === b.value;
+}
+
+/**
+ * The first candidate filename that is usable for the transcript: free, held
+ * by a transcript with the same identity, or held by a file with none (an
+ * unreadable block, or one with neither a `url` nor a meeting's title).
+ * That last overwrite is deliberate, for a video and a meeting alike: the
+ * file has no `url` to be cleaned up by, so leaving it would leave the broken
+ * file behind for good. A file that is someone else's (a different video or
+ * meeting, or, for a video, any meeting) is stepped over, never overwritten.
+ */
+async function resolveFilename(transcript, incoming, folder) {
+  const stem = `${transcript.slug}-${transcript.collisionId}`;
+  const candidates = function* () {
+    yield transcript.filename;
+    yield `${stem}.md`;
+    for (let n = 2; ; n += 1) yield `${stem}-${n}.md`;
+  };
+
+  for (const candidate of candidates()) {
+    let existing;
+    try {
+      existing = await fs.readFile(path.join(folder, candidate), 'utf8');
+    } catch (error) {
+      if (error.code !== 'ENOENT') throw error;
+      return candidate;
+    }
+
+    const owner = fileIdentity(`${transcript.channelFolder}/${candidate}`, existing);
+    if (owner === null || sameIdentity(owner, incoming)) return candidate;
   }
-
-  // A meeting is the same meeting when the file there is one too, under the
-  // same title. A video's transcript, or another title, is not.
-  if (transcript.isMeeting) {
-    const { values } = readFrontmatter(existing) ?? {};
-    const existingPath = `${transcript.channelFolder}/${transcript.filename}`;
-    return values && isMeetingFile(existingPath, values) && values.title === transcript.title
-      ? transcript.filename
-      : `${transcript.slug}-${transcript.collisionId}.md`;
-  }
-
-  // The same video, or a file we cannot read an identity out of: overwrite.
-  const owner = readTranscriptUrl(existing);
-  if (owner === null || owner === transcript.url) return transcript.filename;
-
-  return `${transcript.slug}-${transcript.collisionId}.md`;
 }
