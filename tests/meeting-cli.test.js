@@ -12,7 +12,8 @@ import { writeTranscript } from '../src/transcript-store.js';
 import { meetingTrack } from './meeting-track.js';
 import { listFiles } from './transcripts-dir.js';
 
-const MODIFIED_AT = new Date(2026, 8, 15, 12);
+// No `Z`: noon local time, so the local date is the 15th in every time zone.
+const MODIFIED_AT = new Date('2026-09-15T12:00:00');
 
 const CUES = [
   { id: '3-0', start: 0, end: 4, speaker: 'Ana Lopez', text: 'Shall we begin;' },
