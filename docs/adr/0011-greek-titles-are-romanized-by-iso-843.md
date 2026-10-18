@@ -29,8 +29,8 @@ dropped.
   collision, the same as one holding another video.
 - **A collision is suffixed until the filename is free or already holds the same transcript**:
   `<slug>-<collision id>.md`, then `<slug>-<collision id>-2.md`, `-3`, and so on. Each step is
-  checked the way the first filename is, including that a file whose frontmatter cannot be read
-  is overwritten.
+  checked the way the first filename is, including that a file with no identity, neither a `url`
+  nor a meeting's title, is overwritten, for a meeting as for a video.
 
 ## Considered options
 
