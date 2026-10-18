@@ -5,7 +5,7 @@ import { LAYOUTS } from './clean.js';
 import { fetchTranscript } from './fetch.js';
 import { describeRetry } from './fetch-outcome.js';
 import { parseTarget, TargetParseError } from './target.js';
-import { MeetingFileNotFoundError, transcribeMeeting } from './transcribe.js';
+import { MeetingFileNotFoundError, transcribeMeeting, UnusableMeetingNameError } from './transcribe.js';
 import { preflight, expandPlaylist, ExpansionError, FetchError, YtDlpMissingError } from './ytdlp.js';
 
 const USAGE = `Usage: yt-transcript <url|id|file.vtt> [--lang <code>]
@@ -317,7 +317,9 @@ async function meeting({ target, options, io, deps: { transcribe, rebuild } }) {
   try {
     result = await transcribe({ path: target.path, layout: options.layout });
   } catch (error) {
-    if (!(error instanceof MeetingFileNotFoundError)) throw error;
+    // Both are the user's to fix and both happen before anything is written,
+    // so neither rebuilds the catalog.
+    if (!(error instanceof MeetingFileNotFoundError || error instanceof UnusableMeetingNameError)) throw error;
     io.err(error.message);
     return 1;
   }

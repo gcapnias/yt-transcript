@@ -34,9 +34,22 @@ test('all eight verified titles produce their settled slugs', () => {
 });
 
 test('a title that slugs to nothing falls back to the video id', () => {
-  for (const title of ['Πώς να μάθεις', '日本語のタイトル', '!!! ??? ...']) {
+  for (const title of ['日本語のタイトル', 'Привет мир', '!!! ??? ...']) {
     const transcript = render(track(['Hello.']), { metadata: { ...METADATA, title } });
     assert.equal(transcript.filename, 'o3CX_Y59_74.md', `no fallback for: ${title}`);
+  }
+});
+
+test('a Greek title is romanized into its slug instead of falling back to the video id', () => {
+  const vectors = [
+    ['Πώς να μάθεις AI', 'pos-na-matheis-ai'],
+    ['Συνάντηση ομάδας', 'synantisi-omadas'],
+    ['Ευάγγελος – Weekly sync', 'evangelos-weekly-sync'],
+  ];
+
+  for (const [title, slug] of vectors) {
+    const transcript = render(track(['Hello.']), { metadata: { ...METADATA, title } });
+    assert.equal(transcript.filename, `${slug}.md`, `slug wrong for: ${title}`);
   }
 });
 
@@ -59,7 +72,7 @@ test('a slug retaining under half the title is discarded for the video id', () =
   // The case an emptiness test misses: non-empty, plausible-looking, and it
   // has silently swallowed most of the title. The video id at least admits it.
   const transcript = render(track(['Hello.']), {
-    metadata: { ...METADATA, title: 'Πώς να μάθεις AI' },
+    metadata: { ...METADATA, title: '日本語の AI' },
   });
 
   assert.equal(transcript.filename, 'o3CX_Y59_74.md');
@@ -69,7 +82,7 @@ test('a mostly-latin title keeps its slug even with non-latin words in it', () =
   // The other side of the ratio: retention here is well above half, so falling
   // back would throw away a filename that genuinely describes the video.
   const transcript = render(track(['Hello.']), {
-    metadata: { ...METADATA, title: 'Νέα Skills! v1.2 για agents' },
+    metadata: { ...METADATA, title: '日本語 Skills! v1.2 agents' },
   });
 
   assert.equal(transcript.filename, 'skills-v1-2-agents.md');

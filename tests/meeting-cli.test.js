@@ -8,6 +8,7 @@ import { main, parseArgs } from '../src/cli.js';
 import { parseTarget } from '../src/target.js';
 import { withTempDir } from '../src/temp-dir.js';
 import { MeetingFileNotFoundError, transcribeMeeting } from '../src/transcribe.js';
+import { UnusableMeetingNameError } from '../src/transcript.js';
 import { writeTranscript } from '../src/transcript-store.js';
 import { meetingTrack } from './meeting-track.js';
 import { listFiles } from './transcripts-dir.js';
@@ -116,6 +117,38 @@ test('a meeting never removes a video transcript, nor a video one a meeting', as
   });
 });
 
+test('a Greek file name is filed by its romanization, and the same file again replaces it', async () => {
+  await withTempDir(async (dir) => {
+    const out = path.join(dir, 'transcripts');
+    const input = await meetingFile(dir, 'Συνάντηση.vtt');
+
+    const { file } = await transcribeMeeting({ path: input }, { dir: out });
+    assert.equal(file, path.join(out, 'meetings', 'synantisi.md'));
+
+    // A re-downloaded export has a new modification time. Local time, so the
+    // calendar day is the one written in every zone.
+    const later = new Date(2026, 9, 3, 12);
+    await fs.utimes(input, later, later);
+    const again = await transcribeMeeting({ path: input }, { dir: out });
+
+    assert.equal(again.file, file);
+    assert.deepEqual(await listFiles(out), ['meetings/synantisi.md']);
+    assert.match(await fs.readFile(file, 'utf8'), /^upload_date: 2026-10-03$/m);
+  });
+});
+
+test('a meeting name with no usable slug is refused before anything is written', async () => {
+  await withTempDir(async (dir) => {
+    const out = path.join(dir, 'transcripts');
+
+    await assert.rejects(
+      async () => transcribeMeeting({ path: await meetingFile(dir, '日本会議.vtt') }, { dir: out }),
+      UnusableMeetingNameError,
+    );
+    await assert.rejects(() => fs.stat(out), { code: 'ENOENT' });
+  });
+});
+
 test('a missing file is named, and nothing is written', async () => {
   await withTempDir(async (dir) => {
     const out = path.join(dir, 'transcripts');
@@ -217,6 +250,45 @@ test('a .vtt goes from file to transcript to catalog through the real path, neve
     assert.match(await fs.readFile(path.join(transcripts, 'README.md'), 'utf8'), /meetings\/weekly-sync\.md/);
     assert.ok(out.join('\n').includes(file));
     assert.deepEqual(await listFiles(transcripts), ['README.md', 'meetings/weekly-sync.md']);
+  });
+});
+
+test('a .vtt with no usable slug exits 1 with the rename message, writing nothing and rebuilding nothing', async () => {
+  await withTempDir(async (dir) => {
+    const transcripts = path.join(dir, 'transcripts');
+
+    for (const name of ['日本会議.vtt', '!!! +++.vtt', '日本会議 Q3.vtt']) {
+      const { err, io } = capture();
+
+      const code = await main([await meetingFile(dir, name)], io, {
+        ...forbidden,
+        transcribeMeeting: (request) => transcribeMeeting(request, { dir: transcripts }),
+        rebuildCatalog: async () => assert.fail('the catalog was rebuilt after a refusal'),
+      });
+
+      assert.equal(code, 1);
+      assert.equal(
+        err.join('\n'),
+        `Cannot transcribe "${name}": its name has too few Latin or Greek letters to make a filename. Rename the file and try again.`,
+      );
+    }
+    await assert.rejects(() => fs.stat(transcripts), { code: 'ENOENT' });
+  });
+});
+
+test('a .vtt keeping half its letters is transcribed', async () => {
+  await withTempDir(async (dir) => {
+    const transcripts = path.join(dir, 'transcripts');
+    const { err, io } = capture();
+
+    const code = await main([await meetingFile(dir, '会議 Q3.vtt')], io, {
+      ...forbidden,
+      transcribeMeeting: (request) => transcribeMeeting(request, { dir: transcripts }),
+      rebuildCatalog: () => rebuildCatalog({ dir: transcripts }),
+    });
+
+    assert.equal(code, 0, err.join('\n'));
+    assert.deepEqual(await listFiles(transcripts), ['README.md', 'meetings/q3.md']);
   });
 });
 

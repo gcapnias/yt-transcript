@@ -8,8 +8,11 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
-import { renderMeetingTranscript } from './transcript.js';
+import { renderMeetingTranscript, UnusableMeetingNameError } from './transcript.js';
 import { writeTranscript } from './transcript-store.js';
+
+// Re-exported so the meeting command's errors are all imported from here.
+export { UnusableMeetingNameError };
 
 /** Raised when the `.vtt` a user named is not there. */
 export class MeetingFileNotFoundError extends Error {
@@ -28,6 +31,7 @@ export class MeetingFileNotFoundError extends Error {
  *   is where transcripts live
  * @returns {Promise<{ transcript: ReturnType<typeof renderMeetingTranscript>, file: string }>}
  * @throws {MeetingFileNotFoundError} before anything is written
+ * @throws {UnusableMeetingNameError} before anything is written
  */
 export async function transcribeMeeting({ path: trackPath, layout }, { dir, now = () => new Date() } = {}) {
   let trackText;

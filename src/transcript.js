@@ -18,13 +18,28 @@ import { cleanTrack } from './clean.js';
 import { formatUploadDate, renderFrontmatter } from './frontmatter.js';
 import { cleanMeeting } from './meeting.js';
 import { YOUTUBE } from './site.js';
-import { MEETINGS_FOLDER, transcriptSlug } from './slug.js';
+import { MEETINGS_FOLDER, usableSlug } from './slug.js';
 
 /** What opens a turn's first paragraph: an em dash and a space (ADR-0007). */
 const TURN_DASH = '— ';
 
 /** The `.vtt` a meeting's title is the file name without. */
 const VTT_EXTENSION = /\.vtt$/i;
+
+/**
+ * Raised when a meeting's file name makes no usable slug (ADR-0011). A meeting
+ * has no fallback name, so it is refused, and the remedy is the user's: rename
+ * the file.
+ */
+export class UnusableMeetingNameError extends Error {
+  constructor(fileName) {
+    super(
+      `Cannot transcribe "${fileName}": its name has too few Latin or Greek letters to make a filename. Rename the file and try again.`,
+    );
+    this.name = 'UnusableMeetingNameError';
+    this.fileName = fileName;
+  }
+}
 
 /** A date in the machine's own calendar, as yt-dlp writes one: `20260915`. */
 function compactLocalDate(date) {
@@ -168,6 +183,9 @@ export function renderTranscript({
  * A meeting has no site, so nothing here is identified by one: the title is the
  * file name, the date is when the file was saved, there is no url and no
  * channel, and the track is recorded as auto because it is speech recognition.
+ * The slug is made from the title alone, Greek romanized (ADR-0011), so it does
+ * not move when the file is saved again; a title with no usable slug is refused
+ * with `UnusableMeetingNameError`, before anything is written.
  * Pure, as `renderTranscript` is: the caller reads the file and its mtime, and
  * passes `transcribedAt`, when the transcribing happened.
  *
@@ -177,6 +195,7 @@ export function renderTranscript({
  * @param {Date} input.modifiedAt the file's modification time
  * @param {'auto'|'prose'|'dialog'|'meeting'} [input.layout] the layout asked for
  * @param {Date} [input.transcribedAt]
+ * @throws {UnusableMeetingNameError} when the file name has no usable slug
  *
  * `collisionId` in the result is what a slug collision suffixes: a short hash
  * of the title, which differs exactly when the meetings do. `url` is
@@ -197,10 +216,14 @@ export function renderMeetingTranscript({
   layout: requestedLayout,
   transcribedAt = new Date(),
 }) {
-  const { layout, duration, turns } = cleanMeeting(trackText, { layout: requestedLayout });
   const title = fileName.replace(VTT_EXTENSION, '');
+  // First, so a refusal costs nothing: no fallback name stands in, because the
+  // date of a re-downloaded file would file the same meeting twice.
+  const slug = usableSlug(title);
+  if (slug === null) throw new UnusableMeetingNameError(fileName);
+
+  const { layout, duration, turns } = cleanMeeting(trackText, { layout: requestedLayout });
   const uploadDate = compactLocalDate(modifiedAt);
-  const slug = transcriptSlug(title, `meeting-${uploadDate}`);
 
   const frontmatter = renderFrontmatter({
     title,
