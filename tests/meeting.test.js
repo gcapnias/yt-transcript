@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { readFrontmatter } from '../src/catalog.js';
-import { renderMeetingTranscript } from '../src/transcript.js';
+import { renderMeetingTranscript, UnusableMeetingNameError } from '../src/transcript.js';
 import { body } from './inline-track.js';
 import { meetingTrack } from './meeting-track.js';
 
@@ -206,10 +206,35 @@ test('a repeated word is spoken twice, never a caption artifact', () => {
   assert.equal(body(render(track).contents), '— **Ana Lopez:** no no no no way\n');
 });
 
-test('the title falls back to a dated name when the file name has no Latin letters', () => {
-  const { slug } = render(meetingTrack(CUES), { fileName: 'Συνάντηση.vtt' });
+test('a Greek file name is romanized into the slug, whatever day the file was saved', () => {
+  // Built in local time, so the calendar day is the one written in every zone.
+  for (const modifiedAt of [new Date(2026, 8, 15, 12), new Date(2026, 9, 3, 12)]) {
+    const { slug, filename } = render(meetingTrack(CUES), { fileName: 'Συνάντηση.vtt', modifiedAt });
 
-  assert.equal(slug, 'meeting-20260915');
+    assert.equal(slug, 'synantisi');
+    assert.equal(filename, 'synantisi.md');
+  }
+});
+
+test('a meeting whose file name has no usable slug is refused, naming the file', () => {
+  for (const fileName of ['日本会議.vtt', '!!! ???.vtt', '日本会議 Q3.vtt']) {
+    assert.throws(
+      () => render(meetingTrack(CUES), { fileName }),
+      (error) => {
+        assert.ok(error instanceof UnusableMeetingNameError);
+        assert.equal(
+          error.message,
+          `Cannot transcribe "${fileName}": its name has too few Latin or Greek letters to make a filename. Rename the file and try again.`,
+        );
+        return true;
+      },
+      fileName,
+    );
+  }
+});
+
+test('a meeting name keeping half its letters is transcribed', () => {
+  assert.equal(render(meetingTrack(CUES), { fileName: '会議 Q3.vtt' }).slug, 'q3');
 });
 
 // ------------------------------------------------------------ several voices in one cue

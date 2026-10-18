@@ -28,6 +28,7 @@ export class MeetingFileNotFoundError extends Error {
  *   is where transcripts live
  * @returns {Promise<{ transcript: ReturnType<typeof renderMeetingTranscript>, file: string }>}
  * @throws {MeetingFileNotFoundError} before anything is written
+ * @throws {UnusableMeetingNameError} before anything is written
  */
 export async function transcribeMeeting({ path: trackPath, layout }, { dir, now = () => new Date() } = {}) {
   let trackText;
