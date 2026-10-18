@@ -7,8 +7,8 @@ import { body } from './inline-track.js';
 import { meetingTrack } from './meeting-track.js';
 
 const TRANSCRIBED_AT = new Date('2026-09-16T14:03:05.123Z');
-// Noon UTC, so the local date is the 15th in every time zone.
-const MODIFIED_AT = new Date('2026-09-15T12:00:00Z');
+// No `Z`: noon local time, so the local date is the 15th in every time zone.
+const MODIFIED_AT = new Date('2026-09-15T12:00:00');
 
 function render(trackText, overrides = {}) {
   return renderMeetingTranscript({
