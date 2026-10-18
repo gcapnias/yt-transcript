@@ -154,3 +154,186 @@ test('a byte-order marked transcript survives a different video of the same titl
     assert.match(await fs.readFile(path.join(dir, 'a-channel', 'a-talk.md'), 'utf8'), /first/);
   });
 });
+
+// A meeting has no url: its identity is its title, and it is filed in `meetings`.
+const meeting = (title, marker, { slug = 'weekly-sync', collisionId = 'abc12345', filename = `${slug}.md` } = {}) => ({
+  slug,
+  filename,
+  title,
+  isMeeting: true,
+  collisionId,
+  channelFolder: 'meetings',
+  contents: `---\ntitle: "${title}"\nchannel: ""\nlayout: meeting\n---\n\n${marker}\n`,
+});
+
+const read = (dir, relative) => fs.readFile(path.join(dir, relative), 'utf8');
+
+const put = async (dir, relative, contents) => {
+  await fs.mkdir(path.dirname(path.join(dir, relative)), { recursive: true });
+  await fs.writeFile(path.join(dir, relative), contents, 'utf8');
+};
+
+test('a meeting whose suffixed filename is held by another meeting goes to -2, and nothing is overwritten', async () => {
+  await withTempDir(async (dir) => {
+    // Reachable without any hash collision: the second title is the first's slug plus an id.
+    await writeTranscript(meeting('Weekly sync', 'one'), { dir });
+    await writeTranscript(meeting('Weekly sync-abc12345', 'two', { slug: 'weekly-sync-abc12345' }), { dir });
+    const file = await writeTranscript(meeting('Weekly Sync!', 'three'), { dir });
+
+    assert.equal(path.basename(file), 'weekly-sync-abc12345-2.md');
+    assert.deepEqual(await listing(dir), [
+      'meetings/weekly-sync-abc12345-2.md',
+      'meetings/weekly-sync-abc12345.md',
+      'meetings/weekly-sync.md',
+    ]);
+    assert.match(await read(dir, 'meetings/weekly-sync.md'), /one/);
+    assert.match(await read(dir, 'meetings/weekly-sync-abc12345.md'), /two/);
+    assert.match(await read(dir, 'meetings/weekly-sync-abc12345-2.md'), /three/);
+  });
+});
+
+test('a video whose suffixed filename is held by another video goes to -2, then -3', async () => {
+  await withTempDir(async (dir) => {
+    await writeTranscript(transcript('o3CX_Y59_74', 'a-talk', 'first'), { dir });
+    // A different video squats on the suffix the next one will want.
+    await put(dir, 'a-channel/a-talk-4JofSJIrjwU.md', transcript('zzzzzzzzzzz', 'a-talk', 'second').contents);
+
+    const second = await writeTranscript(transcript('4JofSJIrjwU', 'a-talk', 'third'), { dir });
+    assert.equal(path.basename(second), 'a-talk-4JofSJIrjwU-2.md');
+
+    await put(dir, 'a-channel/a-talk-4JofSJIrjwU-2.md', transcript('yyyyyyyyyyy', 'a-talk', 'squatter').contents);
+    const next = await writeTranscript(transcript('4JofSJIrjwU', 'a-talk', 'fifth'), { dir });
+    assert.equal(path.basename(next), 'a-talk-4JofSJIrjwU-3.md');
+    assert.match(await read(dir, 'a-channel/a-talk-4JofSJIrjwU.md'), /second/);
+    assert.match(await read(dir, 'a-channel/a-talk-4JofSJIrjwU-2.md'), /squatter/);
+  });
+});
+
+test('a transcript already at a suffixed or numbered filename is overwritten there, with no new file', async () => {
+  await withTempDir(async (dir) => {
+    await writeTranscript(meeting('Weekly sync', 'one'), { dir });
+    await writeTranscript(meeting('Weekly sync-abc12345', 'two', { slug: 'weekly-sync-abc12345' }), { dir });
+    const first = await writeTranscript(meeting('Weekly Sync!', 'three'), { dir });
+    const again = await writeTranscript(meeting('Weekly Sync!', 'four'), { dir });
+
+    assert.equal(again, first);
+    assert.equal((await listing(dir)).length, 3);
+    assert.match(await read(dir, 'meetings/weekly-sync-abc12345-2.md'), /four/);
+
+    // And at the plain suffixed step, for a video.
+    await writeTranscript(transcript('o3CX_Y59_74', 'a-talk', 'v1'), { dir });
+    const suffixed = await writeTranscript(transcript('4JofSJIrjwU', 'a-talk', 'v2'), { dir });
+    const rewritten = await writeTranscript(transcript('4JofSJIrjwU', 'a-talk', 'v3'), { dir });
+    assert.equal(rewritten, suffixed);
+    assert.deepEqual((await listing(dir)).filter((f) => f.startsWith('a-channel/')), [
+      'a-channel/a-talk-4JofSJIrjwU.md',
+      'a-channel/a-talk.md',
+    ]);
+  });
+});
+
+test('a video never overwrites a meeting, even in a folder named meetings', async () => {
+  await withTempDir(async (dir) => {
+    await writeTranscript(meeting('Weekly sync', 'the meeting'), { dir });
+
+    const file = await writeTranscript(transcript('o3CX_Y59_74', 'weekly-sync', 'the video', 'meetings'), { dir });
+
+    assert.equal(path.basename(file), 'weekly-sync-o3CX_Y59_74.md');
+    assert.match(await read(dir, 'meetings/weekly-sync.md'), /the meeting/);
+    assert.match(await read(dir, 'meetings/weekly-sync-o3CX_Y59_74.md'), /the video/);
+  });
+});
+
+test('a file whose frontmatter cannot be read is overwritten, at the base and at a suffixed step', async () => {
+  await withTempDir(async (dir) => {
+    await put(dir, 'a-channel/a-talk.md', 'no frontmatter at all\n');
+    const base = await writeTranscript(transcript('o3CX_Y59_74', 'a-talk', 'first'), { dir });
+    assert.equal(path.basename(base), 'a-talk.md');
+    assert.match(await read(dir, 'a-channel/a-talk.md'), /first/);
+
+    // Base held by another video, the suffixed step held by an unclosed block.
+    await put(dir, 'a-channel/a-talk-4JofSJIrjwU.md', '---\ntitle: "never closed"\n\nprose\n');
+    const suffixed = await writeTranscript(transcript('4JofSJIrjwU', 'a-talk', 'second'), { dir });
+    assert.equal(path.basename(suffixed), 'a-talk-4JofSJIrjwU.md');
+    assert.match(await read(dir, 'a-channel/a-talk-4JofSJIrjwU.md'), /second/);
+    assert.deepEqual(await listing(dir), ['a-channel/a-talk-4JofSJIrjwU.md', 'a-channel/a-talk.md']);
+  });
+});
+
+test('a parsed file with no url, outside meetings, is overwritten by an incoming video', async () => {
+  await withTempDir(async (dir) => {
+    // An incomplete video transcript: the catalog flags it for re-download.
+    await put(dir, 'a-channel/a-talk.md', '---\ntitle: "A talk"\n---\n\nbroken\n');
+
+    const file = await writeTranscript(transcript('o3CX_Y59_74', 'a-talk', 'repaired'), { dir });
+
+    assert.equal(path.basename(file), 'a-talk.md');
+    assert.deepEqual(await listing(dir), ['a-channel/a-talk.md']);
+    assert.match(await read(dir, 'a-channel/a-talk.md'), /repaired/);
+  });
+});
+
+test('an incoming meeting overwrites a file with no identity at its base filename', async () => {
+  await withTempDir(async (dir) => {
+    await put(dir, 'meetings/weekly-sync.md', 'not a transcript\n');
+
+    const file = await writeTranscript(meeting('Weekly sync', 'fresh'), { dir });
+
+    assert.equal(path.basename(file), 'weekly-sync.md');
+    assert.deepEqual(await listing(dir), ['meetings/weekly-sync.md']);
+    assert.match(await read(dir, 'meetings/weekly-sync.md'), /fresh/);
+  });
+});
+
+test('writing a meeting again leaves one file with its title, when only a suffixed copy existed', async () => {
+  await withTempDir(async (dir) => {
+    await put(dir, 'meetings/x-abc12345.md', meeting('X', 'old', { slug: 'x' }).contents);
+
+    const file = await writeTranscript(meeting('X', 'new', { slug: 'x' }), { dir });
+
+    assert.equal(path.basename(file), 'x.md');
+    assert.deepEqual(await listing(dir), ['meetings/x.md']);
+    assert.match(await read(dir, 'meetings/x.md'), /new/);
+  });
+});
+
+test('a same-title meeting at an unrelated filename is removed when the meeting is written', async () => {
+  await withTempDir(async (dir) => {
+    await put(dir, 'meetings/meeting-20260915.md', meeting('Συνάντηση', 'legacy').contents);
+
+    await writeTranscript(meeting('Συνάντηση', 'current', { slug: 'synantisi' }), { dir });
+
+    assert.deepEqual(await listing(dir), ['meetings/synantisi.md']);
+  });
+});
+
+test('writing a meeting never removes a video in meetings, or a meeting with another title', async () => {
+  await withTempDir(async (dir) => {
+    const titled = (id, slug, folder) =>
+      transcript(id, slug, 'video', folder).contents.replace('"A talk"', '"Weekly sync"');
+    await put(dir, 'meetings/weekly-chat.md', titled('o3CX_Y59_74', 'weekly-chat', 'meetings'));
+    await put(dir, 'meetings/other.md', meeting('Other', 'other').contents);
+    await put(dir, 'a-channel/elsewhere.md', titled('4JofSJIrjwU', 'elsewhere', 'a-channel'));
+
+    await writeTranscript(meeting('Weekly sync', 'mine'), { dir });
+
+    assert.deepEqual(await listing(dir), [
+      'a-channel/elsewhere.md',
+      'meetings/other.md',
+      'meetings/weekly-chat.md',
+      'meetings/weekly-sync.md',
+    ]);
+  });
+});
+
+test('a failed write removes no other copy of a meeting', async () => {
+  await withTempDir(async (dir) => {
+    await put(dir, 'meetings/x-abc12345.md', meeting('X', 'old', { slug: 'x' }).contents);
+    // The target filename is a directory: the write cannot happen.
+    await fs.mkdir(path.join(dir, 'meetings', 'x.md'));
+
+    await assert.rejects(writeTranscript(meeting('X', 'new', { slug: 'x' }), { dir }));
+
+    assert.match(await read(dir, 'meetings/x-abc12345.md'), /old/);
+  });
+});
