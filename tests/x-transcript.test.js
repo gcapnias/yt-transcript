@@ -189,6 +189,28 @@ test('the slug comes from the title, and falls back to the lowercased handle and
   assert.equal(render(weidel, { videoNumber: 2 }).slug, 'alice_weidel-1877462752526053592-2');
 });
 
+test('a Greek post text is romanized into the slug', () => {
+  const greek = {
+    ...recorded('kw5hine-2106578219269005639'),
+    description: 'Συνάντηση ομάδας https://t.co/cTiQ5Oo5WA',
+    uploaderId: 'Alice_Weidel',
+    displayId: '1877462752526053592',
+  };
+
+  assert.equal(render(greek).slug, 'synantisi-omadas');
+});
+
+test('a Greek post text is romanized into the slug', () => {
+  const greek = {
+    ...recorded('kw5hine-2106578219269005639'),
+    description: 'Συνάντηση ομάδας https://t.co/cTiQ5Oo5WA',
+    uploaderId: 'Alice_Weidel',
+    displayId: '1877462752526053592',
+  };
+
+  assert.equal(render(greek).slug, 'synantisi-omadas');
+});
+
 test('a post with no text is titled by its handle and id, and filed under them', () => {
   const empty = {
     ...recorded('kw5hine-2106578219269005639'),
