@@ -46,7 +46,7 @@ function frontmatter(transcript) {
   );
 }
 
-test('a post transcript has the seven keys, built from what yt-dlp reported', () => {
+test('a post transcript has the settled keys, built from what yt-dlp reported', () => {
   const transcript = render(recorded('poteto-2102050467505430555'));
   const fields = frontmatter(transcript);
 
@@ -58,6 +58,7 @@ test('a post transcript has the seven keys, built from what yt-dlp reported', ()
     'upload_date',
     'fetched',
     'subtitles',
+    'layout',
   ]);
   assert.equal(fields.url, 'https://x.com/i/status/2102050467505430555');
   assert.equal(fields.channel, '"lauren (@poteto)"');
@@ -188,6 +189,17 @@ test('the slug comes from the title, and falls back to the lowercased handle and
   assert.equal(render(weidel, { videoNumber: 2 }).slug, 'alice_weidel-1877462752526053592-2');
 });
 
+test('a Greek post text is romanized into the slug', () => {
+  const greek = {
+    ...recorded('kw5hine-2106578219269005639'),
+    description: 'Συνάντηση ομάδας https://t.co/cTiQ5Oo5WA',
+    uploaderId: 'Sample_Poster',
+    displayId: '1877462752526053592',
+  };
+
+  assert.equal(render(greek).slug, 'synantisi-omadas');
+});
+
 test('a post with no text is titled by its handle and id, and filed under them', () => {
   const empty = {
     ...recorded('kw5hine-2106578219269005639'),
@@ -214,8 +226,11 @@ test('a quote post is the quoting post, from its own first video', () => {
 
 test('the catalog lists a post transcript with no change of its own', () => {
   const transcript = render(recorded('poteto-2102050467505430555'));
-  const { markdown, warnings } = renderCatalog([{ path: transcript.filename, text: transcript.contents }]);
+  assert.equal(transcript.channelFolder, 'poteto');
+  const { markdown, warnings } = renderCatalog([
+    { path: `${transcript.channelFolder}/${transcript.filename}`, text: transcript.contents },
+  ]);
 
   assert.deepEqual(warnings, []);
-  assert.match(markdown, /\(heres-how-i-shipped-2-500-prs[^)]*\.md\) \| lauren \(@poteto\) \| 38:01 \| 2026-09-21 \| auto \|/);
+  assert.match(markdown, /\(poteto\/heres-how-i-shipped-2-500-prs[^)]*\.md\) \| lauren \(@poteto\) \| 38:01 \| 2026-09-21 \| auto \|/);
 });

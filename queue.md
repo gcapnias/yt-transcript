@@ -2,10 +2,7 @@
 
 ## YouTube Videos
 
-<https://www.youtube.com/watch?v=n-ETaiZvHns>
-<https://www.youtube.com/watch?v=QsU0f-547rQ>
-<https://www.youtube.com/watch?v=3fdb_giOrLo>
-<https://www.youtube.com/watch?v=QDJ0CW5s7gA>
+-
 
 ## GitHub Repositories
 

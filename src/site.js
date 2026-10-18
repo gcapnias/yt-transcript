@@ -7,11 +7,11 @@
  * render are handed a site and ask it; none of them asks which site it has.
  *
  * Everything after the subtitle track is downloaded is the same for both:
- * cleaning, the frontmatter's seven keys, the store and the catalog.
+ * cleaning, the frontmatter's keys, the store and the catalog.
  */
 
 import { classifyFetch, classifyPostFetch } from './fetch-outcome.js';
-import { transcriptSlug } from './slug.js';
+import { channelFolder, transcriptSlug } from './slug.js';
 import { postIdentity } from './x-post.js';
 
 /**
@@ -24,14 +24,14 @@ import { postIdentity } from './x-post.js';
  * @property {(fetched: { metadata: object|null, url: string, videoId: string|null,
  *             trackKind: 'auto'|'manual', videoNumber?: number })
  *             => { url: string, collisionId: string,
- *             title: string, channel: string, trackKind: 'auto'|'manual',
- *             slug: string }} identify
+ *             title: string, channel: string, channelFolder: string,
+ *             trackKind: 'auto'|'manual', slug: string }} identify
  */
 
 /** @type {Site} */
 export const YOUTUBE = {
   name: 'youtube',
-  printFields: 'title,channel,duration_string,upload_date',
+  printFields: 'title,channel,uploader_id,channel_id,duration_string,upload_date',
   extraArgs: [],
   // Exit code and track, and stderr only after exit 0 with no track, for the
   // warning a refused subtitle download leaves (`classifyFetch`, ADR-0006).
@@ -43,6 +43,7 @@ export const YOUTUBE = {
       collisionId: videoId,
       title,
       channel: metadata?.channel ?? '',
+      channelFolder: channelFolder({ handle: metadata?.uploaderId, channelId: metadata?.channelId }),
       trackKind,
       slug: transcriptSlug(title, videoId),
     };
@@ -56,10 +57,11 @@ export const YOUTUBE = {
  * id, the one field that tells a post's videos apart; `playlist_index` ranks
  * the video, and is reported only when the whole post was fetched. `title`'s
  * rank suffix says whether the post has more than one video (`reportedRank`).
- * `channel` is absent on X, so it is not asked for.
+ * `channel` is absent on X, so it is not asked for. `channel_id` is the numeric
+ * account id, the channel folder's fallback.
  */
 const POST_FIELDS =
-  'id,title,description,uploader,uploader_id,display_id,playlist_index,extractor_key,webpage_url,' +
+  'id,title,description,uploader,uploader_id,channel_id,display_id,playlist_index,extractor_key,webpage_url,' +
   'duration_string,upload_date';
 
 /**

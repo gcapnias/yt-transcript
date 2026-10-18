@@ -1,16 +1,25 @@
 # yt-transcript
 
-Turns videos on YouTube and X into Markdown transcripts that read as prose, for use as
-agent input or reference material. It produces transcripts, never summaries.
+Turns videos on YouTube and X into Markdown transcripts that read as prose or as
+dialog, for use as agent input or reference material. It produces transcripts, never
+summaries.
 
-Each fetch downloads a subtitle track, cleans it into paragraphs, and writes one
-Markdown file under `transcripts/` with frontmatter describing the video. A catalog
-at `transcripts/README.md` lists every transcript on disk, derived from their
-frontmatter so it cannot drift from what is there.
+Each fetch downloads a subtitle track, cleans it into paragraphs or, for a
+multi-speaker track, turns, and writes one Markdown file with frontmatter describing
+the video, filed in a folder per channel:
+`transcripts/<channel folder>/<slug>.md`. The folder is the channel's handle in
+kebab-case (`@iamseankochel` on YouTube becomes `iamseankochel/`), with Greek
+letters romanized, falling back to its
+channel id, or to `unknown-channel/`; the same handle on YouTube and X is one folder
+(see [ADR-0008](docs/adr/0008-transcripts-are-filed-by-channel-handle.md)). Fetching a
+video again removes any older transcript of it elsewhere, so a renamed channel or a
+retitled video moves rather than duplicates. A catalog at `transcripts/README.md`
+lists every transcript on disk, derived from their frontmatter so it cannot drift
+from what is there; it warns about any transcript left outside a channel folder.
 
 ## Prerequisites
 
-- **Node `>=22.18.0 <23 || >=24.2.0`** — versions where `import.meta.main` exists; see [#2](https://github.com/gcapnias/yt-transcript/issues/2)
+- **Node `>=22.18.0 <23 || >=24.2.0`** — versions where `import.meta.main` exists; see [#2](https://github.com/gcapnias/yt-transcript/issues/2). Needed only to run from source, not for the [standalone executable](#standalone-executable)
 - **`yt-dlp`** on `PATH` — every fetch is a `yt-dlp` spawn; nothing is bundled
 
 ## Usage
@@ -68,7 +77,7 @@ fragment is ignored.
   fetch fails and nothing is written. A transcript written by v0.2.0 has the handle in
   its `url`, so fetching that post again writes a second file. `title` is the post
   text with links removed, `channel` is `Display Name (@handle)`, and `subtitles` is
-  always `auto`: X's tracks are speech recognition. When the post text is too short or not Latin to make a slug, the file
+  always `auto`: X's tracks are speech recognition. When the post text is too short, or neither Latin nor Greek, to make a slug, the file
   is named `<handle>-<post id>.md`, lowercased.
 - **Refused or failed with a message, never retried:** X Broadcasts and Spaces
   (`/i/broadcasts/…`, `/i/events/…`, `/i/spaces/…`), which carry no subtitles; a post
@@ -103,11 +112,76 @@ back to `.gitignore` to decide what to ship.
 
 Both forms need `yt-dlp` on `PATH`; npx does not bundle it.
 
+## Standalone executable
+
+Build a single executable from the same source, to drop on a `PATH` or hand to someone
+without a clone:
+
+```bash
+npm run build
+```
+
+The binary lands in `dist/` as `yt-transcript.exe` on Windows and `yt-transcript`
+elsewhere, built for the machine that runs the build. It runs exactly like `npx .`:
+same arguments, flags, output, exit codes and files, relative to the directory it is
+run from.
+
+```bash
+dist/yt-transcript o3CX_Y59_74
+```
+
+Like `npx .`, it needs `yt-dlp` on `PATH` to fetch videos, but it does not need Node,
+whose version requirement applies only to running from source. [Bun](https://bun.sh)
+is needed only to build it (tested with Bun 1.4.3), and the binary is large, about
+96 MB, because it embeds Bun's runtime. Running the source under Bun is not supported.
+
+## Meetings
+
+A path ending in `.vtt` is a meeting, such as a Microsoft Teams transcript export:
+
+```bash
+yt-transcript path/to/meeting.vtt
+```
+
+It is transcribed from the file, with no download, so `yt-dlp` is not needed. The
+transcript is filed in `transcripts/meetings/` and listed in the catalog. Each
+cue's speaker is read from its `<v Name>` voice tag, the parts of one utterance
+(`<uuid>/<utterance>-<part>` cue ids) are rejoined even when other speakers' cues
+sit between them, and consecutive utterances by one speaker form one turn, written
+`— **Name:** text`. A cue with no voice tag is an unnamed turn. A `.vtt` that names
+no speakers is laid out as an unnamed dialog. Nothing is deduplicated, and every
+word in the cues is in the transcript. In this layout `;` counts as a sentence end
+for paragraph breaks, because Teams writes the Greek question mark that way.
+`--layout prose` drops the names. `--lang`, `--playlist` and `--force` are ignored.
+
+The file name, without `.vtt`, is the meeting's identity: transcribing the same file
+again replaces its transcript. Its slug is made from that name, with Greek romanized
+(`Συνάντηση.vtt` becomes `synantisi.md`); a file whose name has too few Latin or
+Greek letters to make a slug is refused, and must be renamed (see
+[ADR-0011](docs/adr/0011-greek-titles-are-romanized-by-iso-843.md)).
+
+The frontmatter has no `url`: `title` is the file name without `.vtt`, `channel` is
+empty, `duration` is the latest cue end, `upload_date` is the file's modification
+date, and `subtitles` is `auto`. Speaker names are written exactly as in the file;
+see [ADR-0010](docs/adr/0010-meetings-are-transcribed-into-a-meeting-layout.md).
+
 ## Flags
 
-- `--lang <code>` — subtitle language. Default `en`, which accepts `en`, `en-US` or
-  `en-GB`: a manual track is preferred over an auto one, then the variants in that
-  order. Any other code, `en-US` included, is matched exactly.
+- `--lang <code>` — subtitle language. Default `en`, which accepts `en`,
+  `en-orig`, `en-US`, `en-GB` or a named track (`en-` plus an 11-character id,
+  such as `en-JkeT_87f4cc` for a live recording's `English - DTVCC1`): a manual
+  track is preferred over an auto one, then the variants in that order, named
+  tracks last. When a manual or named track loses, a single-video fetch names
+  it and the `--lang` that selects it. Any other code, `en-US` included, is
+  matched exactly.
+- `--layout auto|prose|dialog|meeting` — `meeting` is for a `.vtt` only (see
+  Meetings); for a URL, default `auto`: a track whose speaker changes
+  (`>>` on auto and named tracks, `- ` on other manual ones) give it 10 or more
+  turns becomes a dialog, each turn opening with `— `; speech before the first
+  change counts as a turn. Any other track is prose. `prose` and `dialog` force
+  one, in a batch for every video; `dialog` on a track with no speaker changes
+  gives one turn and a warning. The layout used is recorded as `layout:` in the
+  frontmatter.
 - `--playlist` — read a `watch?v=...&list=...` URL as the playlist rather than the
   single video. A bare playlist or channel URL expands without it.
 - `--force` — in a batch, ignore the skip set and re-fetch everything. A single

@@ -11,9 +11,11 @@
  */
 
 import fs from 'node:fs/promises';
+import path from 'node:path';
 
 import { describeFailure, UNLISTED_VIDEO, withRateLimitRetries } from './fetch-outcome.js';
 import { xPost, YOUTUBE } from './site.js';
+import { trackKeyFromFileName } from './subtitle-track.js';
 import { withTempDir } from './temp-dir.js';
 import { renderTranscript } from './transcript.js';
 import { writeTranscript } from './transcript-store.js';
@@ -35,14 +37,17 @@ import { FetchError, fetchSubtitleTrack, listPostVideos } from './ytdlp.js';
  * turned into the site every layer below asks (see `site.js`).
  *
  * @param {{ url: string, videoId: string|null, post?: { videoNumber: number },
- *           lang?: string }} video
+ *           lang?: string, layout?: 'auto'|'prose'|'dialog' }} video
  * @param {{ fetchTrack?: Function, listVideos?: Function, write?: Function, dir?: string,
  *           sleep?: (ms: number) => Promise<void>, delays?: number[],
  *           onRetry?: Function }} [deps]
- * @returns {Promise<{ transcript: object, file: string }>}
+ * @returns {Promise<{ transcript: object, file: string,
+ *                     passedOver: import('./ytdlp.js').PassedOverTrack[] }>}
+ *   `passedOver` is the tracks that lost to the one used, as `findSubtitleTrack`
+ *   lists them, for a single-video fetch to name
  * @throws {FetchError} carrying `failure` and `retryable`
  */
-export async function fetchTranscript({ url, videoId, post, lang = 'en' }, deps = {}) {
+export async function fetchTranscript({ url, videoId, post, lang = 'en', layout }, deps = {}) {
   // `fetchTrack` downloads the subtitle track; a *fetch*, in this codebase's
   // vocabulary, is the whole operation this function performs.
   const {
@@ -56,27 +61,32 @@ export async function fetchTranscript({ url, videoId, post, lang = 'en' }, deps 
   } = deps;
   const site = post ? xPost() : YOUTUBE;
 
-  const transcript = await withRateLimitRetries(
+  const { transcript, passedOver } = await withRateLimitRetries(
     () =>
       withTempDir(async (destDir) => {
-        const { metadata, trackPath } = await fetchTrack({ url, lang, destDir, site });
+        const fetched = await fetchTrack({ url, lang, destDir, site });
+        const { metadata, trackPath, passedOver = [] } = fetched;
         const videoNumber = post ? await postVideoNumber({ metadata, url, lang, listVideos }) : undefined;
 
         // Rendered before the directory goes: only the transcript leaves it.
-        return renderTranscript({
+        const transcript = renderTranscript({
           trackText: await fs.readFile(trackPath, 'utf8'),
           url,
           videoId,
           site,
           metadata,
           videoNumber,
+          // The key is what tells a named track, whatever it was asked for by.
+          trackKey: trackKeyFromFileName(path.basename(trackPath)),
+          layout,
         });
+        return { transcript, passedOver };
       }),
     { sleep, delays, onRetry },
   );
 
   const file = await write(transcript, { dir });
-  return { transcript, file };
+  return { transcript, file, passedOver };
 }
 
 /**

@@ -1,12 +1,15 @@
 import { describeBatch, runBatch } from './batch.js';
 import { planBatch } from './batch-plan.js';
 import { readExistingUrls, rebuildCatalog } from './catalog-store.js';
+import { LAYOUTS } from './clean.js';
 import { fetchTranscript } from './fetch.js';
 import { describeRetry } from './fetch-outcome.js';
 import { parseTarget, TargetParseError } from './target.js';
+import { MeetingFileNotFoundError, transcribeMeeting, UnusableMeetingNameError } from './transcribe.js';
 import { preflight, expandPlaylist, ExpansionError, FetchError, YtDlpMissingError } from './ytdlp.js';
 
-const USAGE = `Usage: yt-transcript <url|id> [--lang <code>] [--playlist] [--force]
+const USAGE = `Usage: yt-transcript <url|id|file.vtt> [--lang <code>]
+                     [--layout auto|prose|dialog|meeting] [--playlist] [--force]
        yt-transcript catalog
 
   <url|id>      a YouTube video URL, a bare video id, a youtu.be or /shorts
@@ -15,9 +18,22 @@ const USAGE = `Usage: yt-transcript <url|id> [--lang <code>] [--playlist] [--for
                 /i/status/<id>, or a t.co link), which fetches one video:
                 its first, or the media item a trailing /video/N or
                 /photo/N selects
-  --lang <code> subtitle language (default: en). en accepts en, en-US or
-                en-GB, preferring a manual track, then that order; any
+  <file.vtt>    a meeting's local .vtt file, such as a Microsoft Teams
+                transcript export, instead of a URL. It is transcribed with
+                no download, into transcripts/meetings, as a meeting: turns
+                named by speaker (— **Name:** text). A file that names no
+                speakers is a dialog. --lang, --playlist and --force are
+                ignored
+  --lang <code> subtitle language (default: en). en accepts en, en-orig,
+                en-US, en-GB or a named track (en-JkeT_87f4cc), preferring
+                a manual track, then that order, named tracks last; any
                 other code is matched exactly
+  --layout <l>  auto|prose|dialog|meeting (default: auto). auto lays a track
+                out as a dialog, one turn per speaker change, when it has 10
+                or more turns, and as prose otherwise. prose and dialog force
+                one; in a batch it applies to every video. meeting is for a
+                .vtt file only, and is what auto picks for one that names
+                speakers; prose drops the names
   --playlist    read a watch?v=...&list=... URL as the playlist, not the video
   --force       in a batch, ignore the skip set and re-fetch everything. A
                 single video is re-fetched either way.
@@ -38,7 +54,7 @@ const CATALOG_COMMAND = 'catalog';
  * unknown flag is a usage error rather than something passed on to `yt-dlp`.
  */
 export function parseArgs(argv) {
-  const options = { target: null, lang: 'en', playlist: false, force: false };
+  const options = { target: null, lang: 'en', layout: 'auto', playlist: false, force: false };
 
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
@@ -46,6 +62,13 @@ export function parseArgs(argv) {
       const value = argv[index + 1];
       if (!value || value.startsWith('-')) throw new UsageError('--lang needs a language code.');
       options.lang = value;
+      index += 1;
+    } else if (arg === '--layout') {
+      const value = argv[index + 1];
+      if (!LAYOUTS.includes(value)) {
+        throw new UsageError(`--layout needs one of ${LAYOUTS.join(', ')}.`);
+      }
+      options.layout = value;
       index += 1;
     } else if (arg === '--playlist') {
       options.playlist = true;
@@ -95,6 +118,7 @@ export async function main(argv, io = {}, deps = {}) {
   const rebuild = deps.rebuildCatalog ?? rebuildCatalog;
   const expand = deps.expandPlaylist ?? expandPlaylist;
   const readUrls = deps.readExistingUrls ?? readExistingUrls;
+  const transcribe = deps.transcribeMeeting ?? transcribeMeeting;
 
   if (argv[0] === CATALOG_COMMAND) {
     if (argv.length > 1) {
@@ -132,6 +156,18 @@ export async function main(argv, io = {}, deps = {}) {
     return 1;
   }
 
+  // A meeting is transcribed from the file and goes no further: no preflight,
+  // no yt-dlp and no network (ADR-0010). `--lang`, `--playlist` and `--force`
+  // mean nothing to it and are ignored.
+  if (target.kind === 'file') {
+    return meeting({ target, options, io: { out, err }, deps: { transcribe, rebuild } });
+  }
+
+  if (options.layout === 'meeting') {
+    err('--layout meeting only applies to a meeting: give a .vtt file.');
+    return 1;
+  }
+
   try {
     await checkYtDlp();
   } catch (error) {
@@ -159,40 +195,18 @@ export async function main(argv, io = {}, deps = {}) {
     // An X post has no video id and its identity is only known after the fetch
     // (ADR-0004); it is fetched by the url it was typed as, and the video
     // number it chose.
-    const { transcript, file } = await fetchOne(
+    const { transcript, file, passedOver } = await fetchOne(
       {
         url: target.url,
         videoId: target.videoId,
         ...(target.kind === 'post' && { post: { videoNumber: target.videoNumber } }),
         lang: options.lang,
+        layout: options.layout,
       },
       { onRetry: (retry) => err(describeRetry({ url: target.url, ...retry })) },
     );
 
-    report(out, transcript, file);
-
-    // The rebuild is a full rescan rather than an appended row, so it runs
-    // after the write and reflects the whole directory. A batch (ytdlp-xmu.6)
-    // calls `rebuildCatalog` once at its end instead of once per video.
-    try {
-      const { warnings } = await rebuild();
-      for (const warning of warnings) err(warning);
-    } catch (error) {
-      // The spec does not cover a rebuild that fails on I/O, so this is a
-      // reading rather than a rule: the rebuild is a *required* trigger, not a
-      // nicety, and a command with two required effects that manages one has
-      // not succeeded. Exit 1 covering several conditions distinguished only
-      // by the message is already this tool's shape — rate-limited and
-      // permanently unfetchable share it too.
-      //
-      // The transcript is written and already reported. Losing that fact in a
-      // stack trace would be the worse failure, so name both and say what
-      // fixes it.
-      reportRebuildFailure(err, error, 'The transcript was written');
-      return 1;
-    }
-
-    return 0;
+    return await finishOne({ transcript, file, passedOver, io: { out, err }, rebuild });
   } catch (error) {
     // Rate-limited and permanently unfetchable share exit 1. There is no
     // second exit code: the two are the same observable, and inventing a code
@@ -214,12 +228,24 @@ export async function main(argv, io = {}, deps = {}) {
  * step with the first. A field the metadata did not carry is left out rather
  * than printed empty or as a placeholder.
  *
- * Single-video only. A batch reports per-video progress and a roll-call
- * instead, and a block per video would bury both.
+ * The line after the track kind names the manual and named tracks that lost
+ * to the one used, so a person who wanted one can say which (ADR-0009). It is
+ * absent when none did.
+ *
+ * The one renderer for single-video, meeting and batch fetches; a second copy
+ * would drift.
+ *
+ * @param {import('./ytdlp.js').PassedOverTrack[]} [passedOver]
  */
-function report(out, transcript, file) {
+function report(out, transcript, file, passedOver = []) {
   out(file);
-  out(`  ${transcript.url}  (${transcript.trackKind} subtitle track)`);
+  // A meeting has no url, so its line opens with the layout instead of one.
+  const subject = transcript.isMeeting ? `${transcript.layout} layout` : transcript.url;
+  out(`  ${subject}  (${transcript.trackKind} subtitle track)`);
+  if (passedOver.length > 0) {
+    const tracks = passedOver.map(({ kind, key }) => `${kind} ${key}`).join(', ');
+    out(`  also on this video: ${tracks}; re-run with --lang <key> to use one`);
+  }
 
   const fields = Object.entries(transcript.video ?? {}).filter(([, value]) => value);
   // Aligned on the longest label present, so the column is never a constant
@@ -243,6 +269,62 @@ function report(out, transcript, file) {
 function reportRebuildFailure(err, error, written) {
   err(`${written}, but the catalog could not be rebuilt: ${error.message}`);
   err('Run `yt-transcript catalog` to rebuild it.');
+}
+
+/**
+ * What follows a single written transcript, a video's or a meeting's: report
+ * it, pass on its warnings, and rebuild the catalog.
+ *
+ * The rebuild is a full rescan rather than an appended row, so it runs after
+ * the write and reflects the whole directory. A batch (ytdlp-xmu.6) calls
+ * `rebuildCatalog` once at its end instead of once per video.
+ *
+ * @returns {Promise<number>} the process exit code
+ */
+async function finishOne({ transcript, file, passedOver, io: { out, err }, rebuild }) {
+  report(out, transcript, file, passedOver);
+  for (const warning of transcript.warnings ?? []) err(warning);
+
+  try {
+    const { warnings } = await rebuild();
+    for (const warning of warnings) err(warning);
+  } catch (error) {
+    // The spec does not cover a rebuild that fails on I/O, so this is a
+    // reading rather than a rule: the rebuild is a *required* trigger, not a
+    // nicety, and a command with two required effects that manages one has
+    // not succeeded. Exit 1 covering several conditions distinguished only
+    // by the message is already this tool's shape — rate-limited and
+    // permanently unfetchable share it too.
+    //
+    // The transcript is written and already reported. Losing that fact in a
+    // stack trace would be the worse failure, so name both and say what
+    // fixes it.
+    reportRebuildFailure(err, error, 'The transcript was written');
+    return 1;
+  }
+
+  return 0;
+}
+
+/**
+ * The meeting command: read the `.vtt`, write the transcript, then the same
+ * two required effects as a single fetch (see `finishOne`).
+ *
+ * @returns {Promise<number>} the process exit code
+ */
+async function meeting({ target, options, io, deps: { transcribe, rebuild } }) {
+  let result;
+  try {
+    result = await transcribe({ path: target.path, layout: options.layout });
+  } catch (error) {
+    // Both are the user's to fix and both happen before anything is written,
+    // so neither rebuilds the catalog.
+    if (!(error instanceof MeetingFileNotFoundError || error instanceof UnusableMeetingNameError)) throw error;
+    io.err(error.message);
+    return 1;
+  }
+
+  return finishOne({ ...result, io, rebuild });
 }
 
 /**
@@ -281,7 +363,15 @@ async function batch({ target, options, io: { out, err }, deps }) {
   const { fetched, failures } = await runBatch(toFetch, {
     fetchOne,
     lang: options.lang,
+    layout: options.layout,
     sleep,
+    // The block of each video that was written goes to stdout under its
+    // progress line, so a long batch still says what each video was and where
+    // it landed. Failures, warnings and retries stay on stderr, so `2>/dev/null`
+    // leaves a clean record of what was written and `2>&1` interleaves the
+    // failures in as they happen. A video's warnings follow its block.
+    onFetched: ({ transcript, file, passedOver }) => report(out, transcript, file, passedOver),
+    onWarning: (warning) => err(warning),
     onProgress: ({ url, position, total }) => out(`[${position}/${total}] ${url}`),
     onRetry: (retry) => err(describeRetry(retry)),
     // In full, exactly as the single-video path reports it: the wording is

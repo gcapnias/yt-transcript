@@ -1,45 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { renderTranscript } from '../src/transcript.js';
-import { readFixture } from './fixtures.js';
-
-const METADATA = {
-  title: 'OpenAI Codex Crash Course – Build & Deploy Apps with Autonomous AI',
-  channel: 'freeCodeCamp.org',
-  duration: '41:18',
-  uploadDate: '20260910',
-};
-
-const FETCHED_AT = new Date('2026-09-16T14:03:05.123Z');
-
-/**
- * Builds a subtitle track from cue texts. `auto` decides which track kind the
- * classifier will read out of the body, using the same two signals a real
- * track carries: `<c>` word-timing tags and `align:start position:0%`.
- */
-function track(cueTexts, { auto = false } = {}) {
-  const stamp = (n) => `00:00:${String(n).padStart(2, '0')}.000`;
-  const settings = auto ? ' align:start position:0%' : '';
-  const cues = cueTexts.map((text, index) => {
-    const body = auto ? text.replace(/(\s)(\S+)$/, '$1<00:00:00.500><c>$2</c>') : text;
-    return `${stamp(index)} --> ${stamp(index + 1)}${settings}\n${body}`;
-  });
-  return `WEBVTT\nKind: captions\nLanguage: en\n\n${cues.join('\n\n')}\n`;
-}
-
-function render(trackText, overrides = {}) {
-  return renderTranscript({
-    trackText,
-    url: 'https://www.youtube.com/watch?v=o3CX_Y59_74',
-    videoId: 'o3CX_Y59_74',
-    metadata: METADATA,
-    fetchedAt: FETCHED_AT,
-    ...overrides,
-  });
-}
-
-const body = (contents) => contents.split(/\n---\n\n/)[1];
+import { readFixture, readNamedFixture } from './fixtures.js';
+import { body, METADATA, render, track } from './inline-track.js';
 
 // ---------------------------------------------------------------- slug
 
@@ -71,9 +34,22 @@ test('all eight verified titles produce their settled slugs', () => {
 });
 
 test('a title that slugs to nothing falls back to the video id', () => {
-  for (const title of ['Πώς να μάθεις', '日本語のタイトル', '!!! ??? ...']) {
+  for (const title of ['日本語のタイトル', 'Привет мир', '!!! ??? ...']) {
     const transcript = render(track(['Hello.']), { metadata: { ...METADATA, title } });
     assert.equal(transcript.filename, 'o3CX_Y59_74.md', `no fallback for: ${title}`);
+  }
+});
+
+test('a Greek title is romanized into its slug instead of falling back to the video id', () => {
+  const vectors = [
+    ['Πώς να μάθεις AI', 'pos-na-matheis-ai'],
+    ['Συνάντηση ομάδας', 'synantisi-omadas'],
+    ['Ευάγγελος – Weekly sync', 'evangelos-weekly-sync'],
+  ];
+
+  for (const [title, slug] of vectors) {
+    const transcript = render(track(['Hello.']), { metadata: { ...METADATA, title } });
+    assert.equal(transcript.filename, `${slug}.md`, `slug wrong for: ${title}`);
   }
 });
 
@@ -96,7 +72,7 @@ test('a slug retaining under half the title is discarded for the video id', () =
   // The case an emptiness test misses: non-empty, plausible-looking, and it
   // has silently swallowed most of the title. The video id at least admits it.
   const transcript = render(track(['Hello.']), {
-    metadata: { ...METADATA, title: 'Πώς να μάθεις AI' },
+    metadata: { ...METADATA, title: '日本語の AI' },
   });
 
   assert.equal(transcript.filename, 'o3CX_Y59_74.md');
@@ -106,7 +82,7 @@ test('a mostly-latin title keeps its slug even with non-latin words in it', () =
   // The other side of the ratio: retention here is well above half, so falling
   // back would throw away a filename that genuinely describes the video.
   const transcript = render(track(['Hello.']), {
-    metadata: { ...METADATA, title: 'Νέα Skills! v1.2 για agents' },
+    metadata: { ...METADATA, title: '日本語 Skills! v1.2 agents' },
   });
 
   assert.equal(transcript.filename, 'skills-v1-2-agents.md');
@@ -157,7 +133,7 @@ test('the rendered transcript carries what the run reports about the video', () 
 
 // -------------------------------------------------------- frontmatter
 
-test('frontmatter carries exactly the seven keys, in order, with the settled quoting', () => {
+test('frontmatter carries exactly its keys, in order, with the settled quoting', () => {
   const { contents } = render(track(['Hello there.'], { auto: true }));
 
   assert.ok(
@@ -171,6 +147,7 @@ test('frontmatter carries exactly the seven keys, in order, with the settled quo
         'upload_date: 2026-09-10',
         'fetched: 2026-09-16T14:03:05Z',
         'subtitles: auto',
+        'layout: prose',
         '---',
         '',
         '',
@@ -178,6 +155,18 @@ test('frontmatter carries exactly the seven keys, in order, with the settled quo
     ),
     contents.slice(0, 400),
   );
+});
+
+test('the handle and channel id choose the folder and never reach the frontmatter', () => {
+  const plain = render(track(['Hello there.'], { auto: true }));
+  const withHandle = render(track(['Hello there.'], { auto: true }), {
+    metadata: { ...METADATA, uploaderId: '@freecodecamp', channelId: 'UCaaaaaaaaaaaaaaaaaaaaaa' },
+  });
+
+  assert.equal(withHandle.channelFolder, 'freecodecamp');
+  // Byte for byte what the same metadata rendered before folders existed.
+  assert.equal(withHandle.contents, plain.contents);
+  assert.doesNotMatch(withHandle.contents, /uploader|channel_id|UCaaaa|@freecodecamp/);
 });
 
 test('a title containing a quote or a backslash is escaped, not re-quoted', () => {
@@ -222,7 +211,7 @@ test('the body is prose: no heading, no timestamps, no markup', () => {
   assert.ok(!/&(amp|lt|gt|quot|#39);/.test(prose), 'the body carries an undecoded entity');
 });
 
-test('paragraphs are separated by blank lines and break at a sentence end past 100 words', () => {
+test('paragraphs are separated by blank lines and break at a sentence end past 130 words', () => {
   // Ten words per cue, each ending a sentence, and each cue distinct so dedup
   // has nothing to find either way.
   const cues = Array.from(
@@ -233,8 +222,8 @@ test('paragraphs are separated by blank lines and break at a sentence end past 1
   const paragraphs = body(contents).trimEnd().split('\n\n');
 
   assert.equal(paragraphs.length, 2);
-  assert.equal(paragraphs[0].split(' ').length, 100);
-  assert.equal(paragraphs[1].split(' ').length, 50);
+  assert.equal(paragraphs[0].split(' ').length, 130);
+  assert.equal(paragraphs[1].split(' ').length, 20);
   assert.ok(paragraphs[0].endsWith('.'));
 });
 
@@ -301,13 +290,11 @@ test('manual output keeps every sentence the auto dedup heuristic would have eat
 
   // Dialogue echo: k=2, the second speaker's opening word deleted.
   //
-  // The literal lost its two `- ` prefixes when artifact stripping landed:
-  // both cues are line-start speaker markers, and deleting them is this
-  // pipeline's settled behaviour. What the assertion measures is unchanged —
-  // both utterances survive, nothing is deleted — and it reads like an
-  // accidental duplication precisely because the marker is gone. It is not
-  // one, and dedup still never runs on a manual track.
-  assert.ok(warmth.includes('Warmth. Warmth, light.'), 'the two-speaker exchange lost a word');
+  // This track marks enough `- ` turns to be a dialog, so each speaker's reply
+  // is its own turn: the `- ` markers become the em dashes. What the assertion
+  // measures is unchanged — both replies survive, nothing is deleted — and
+  // dedup still never runs on a manual track.
+  assert.ok(warmth.includes('— Warmth.\n\n— Warmth, light.'), 'the two-speaker exchange lost a word');
   // Number split across cues: k=1, a whole magnitude deleted.
   assert.ok(warmth.includes('100 trillion, trillion atoms'), 'the split number lost a magnitude');
   // Rhetorical repeat: k=2, the entire cue erased.
@@ -463,4 +450,67 @@ test('artifacts are stripped before dedup, so repeated boilerplate never feeds t
   );
 
   assert.equal(body(contents).trimEnd(), 'the plan is simple and it works.');
+});
+
+// ------------------------------------------------- named tracks (ADR-0009)
+
+const DTVCC1 = 'en-JkeT_87f4cc';
+const CC1 = 'en-uYU-mmqFLq8';
+
+test('a named track that reads as manual stays manual, minus its speaker markers and sound events', () => {
+  const { contents, trackKind } = render(readNamedFixture(DTVCC1), { trackKey: DTVCC1 });
+  const text = body(contents);
+
+  assert.equal(trackKind, 'manual');
+  assert.match(contents, /^subtitles: manual$/m);
+  // The recorded excerpt opens `>>> All right.` and holds one `[ Applause ]`.
+  assert.match(text, /^All right\. Good morning\./);
+  assert.ok(!text.includes('>'), 'a speaker marker survived');
+  assert.ok(!text.includes('[ Applause ]'), 'a padded sound event survived');
+});
+
+test('a manual track that is not named keeps its markers and sound events, as it always did', () => {
+  // The same recorded track, asked for by a key that is not a named one's.
+  const text = body(render(readNamedFixture(DTVCC1), { trackKey: 'en' }).contents);
+
+  assert.match(text, /^>>> All right\./);
+  assert.ok(text.includes('>> Thank you, Satya.'));
+  assert.equal(text.match(/\[ Applause \]/g).length, 1);
+  // No key at all is not a named one either.
+  assert.match(body(render(readNamedFixture(DTVCC1)).contents), /^>>> All right\./);
+});
+
+test('a named track that reads as auto is cleaned as auto, with no stray angle bracket', () => {
+  const { contents, trackKind } = render(readNamedFixture(CC1), { trackKey: CC1 });
+  const text = body(contents);
+
+  assert.equal(trackKind, 'auto');
+  assert.match(contents, /^subtitles: auto$/m);
+  assert.match(text, /^All right\. Good morning\./);
+  assert.ok(!text.includes('>'), text);
+});
+
+test('a named manual track still skips dedup and keeps a credit-like line', () => {
+  // Kind still decides dedup (ADR-0009), so a repeated cue stays. A line that
+  // reads like a credit is kept for another reason: the named track reads the
+  // auto notation, and that table has no credit rule.
+  const cues = ['Transcriber: Jane Doe', 'Hello there.', 'Hello there.', 'Goodbye now.'];
+  const { contents } = render(track(cues), { trackKey: DTVCC1 });
+
+  assert.equal(body(contents).trimEnd(), 'Transcriber: Jane Doe Hello there. Hello there. Goodbye now.');
+});
+
+test('a named manual track takes the auto notation only: dashes and parentheses are speech', () => {
+  const { contents } = render(track(['- Heat. (Laughter) Warmth.', '&gt;&gt; Light.']), { trackKey: DTVCC1 });
+
+  assert.equal(body(contents).trimEnd(), '- Heat. (Laughter) Warmth. Light.');
+});
+
+test('the auto speaker marker is >> or >>>, removed whole, on a named track as on any auto one', () => {
+  const lines = ['&gt;&gt;&gt; So this is the plan.', '&gt;&gt; It is a good one.', '[ Applause ]'];
+
+  for (const trackKey of [undefined, 'en', CC1]) {
+    const { contents } = render(track(lines, { auto: true }), { trackKey });
+    assert.equal(body(contents).trimEnd(), 'So this is the plan. It is a good one.', trackKey);
+  }
 });
